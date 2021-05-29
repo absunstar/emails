@@ -107,6 +107,11 @@ app.controller('emails', function ($scope, $http) {
     site.showModal('#viewEmailModal');
   };
 
+  $scope.deleteAll = function () {
+    $scope.list.forEach((mail, i) => {
+      $scope.delete(mail);
+    });
+  };
   $scope.delete = function (email) {
     $scope.email = email || $scope.email;
     $scope.busy = true;

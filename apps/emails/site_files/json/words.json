@@ -14,6 +14,7 @@
   { "name": "emails_details", "en": "Email Details", "ar": "تفاصيل رسالة" },
   { "name": "emails_edit", "en": "Edit Email", "ar": "تعديل بيانات رسالة" },
   { "name": "emails_delete", "en": "Delete Email", "ar": "حذف رسالة" },
+  { "name": "emails_delete_all", "en": "Delete All Emails", "ar": "حذف كل رسالة" },
   { "name": "emails_name", "en": "Email Name", "ar": "اسم الرسالة" },
   { "name": "emails_logo", "en": "Email Logo", "ar": "شعار الرسالة" },
   { "name": "emails_img", "en": "Email Images", "ar": "ملفات الرسالة" }

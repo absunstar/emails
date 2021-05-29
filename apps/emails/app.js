@@ -50,10 +50,10 @@ module.exports = function init(site) {
             }
           },
         );
-      }else{
+      } else {
         response.error = err.message;
       }
-      
+
       res.json(response);
     });
   });
@@ -113,11 +113,14 @@ module.exports = function init(site) {
         (err, result) => {
           if (!err) {
             response.done = true;
+          } else {
+            response.error = err.message;
           }
           res.json(response);
         },
       );
     } else {
+      response.error = 'no id';
       res.json(response);
     }
   });

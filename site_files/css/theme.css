@@ -1,0 +1,33 @@
+:root {
+ 
+  --float : right;
+  --direction : rtl;
+  --color: #030303;
+  --background-color: #ffffff;
+  --box-shadow-color: #000;
+  --navbar-color: #fff;
+  --navbar-background-color: #283e4a;
+  --navbar-box-shadow-color: #000;
+  --modal-color: #fff;
+  --modal-header-color: #fff;
+  --modal-footer-color: #fff;
+  --modal-background-color: #607D8B;
+  --modal-header-background-color: #283e4a;
+  --modal-footer-background-color: #607D8B;
+  --modal-box-shadow-color: #191919;
+  --body-color: #030303;
+  --body-background-color: #607D8B;
+  --body-border: 1px solid #353535;
+  --table-color: #030303;
+  --table-background-color: #ffffff;
+  --table-border: 1px solid #bbb;
+  --footer-color: #fff;
+  --footer-background-color: #353535;
+  --btn-color: #ffffff;
+  --btn-background-color: #283e4a;
+  --btn-box-shadow-color: #000;
+  --input-color: #3d768a;
+  --input-background-color: #ffffff;
+  --input-border: 1px solid #9e9e9e;
+  --input-box-shadow-color: #9e9e9e;
+}

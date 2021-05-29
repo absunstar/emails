@@ -1,0 +1,27 @@
+<h2 class="brand">
+    <a href="/"> ##word.brand_title##
+        <span> ##word.brand_tag## </span>
+    </a>
+</h2>
+<a href="#" onclick="$('.links').toggle()" class="mobile-btn" > <i class="fa fa-bars"></i> </a>
+<ul class="links">
+    <li x-features="!login">
+        <a class="bg-green white" ng-click="login()"> ##word.security_login## </a>
+    </li>
+    <li x-features="test">
+        <a ng-click="register()"> ##word.security_register## </a>
+    </li>
+    <li x-features="login">
+        <a class="bg-red white" ng-click="logout()"> ##word.security_logout##
+            <b class=""> ##user.name## </b>
+        </a>
+    </li>
+    <li x-lang="ar">
+        <a class="bold" ng-click="changeLang('en')">
+            <i class="fa fa-globe"></i> ##word.en_lang## </a>
+    </li>
+    <li x-lang="en">
+        <a class="bold" ng-click="changeLang('ar')">
+            <i class="fa fa-globe"></i> ##word.ar_lang## </a>
+    </li>
+</ul>

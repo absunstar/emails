@@ -1,0 +1,8 @@
+[
+   
+    {"name" : "add" , "en" : "Add " , "ar" : "اضافة" },
+    {"name" : "update" , "en" : "Update" , "ar" : "تعديل" },
+    {"name" : "delete" , "en" : "Delete" , "ar" : "حذف" },
+    {"name" : "view" , "en" : "View" , "ar" : "مشاهدة" }
+
+]

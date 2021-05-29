@@ -1,0 +1,13 @@
+[
+    {"name" : "color" , "value" : "#fff"},
+    {"name" : "background-color" , "value" : "#353535"},
+    {"name" : "body-background-color" , "value" : "#191919"},
+    {"name" : "footer-background-color" , "value" : "#353535"},
+    {"name" : "btn-color" , "value" : "#fff"},
+    {"name" : "input-color" , "value" : "#FF9800"},
+    {"name" : "ad-title-color" , "value" : "#607d8b"},
+    {"name" : "modal-color" , "value" : "#FF9800"},
+    {"name" : "btn-background-color" , "value" : "#51801b"},
+    {"name" : "box-shadow-color" , "value" : "#000"},
+    {"name" : "price-color" , "value" : "#ff9800"}
+]

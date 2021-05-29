@@ -1,0 +1,118 @@
+{
+    "countries": [
+      
+        {
+            "id": 2,
+            "name": "Egypt", "ar":"مصر",
+            "selected": true,
+            "regions": [
+                {
+                    "name": "Cairo", "ar":"القاهرة"
+                },
+                {
+                    "name": "Alex", "ar":"الاسكندرية"
+                },
+                {
+                    "name": "Tanta", "ar":"طنطا"
+                }
+            ]
+        },
+        {
+            "name": "Saudi","ar":"السعودية",
+            "regions": [
+                {
+                    "name": "Madina", "ar":"المدينة"
+                },
+                {
+                    "name": "Macca", "ar":"مكة"
+                },
+                {
+                    "name": "Gada", "ar":"جادة"
+                }
+            ]
+        }
+    ],
+    "currencies": [
+        {
+            "name": "USD", "ar":"دولار"
+        },
+        {
+            "name": "EGP", "ar":"جنيه مصرى"
+        }
+    ],
+    "objectives": [
+        {
+            "name": "Sell", "ar":"للبيع"
+        },
+        {
+            "name": "Rent", "ar":"للايجار"
+        },
+        {
+            "name": "Exchange", "ar":"للتبادل"
+        },
+        {
+            "name": "Purchase", "ar":"مطلوب للشراء"
+        }
+    ],
+    "categories": [
+        {
+            "name": "Department", "ar":"عقارات", "brands":[
+                {
+                    "name": "n1", "ar":"شقه"
+                },
+                {
+                    "name": "n2", "ar":"بيت"
+                },
+                {
+                    "name": "n3", "ar":"ارض"
+                },
+                {
+                    "name": "n4", "ar":"عمارة"
+                },
+                {
+                    "name": "n5", "ar":"مكتب"
+                },
+                {
+                    "name": "n6", "ar":"استديو"
+                },
+                {
+                    "name": "n7", "ar":"شاليه" 
+                },
+                {
+                    "name": "n8", "ar":"فله"
+                },
+                {
+                    "name": "n9", "ar":"قصر"
+                }
+            ]
+        },
+        {
+            "name": "Mobile", "ar":"موبيل" , "brands":[
+                {
+                    "name": "Samsung", "ar":"سامسونج"
+                },
+                {
+                    "name": "Apple", "ar":"أبل"
+                },
+                {
+                    "name": "Microsoft", "ar":"مايكروسوفت"
+                },
+                {
+                    "name": "HP", "ar":"اتش بى"
+                },
+                {
+                    "name": "DELL", "ar":"ديل"
+                },
+                {
+                    "name": "Toshiba", "ar":"توشيبا"
+                },
+                {
+                    "name": "LG", "ar":"ال جى"
+                },
+                {
+                    "name": "Lenevo", "ar":"لينفو"
+                }
+            ]
+        }
+    ]
+}

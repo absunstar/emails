@@ -1,0 +1,20 @@
+[
+  { "name": "emails_add", "en": "Add Email", "ar": "اضافة رسالة" },
+  { "name": "emails_search", "en": "Search Email", "ar": "بحث رسالة" },
+  { "name": "user_created", "en": "User Created", "ar": "معلومات الاضافة" },
+  { "name": "user_updated", "en": "User Updated", "ar": "معلومات التعديل" },
+
+  { "name": "emails_from", "en": "From Email", "ar": "من البريد الالكترونى" },
+  { "name": "emails_to", "en": "To Email", "ar": "الى البريد الالكنرونى" },
+  { "name": "emails_message", "en": "Message", "ar": "الرسالة" },
+  { "name": "emails_subject", "en": "Subject", "ar": "عنوان الرسالة" },
+  { "name": "emails_actions", "en": "Actions", "ar": "الخيارات" },
+
+  { "name": "emails_new", "en": "New Email", "ar": "رسالة جديدة" },
+  { "name": "emails_details", "en": "Email Details", "ar": "تفاصيل رسالة" },
+  { "name": "emails_edit", "en": "Edit Email", "ar": "تعديل بيانات رسالة" },
+  { "name": "emails_delete", "en": "Delete Email", "ar": "حذف رسالة" },
+  { "name": "emails_name", "en": "Email Name", "ar": "اسم الرسالة" },
+  { "name": "emails_logo", "en": "Email Logo", "ar": "شعار الرسالة" },
+  { "name": "emails_img", "en": "Email Images", "ar": "ملفات الرسالة" }
+]

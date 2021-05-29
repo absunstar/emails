@@ -1,0 +1,20 @@
+{
+  "name": "smpt-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "dependencies": {
+    "init": "^0.1.2",
+    "mailparser": "^3.0.0",
+    "sendmail": "^1.6.1",
+    "smtp-server": "^3.8.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

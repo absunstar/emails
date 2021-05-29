@@ -1,0 +1,25 @@
+<div ng-hide="busy" class="row">
+  <table class="table border">
+    <tr>
+      <td class="bold">##word.emails_from##</td>
+      <td class="center blue">{{email.from_email}}</td>
+    </tr>
+
+    <tr>
+      <td class="bold">##word.emails_to##</td>
+      <td class="center blue">{{email.to_email}}</td>
+    </tr>
+    <tr>
+      <td class="bold">##word.emails_subject##</td>
+      <td class="center">{{email.subject}}</td>
+    </tr>
+    <tr>
+      <td class="bold">##word.emails_message##</td>
+      <td class="email-message">
+        <div ng-bind-html="email.html || email.textAsHtml"></div>
+      </td>
+    </tr>
+  </table>
+
+  <br />
+</div>

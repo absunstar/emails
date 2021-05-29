@@ -1,0 +1,12 @@
+/* div.selector.un-selected {
+    background: #9E9E9E;
+    border: 1px solid #000;
+    color: #fff;
+} */
+:root {
+  --user-select: inherit;
+}
+.email-message {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}

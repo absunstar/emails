@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" data-ng-app="myApp">
+  <head x-import="head.html"> </head>
+
+  <body class="##session.lang##">
+    <nav x-import="navbar/index.html" class="navbar" data-ng-controller="navbar"></nav>
+
+    <div id="main-layout" class="container">
+      <div class="row">
+        <div class="col" ng-controller="emails">
+          <div x-import="emails/add_modal.html"></div>
+          <div x-import="emails/update_modal.html"></div>
+          <div x-import="emails/delete_modal.html"></div>
+          <div x-import="emails/view_modal.html"></div>
+          <div x-import="emails/search.html"></div>
+
+          <div class="top-actions">
+            <i-button type="add" ng-click="newEmail()" label="##word.emails_new##"></i-button>
+            <i-button type="search" onclick="site.showModal('#SearchModal')" label="##word.search_all##"></i-button>
+          </div>
+
+          <table class="table hover loaded" id="t1">
+            <tr>
+              <th>##word.emails_from##</th>
+              <th>##word.emails_to##</th>
+              <th>##word.emails_subject##</th>
+              <th>##word.emails_actions##</th>
+            </tr>
+            <tr ng-repeat="c in list | filter:search.name" >
+              <td class="bold">
+                {{c.from_email}} <br />
+                <span class="blue"> {{c.date}} </span>
+              </td>
+              <td class="bold">{{c.to_email}}</td>
+              <td class="bold" ng-click="details(c)">
+                {{c.subject}}
+                <p class="green">type : {{c.message_type}} & status : {{c.message_status}}</p>
+              </td>
+              <td class="center">
+                <i-button type="delete" ng-click="delete(c)" label="##word.delete##"></i-button>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div x-import="scripts.html"></div>
+
+    <script x-import="emails/index.js"></script>
+  </body>
+</html>

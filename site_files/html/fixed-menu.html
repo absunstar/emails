@@ -1,0 +1,15 @@
+<div class="fixed-menu row">
+    <ul class="##word.menu_class## ">
+        <li x-permission="!login"><a onclick="site.showModal('#loginModal')"> ##word.login##  </a></li>
+        <li x-permission="!login"><a onclick="site.showModal('#registerModal')"> ##word.owner_register##  </a></li>
+        <li x-permission="login"><a onclick="site.showModal('#logoutModal')"> ##word.logout##  [ ##user.email## ] </a></li>
+
+        <li x-permission="login"><a onclick="site.showModal('#newAdModal')"> ##word.add_new_company## </a></li>
+        <li x-permission="login"><a onclick="site.showModal('#newAdModal')"> ##word.add_new_project## </a></li>
+        <li x-permission="login"><a onclick="site.showModal('#newAdModal')"> ##word.add_new_customer## </a></li>
+        <li x-permission="login"><a onclick="site.showModal('#newAdModal')"> ##word.add_new_sales## </a></li>
+        <li x-permission="login"><a onclick="site.showModal('#newAdModal')"> ##word.add_new_task## </a></li>
+        <li x-permission="login"><a onclick="site.showModal('#newAdModal')"> ##word.add_new_service## </a></li>
+
+    </ul>
+</div>

@@ -1,0 +1,6 @@
+[
+    {"name" : "emails" , "ar" : "ادارة المحافظات" , "en" : "Emails Management"} ,
+    {"name" : "cities" , "ar" : "ادارة المدن" , "en" : "Cities Management"} ,
+    {"name" : "towns" , "ar" : "ادارة القرى" , "en" : "Towns Management"} ,
+    {"name" : "regions" , "ar" : "ادارة المناطق" , "en" : "Regions Management"}
+]

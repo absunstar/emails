@@ -17,7 +17,7 @@ module.exports = function init(site) {
     response.done = false;
     let doc = req.body;
 
-    if (doc.source !== 'isite' || !req.session.user) {
+    if (doc.source !== 'isite' && !req.session.user) {
       res.json(response);
       return;
     }

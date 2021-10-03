@@ -15,13 +15,13 @@ module.exports = function init(site) {
   site.onPOST('/api/emails/add', (req, res) => {
     let response = {};
     response.done = false;
+    let doc = req.body;
 
-    if (!req.session.user) {
+    if (doc.source !== 'isite' || !req.session.user) {
       res.json(response);
       return;
     }
 
-    let doc = req.body;
     doc.message_type = 'send_mail';
     doc.message_status = false;
     doc.date = new Date();

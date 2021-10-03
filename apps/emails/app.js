@@ -12,7 +12,7 @@ module.exports = function init(site) {
     },
   });
 
-  site.onPOST({ name: '/api/emails/add', require: { feauters: [] } }, (req, res) => {
+  site.onPOST({ name: '/api/emails/add', require: { features: [] } }, (req, res) => {
     let response = {};
     response.done = false;
     let doc = req.body;

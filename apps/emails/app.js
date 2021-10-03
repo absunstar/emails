@@ -18,6 +18,7 @@ module.exports = function init(site) {
     let doc = req.body;
 
     if (doc.source !== 'isite' && !req.session.user) {
+      response.error = 'You Are Not Authorized';
       res.json(response);
       return;
     }

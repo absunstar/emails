@@ -174,6 +174,7 @@ module.exports = function init(site) {
       {
         select: req.body.select || {},
         where: req.body.where,
+        limit : req.body.limit
       },
       (err, docs) => {
         if (!err) {

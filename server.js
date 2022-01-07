@@ -12,7 +12,7 @@ const site = require('../isite')({
   port: 60025,
   lang: 'en',
   security: {
-    keys: ['e698f2679be5ba5c9c0b0031cb5b057c' , '9705a3a85c1b21118532fefcee840f99'],
+    keys: ['a2797cd0076d385e86663865dc4d855b'],
   },
   mongodb: {
     db: 'smpt-server',

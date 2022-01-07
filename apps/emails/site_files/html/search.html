@@ -9,8 +9,9 @@
         <form class="form">
           <i-control ng-model="search.from" label="##word.emails_from##" type="text"></i-control>
           <i-control ng-model="search.to" label="##word.emails_to##" type="text"></i-control>
+          <i-control ng-model="search.limit" type="number" label="##word.emails_limit##" ></i-control>
           <div class="row">
-            <i-textarea ng-model="email.message" label="##word.emails_message##"></i-textarea>
+            <i-textarea ng-model="search.message" label="##word.emails_message##"></i-textarea>
           </div>
         </form>
       </div>

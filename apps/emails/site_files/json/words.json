@@ -9,6 +9,7 @@
   { "name": "emails_message", "en": "Message", "ar": "الرسالة" },
   { "name": "emails_subject", "en": "Subject", "ar": "عنوان الرسالة" },
   { "name": "emails_actions", "en": "Actions", "ar": "الخيارات" },
+  { "name": "emails_limit", "en": "Limit", "ar": "عدد الايميلات" },
 
   { "name": "emails_new", "en": "New Email", "ar": "رسالة جديدة" },
   { "name": "emails_details", "en": "Email Details", "ar": "تفاصيل رسالة" },

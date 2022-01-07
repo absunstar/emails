@@ -155,7 +155,7 @@ app.controller('emails', function ($scope, $http) {
         if ($scope.search.message) {
             where['message'] = $scope.search.message;
         }
-        $scope.loadAll(where , search.limit);
+        $scope.loadAll(where , $scope.search.limit);
 
         site.hideModal('#SearchModal');
     };

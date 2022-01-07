@@ -22,9 +22,9 @@
           <i-control ng-model="search" label="Search"></i-control>
           <table class="table hover loaded" id="t1">
             <tr>
-              <th>##word.emails_from## <i-control ng-model="search.from_email"></i-control></th>
-              <th>##word.emails_to## <i-control ng-model="search.to_email"></i-control></th>
-              <th>##word.emails_subject## <i-control ng-model="search.subject"></i-control></th>
+              <th>##word.emails_from## </th>
+              <th>##word.emails_to## </th>
+              <th>##word.emails_subject## </th>
               <th>##word.emails_actions## <i-button type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button></th>
             </tr>
             <tr ng-repeat="c in list | filter:search">

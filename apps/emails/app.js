@@ -7,9 +7,6 @@ module.exports = function init(site) {
     path: __dirname + '/site_files/html/index.html',
     parser: 'html',
     compress: true,
-    require: {
-      permissions: ['login'],
-    },
   });
 
   site.onPOST({ name: '/api/emails/add', require: { features: [] } }, (req, res) => {

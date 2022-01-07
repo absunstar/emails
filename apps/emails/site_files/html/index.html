@@ -5,7 +5,7 @@
   <body class="##session.lang##">
     <nav x-import="navbar/index.html" class="navbar" data-ng-controller="navbar"></nav>
 
-    <div id="main-layout" class="container">
+    <div id="main-layout" class="container" x-permission="login">
       <div class="row">
         <div class="col" ng-controller="emails">
           <div x-import="emails/add_modal.html"></div>
@@ -47,6 +47,6 @@
 
     <div x-import="scripts.html"></div>
 
-    <script x-import="emails/index.js"></script>
+    <script x-import="emails/index.js" x-permission="login"></script>
   </body>
 </html>

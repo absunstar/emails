@@ -143,24 +143,24 @@ app.controller('emails', function ($scope, $http) {
     };
 
     $scope.searchAll = function () {
-        $scope.search = $scope.search || {};
+        $scope.emailSearch = $scope.emailSearch || {};
         let where = {};
 
-        if ($scope.search.from) {
-            where['from'] = $scope.search.from;
+        if ($scope.emailSearch.from) {
+            where['from'] = $scope.emailSearch.from;
         }
-        if ($scope.search.to) {
-            where['to'] = $scope.search.to;
+        if ($scope.emailSearch.to) {
+            where['to'] = $scope.emailSearch.to;
         }
-        if ($scope.search.message) {
-            where['message'] = $scope.search.message;
+        if ($scope.emailSearch.message) {
+            where['message'] = $scope.emailSearch.message;
         }
-        $scope.loadAll(where , $scope.search.limit);
+        $scope.loadAll(where, $scope.emailSearch.limit);
 
         site.hideModal('#SearchModal');
     };
 
-    $scope.loadAll = function (where , limit) {
+    $scope.loadAll = function (where, limit) {
         $scope.busy = true;
         $http({
             method: 'POST',

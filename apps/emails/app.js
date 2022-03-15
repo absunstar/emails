@@ -169,9 +169,9 @@ module.exports = function init(site) {
 
     $emails.findMany(
       {
-        select: req.body.select || {},
-        where: req.body.where,
-        limit : req.body.limit
+        select: req.data.select || {},
+        where: where,
+        limit : req.data.limit
       },
       (err, docs) => {
         if (!err) {

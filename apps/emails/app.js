@@ -153,18 +153,18 @@ module.exports = function init(site) {
       return;
     }
 
-    let where = req.data.where || {};
-
-    if (where['from']) {
-      where['from'] = new RegExp(where['from'], 'i');
+    let user_where = req.data.where || {};
+    let where = {}
+    if (user_where['from']) {
+      where['from_email'] = new RegExp(user_where['from'], 'i');
     }
 
-    if (where['to']) {
-      where['to'] = new RegExp(where['to'], 'i');
+    if (user_where['to']) {
+      where['to_email'] = new RegExp(user_where['to'], 'i');
     }
 
-    if (where['message']) {
-      where['message'] = new RegExp(where['message'], 'i');
+    if (user_where['message']) {
+      where['message'] = new RegExp(user_where['message'], 'i');
     }
 
     $emails.findMany(

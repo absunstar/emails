@@ -1,9 +1,7 @@
-<script src="/x-js/jquery.js"></script>
-<script src="/x-js/angular.js"></script>
-<script src="/x-js/site.js"></script>
+
+<script src="/x-js/all.js"></script>
 
 <script>
-  var app = app || angular.module("myApp", []);
   setTimeout(() => {
         document.querySelectorAll('.loaded').forEach(el => {
             el.style.visibility = 'visible';
@@ -11,7 +9,6 @@
     }, 2000);
 </script>
 
-<script src="/x-js/directive.js"></script>
 <script x-import="app.js"></script>
 <script x-import="navbar.js"></script>
 

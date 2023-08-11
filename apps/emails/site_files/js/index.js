@@ -167,16 +167,7 @@ app.controller('emails', function ($scope, $http) {
             data: {
                 where: where,
                 limit: limit,
-                select: {
-                    id: 1,
-                    date: 1,
-                    from_email: 1,
-                    to_email: 1,
-                    subject: 1,
-                    message: 1,
-                    message_status: 1,
-                    message_type: 1,
-                },
+                select: {},
             },
         }).then(
             function (response) {

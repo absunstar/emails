@@ -29,7 +29,7 @@
               <th>##word.emails_actions## <i-button type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button></th>
             </tr>
             <tr ng-repeat="c in list | filter:search">
-              <td>{{$index + 1}}</td>
+              <td class="bold center">{{$index + 1}}</td>
               <td class="bold">
                 {{c.from}} <br />
                 <span class="blue"> {{c.date}} </span>

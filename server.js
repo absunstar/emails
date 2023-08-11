@@ -66,6 +66,7 @@ const server = new SMTPServer({
         console.error('Error:', err);
       } else {
         try {
+          console.log(parsed);
           parsed.from_email = parsed.from.text;
           parsed.to_email = parsed.to.text;
           parsed.message = parsed.text;

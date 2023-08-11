@@ -20,14 +20,10 @@ module.exports = function init(site) {
       return;
     }
 
-    doc.message_type = 'send_mail';
-    doc.message_status = false;
+    doc.folder = 'sending';
     doc.date = new Date();
     doc.guid = new Date().getTime();
-    doc.$req = req;
-    doc.$res = res;
-
-    doc._created = site.security.getUserFinger({ $req: req, $res: res });
+    doc._created = req.getUserFinger();
 
     $emails.add(doc, (err, new_doc) => {
       if (!err) {
@@ -35,15 +31,15 @@ module.exports = function init(site) {
 
         sendmail(
           {
-            from: doc.from_email,
-            to: doc.to_email,
+            from: doc.from,
+            to: doc.to,
             subject: doc.subject,
-            html: doc.message,
+            html: doc.html,
           },
           function (err, reply) {
             if (err) {
             } else {
-              new_doc.message_status = true;
+              new_doc.folder = 'send';
               $emails.update(new_doc);
             }
           },

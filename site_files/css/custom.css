@@ -9,9 +9,9 @@
   --scrollbar-box-shadow: inset 0 0 6px #000000;
 }
 body {
-  user-select: all;
-  -webkit-user-select: all;
-  -moz-user-select: all;
+  user-select: auto;
+  -webkit-user-select: auto;
+  -moz-user-select: auto;
 }
 
 .fa-social {

@@ -35,9 +35,9 @@ body {
     color:  var(--color);
     background-color:  var(--body-background-color);
     zoom: 90%;
-    /* user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none; */
+    user-select: all;
+    -webkit-user-select: all;
+    -moz-user-select: all;
 }
 h1,h2{
     font-weight: normal;

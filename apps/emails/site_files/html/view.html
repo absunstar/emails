@@ -1,5 +1,5 @@
 <div ng-hide="busy" class="row">
-  <table class="table border">
+  <table class="table">
     <tr>
       <td class="bold">##word.From##</td>
       <td class="center blue">{{email.from}}</td>
@@ -15,8 +15,8 @@
     </tr>
     <tr>
       <td class="bold">##word.Message##</td>
-      <td class="email-message">
-        <div class=""> {{email.html}}</div>
+      <td>
+        <div ng-bind-html="email.html"></div>
       </td>
     </tr>
   </table>

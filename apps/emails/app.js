@@ -42,7 +42,7 @@ module.exports = function init(site) {
               new_doc.folder = 'send';
               $emails.update(new_doc);
             }
-          },
+          }
         );
       } else {
         response.error = err.message;
@@ -80,7 +80,7 @@ module.exports = function init(site) {
             response.error = err.message;
           }
           res.json(response);
-        },
+        }
       );
     } else {
       res.json(response);
@@ -111,7 +111,7 @@ module.exports = function init(site) {
             response.error = err.message;
           }
           res.json(response);
-        },
+        }
       );
     } else {
       response.error = 'no id';
@@ -136,7 +136,7 @@ module.exports = function init(site) {
           response.error = err.message;
         }
         res.json(response);
-      },
+      }
     );
   });
 
@@ -150,24 +150,24 @@ module.exports = function init(site) {
     }
 
     let user_where = req.data.where || {};
-    let where = {}
+    let where = {};
     if (user_where['from']) {
-      where['from_email'] = new RegExp(user_where['from'], 'i');
+      where['from'] = new RegExp(user_where['from'], 'i');
     }
 
     if (user_where['to']) {
-      where['to_email'] = new RegExp(user_where['to'], 'i');
+      where['to'] = new RegExp(user_where['to'], 'i');
     }
 
     if (user_where['message']) {
-      where['message'] = new RegExp(user_where['message'], 'i');
+      where['html'] = new RegExp(user_where['message'], 'i');
     }
 
     $emails.findMany(
       {
         select: req.data.select || {},
         where: where,
-        limit : req.data.limit
+        limit: req.data.limit,
       },
       (err, docs) => {
         if (!err) {
@@ -177,7 +177,7 @@ module.exports = function init(site) {
           response.error = err.message;
         }
         res.json(response);
-      },
+      }
     );
   });
 };

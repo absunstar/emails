@@ -3,9 +3,6 @@ app.controller('emails', function ($scope, $http) {
 
     $scope.newEmail = function () {
         $scope.error = '';
-        $scope.email = {
-            image_url: '/images/email.png',
-        };
         site.showModal('#addEmailModal');
     };
 
@@ -41,7 +38,6 @@ app.controller('emails', function ($scope, $http) {
     $scope.edit = function (email) {
         $scope.error = '';
         $scope.view(email);
-        $scope.email = {};
         site.showModal('#updateEmailModal');
     };
 
@@ -73,7 +69,6 @@ app.controller('emails', function ($scope, $http) {
 
     $scope.remove = function (email) {
         $scope.view(email);
-        $scope.email = {};
         site.showModal('#deleteEmailModal');
     };
 
@@ -102,7 +97,6 @@ app.controller('emails', function ($scope, $http) {
 
     $scope.details = function (email) {
         $scope.view(email);
-        $scope.email = {};
         site.showModal('#viewEmailModal');
     };
 
@@ -152,7 +146,7 @@ app.controller('emails', function ($scope, $http) {
             where['to'] = $scope.emailSearch.to;
         }
         if ($scope.emailSearch.message) {
-            where['message'] = $scope.emailSearch.message;
+            where['html'] = $scope.emailSearch.message;
         }
         $scope.loadAll(where, $scope.emailSearch.limit);
 

@@ -1,55 +1,55 @@
 <!DOCTYPE html>
 <html lang="en" data-ng-app="myApp">
-    <head x-import="head.html"> </head>
+  <head x-import="head.html"> </head>
 
-    <body class="##session.lang##">
-        <nav x-import="navbar/index.html" class="sitebar" data-ng-controller="navbar"></nav>
+  <body class="##session.lang##">
+    <nav x-import="navbar/index.html" class="sitebar" data-ng-controller="navbar"></nav>
 
-        <div id="main-layout" class="container" x-permission="login">
-            <div class="row">
-                <div class="col" ng-controller="emails">
-                    <div x-import="emails/add_modal.html"></div>
-                    <div x-import="emails/update_modal.html"></div>
-                    <div x-import="emails/delete_modal.html"></div>
-                    <div x-import="emails/view_modal.html"></div>
-                    <div x-import="emails/search.html"></div>
+    <div id="main-layout" class="container" x-permission="login">
+      <div class="row">
+        <div class="col" ng-controller="emails">
+          <div x-import="emails/add_modal.html"></div>
+          <div x-import="emails/update_modal.html"></div>
+          <div x-import="emails/delete_modal.html"></div>
+          <div x-import="emails/view_modal.html"></div>
+          <div x-import="emails/search.html"></div>
 
-                    <div class="top-actions">
-                        <i-button type="add" ng-click="newEmail()" label="##word.emails_new##"></i-button>
-                        <i-button type="search" onclick="site.showModal('#SearchModal')" label="##word.search_all##"></i-button>
-                    </div>
+          <div class="top-actions">
+            <i-button type="add" ng-click="newEmail()" label="##word.emails_new##"></i-button>
+            <i-button type="search" onclick="site.showModal('#SearchModal')" label="##word.search_all##"></i-button>
+          </div>
 
-                    <i-control ng-model="search" label="Search"></i-control>
-                    <table class="table hover loaded" id="t1">
-                        <tr>
-                            <th>Index</th>
-                            <th>##word.emails_from##</th>
-                            <th>##word.emails_to##</th>
-                            <th>##word.emails_subject##</th>
-                            <th>##word.emails_actions## <i-button type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button></th>
-                        </tr>
-                        <tr ng-repeat="c in list | filter:search">
-                            <td>{{$index + 1}}</td>
-                            <td class="bold">
-                                {{c.from_email}} <br />
-                                <span class="blue"> {{c.date}} </span>
-                            </td>
-                            <td class="bold">{{c.to_email}}</td>
-                            <td class="bold" ng-click="details(c)">
-                                {{c.subject}}
-                                <p class="green">type : {{c.message_type}} & status : {{c.message_status}}</p>
-                            </td>
-                            <td class="center">
-                                <i-button type="delete" ng-click="delete(c)" label="##word.emails_delete##"></i-button>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
+          <i-control ng-model="search" label="Search"></i-control>
+          <table class="table hover loaded" id="t1">
+            <tr>
+              <th>Index</th>
+              <th>##word.emails_from##</th>
+              <th>##word.emails_to##</th>
+              <th>##word.emails_subject##</th>
+              <th>##word.emails_actions## <i-button type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button></th>
+            </tr>
+            <tr ng-repeat="c in list | filter:search">
+              <td>{{$index + 1}}</td>
+              <td class="bold">
+                {{c.from}} <br />
+                <span class="blue"> {{c.date}} </span>
+              </td>
+              <td class="bold">{{c.to}}</td>
+              <td class="bold" ng-click="details(c)">
+                {{c.subject}}
+                <p class="green">Folder : {{c.folder}}</p>
+              </td>
+              <td class="center">
+                <i-button type="delete" ng-click="delete(c)" label="##word.emails_delete##"></i-button>
+              </td>
+            </tr>
+          </table>
         </div>
+      </div>
+    </div>
 
-        <div x-import="scripts.html"></div>
+    <div x-import="scripts.html"></div>
 
-        <script x-import="emails/index.js" x-permission="login"></script>
-    </body>
+    <script x-import="emails/index.js" x-permission="login"></script>
+  </body>
 </html>

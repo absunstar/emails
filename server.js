@@ -66,15 +66,17 @@ const server = new SMTPServer({
         console.error('Error:', err);
       } else {
         try {
-          console.log(parsed);
-          parsed.from_email = parsed.from.text;
-          parsed.to_email = parsed.to.text;
-          parsed.message = parsed.text;
-          parsed.mail_date = new Date(parsed.date);
-          parsed.guid = site.md5(parsed.messageId || parsed.date + parsed.from_email + parsed.to_email + parsed.subject);
-          parsed.message_type = 'recived_mail';
-          parsed.message_status = true;
-          $emails.add(parsed, (err, docs) => {
+          let message = {};
+
+          message.folder = 'inbox';
+          message.subject = parsed.subject;
+          message.from = parsed.from.text;
+          message.to = parsed.to.text;
+          message.date = new Date(parsed.date);
+          message.text = parsed.text;
+          message.html = parsed.html;
+          message.guid = parsed.messageId || site.md5(message.date + message.subject + message.from + message.to);
+          $emails.add(message, (err, docs) => {
             if (err) {
               console.error('Error:', err.message);
             }

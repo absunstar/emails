@@ -1,22 +1,22 @@
 <div ng-hide="busy" class="row">
   <table class="table border">
     <tr>
-      <td class="bold">##word.emails_from##</td>
+      <td class="bold">##word.From##</td>
       <td class="center blue">{{email.from}}</td>
     </tr>
 
     <tr>
-      <td class="bold">##word.emails_to##</td>
+      <td class="bold">##word.To##</td>
       <td class="center blue">{{email.to}}</td>
     </tr>
     <tr>
-      <td class="bold">##word.emails_subject##</td>
+      <td class="bold">##word.Subject##</td>
       <td class="center">{{email.subject}}</td>
     </tr>
     <tr>
-      <td class="bold">##word.emails_message##</td>
+      <td class="bold">##word.Message##</td>
       <td class="email-message">
-        <i-content ng-model="email.html"></i-content>
+        <div class=""> {{email.html}}</div>
       </td>
     </tr>
   </table>

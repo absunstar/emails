@@ -3,6 +3,7 @@ app.controller('emails', function ($scope, $http) {
 
     $scope.newEmail = function () {
         $scope.error = '';
+        $scope.email = {};
         site.showModal('#addEmailModal');
     };
 
@@ -24,7 +25,7 @@ app.controller('emails', function ($scope, $http) {
                 $scope.busy = false;
                 if (response.data.done) {
                     site.hideModal('#addEmailModal');
-                    $scope.loadAll();
+                    $scope.list.push(response.data.doc);
                 } else {
                     $scope.error = '##word.error##';
                 }
@@ -74,6 +75,7 @@ app.controller('emails', function ($scope, $http) {
 
     $scope.view = function (email) {
         $scope.busy = true;
+        $scope.currentEmail = {};
         $http({
             method: 'POST',
             url: '/api/emails/view',
@@ -84,7 +86,7 @@ app.controller('emails', function ($scope, $http) {
             function (response) {
                 $scope.busy = false;
                 if (response.data.done) {
-                    $scope.email = response.data.doc;
+                    $scope.currentEmail = response.data.doc;
                 } else {
                     $scope.error = response.data.error;
                 }
@@ -106,14 +108,13 @@ app.controller('emails', function ($scope, $http) {
         });
     };
     $scope.delete = function (email) {
-        $scope.email = email || $scope.email;
         $scope.busy = true;
         $http({
             method: 'POST',
             url: '/api/emails/delete',
             data: {
-                id: $scope.email.id,
-                name: $scope.email.name,
+                id: email.id,
+                name: email.name,
             },
         }).then(
             function (response) {

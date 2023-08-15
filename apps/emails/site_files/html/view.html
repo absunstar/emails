@@ -2,21 +2,21 @@
   <table class="table">
     <tr>
       <td class="bold">##word.From##</td>
-      <td class="center blue">{{email.from}}</td>
+      <td class="center blue">{{currentEmail.from}}</td>
     </tr>
 
     <tr>
       <td class="bold">##word.To##</td>
-      <td class="center blue">{{email.to}}</td>
+      <td class="center blue">{{currentEmail.to}}</td>
     </tr>
     <tr>
       <td class="bold">##word.Subject##</td>
-      <td class="center">{{email.subject}}</td>
+      <td class="center">{{currentEmail.subject}}</td>
     </tr>
     <tr>
       <td class="bold">##word.Message##</td>
       <td>
-        <div ng-bind-html="email.html || email.text"></div>
+        <div ng-bind-html="currentEmail.html || currentEmail.text"></div>
       </td>
     </tr>
   </table>

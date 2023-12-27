@@ -74,7 +74,8 @@ app.controller('emails', function ($scope, $http) {
   };
 
   function replaceIframeContent(iframeElement, newHTML) {
-    iframeElement.srcdoc = newHTML;
+    var blob = new Blob([newHTML], { type: 'text/html; charset=utf-8' });
+    iframeElement.src = URL.createObjectURL(blob);
   }
 
   $scope.view = function (email) {

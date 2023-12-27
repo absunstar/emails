@@ -95,6 +95,7 @@ app.controller('emails', function ($scope, $http) {
         if (response.data.done) {
           $scope.currentEmail = response.data.doc;
           $scope.currentEmail.html = $scope.currentEmail.html || $scope.currentEmail.text;
+          console.log($scope.currentEmail.html);
           replaceIframeContent(document.querySelector('#iframe-message'), $scope.currentEmail.html);
         } else {
           $scope.error = response.data.error;

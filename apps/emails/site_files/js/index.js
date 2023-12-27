@@ -88,7 +88,7 @@ app.controller('emails', function ($scope, $http) {
         if (response.data.done) {
           $scope.currentEmail = response.data.doc;
           $scope.currentEmail.html = $scope.currentEmail.html || $scope.currentEmail.text;
-          document.querySelector('#iframe-message').src = 'data:text/html;charset=utf-8,' + escape($scope.currentEmail.html);
+          document.querySelector('#iframe-message').src = 'data:text/html;charset=utf-8,' + $scope.currentEmail.html;
         } else {
           $scope.error = response.data.error;
         }

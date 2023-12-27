@@ -73,6 +73,13 @@ app.controller('emails', function ($scope, $http) {
     site.showModal('#deleteEmailModal');
   };
 
+  function replaceIframeContent(iframeElement, newHTML) {
+    iframeElement.src = 'about:blank';
+    iframeElement.contentWindow.document.open();
+    iframeElement.contentWindow.document.write(newHTML);
+    iframeElement.contentWindow.document.close();
+  }
+
   $scope.view = function (email) {
     $scope.busy = true;
     $scope.currentEmail = {};
@@ -88,7 +95,7 @@ app.controller('emails', function ($scope, $http) {
         if (response.data.done) {
           $scope.currentEmail = response.data.doc;
           $scope.currentEmail.html = $scope.currentEmail.html || $scope.currentEmail.text;
-          document.querySelector('#iframe-message').src = 'data:text/html;charset=utf-8,' + $scope.currentEmail.html;
+          replaceIframeContent(document.querySelector('#iframe-message'), $scope.currentEmail.html);
         } else {
           $scope.error = response.data.error;
         }

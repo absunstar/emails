@@ -1,5 +1,5 @@
 <div ng-hide="busy" class="row">
-  <table class="table hover">
+  <table class="table border">
     <tr>
       <td class="bold">##word.From##</td>
       <td class="center blue">{{currentEmail.from}}</td>
@@ -16,8 +16,7 @@
     <tr>
       <td class="bold">##word.Message##</td>
       <td>
-        <div>{{currentEmail.text}}</div>
-        <iframe sandbox id="iframe-message" frameborder="0"></iframe>
+        <div id="div-message">{{currentEmail.text}}</div>
       </td>
     </tr>
   </table>

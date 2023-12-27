@@ -1,5 +1,5 @@
 <div ng-hide="busy" class="row">
-  <table class="table">
+  <table class="table hover">
     <tr>
       <td class="bold">##word.From##</td>
       <td class="center blue">{{currentEmail.from}}</td>
@@ -16,7 +16,7 @@
     <tr>
       <td class="bold">##word.Message##</td>
       <td>
-        <i-content ng-model="currentEmail.text" label="##word.Message##"></i-content>
+        <div ng-bind="currentEmail.html" contenteditable="true"></div>
       </td>
     </tr>
   </table>

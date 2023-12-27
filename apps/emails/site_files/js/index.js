@@ -74,8 +74,7 @@ app.controller('emails', function ($scope, $http) {
   };
 
   function replaceIframeContent(iframeElement, newHTML) {
-    var blob = new Blob([newHTML], { type: 'text/html; charset=utf-8' });
-    iframeElement.src = URL.createObjectURL(blob);
+    iframeElement.srcdoc = newHTML;
   }
 
   $scope.view = function (email) {
@@ -93,7 +92,6 @@ app.controller('emails', function ($scope, $http) {
         if (response.data.done) {
           $scope.currentEmail = response.data.doc;
           $scope.currentEmail.html = $scope.currentEmail.html || $scope.currentEmail.text;
-          console.log($scope.currentEmail.html);
           replaceIframeContent(document.querySelector('#iframe-message'), $scope.currentEmail.html);
         } else {
           $scope.error = response.data.error;

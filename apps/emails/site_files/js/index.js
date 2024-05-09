@@ -182,6 +182,4 @@ app.controller('emails', function ($scope, $http) {
       }
     );
   };
-
-  $scope.loadAll();
 });

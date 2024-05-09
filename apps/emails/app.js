@@ -9,6 +9,13 @@ module.exports = function init(site) {
     compress: true,
   });
 
+  site.onGET({
+    name: 'free',
+    path: __dirname + '/site_files/html/free.html',
+    parser: 'html',
+    compress: true,
+  });
+
   site.onPOST({ name: '/api/emails/add', require: { features: [] } }, (req, res) => {
     let response = {};
     response.done = false;

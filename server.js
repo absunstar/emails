@@ -12,6 +12,10 @@ const site = require('../isite')({
   port: 60025,
   lang: 'en',
   version: new Date().getTime(),
+  require: {
+    features: [],
+    permissions: [],
+  },
   security: {
     keys: ['a2797cd0076d385e86663865dc4d855b'],
   },

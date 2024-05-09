@@ -141,7 +141,7 @@ app.controller('emails', function ($scope, $http) {
     );
   };
 
-  $scope.searchAll = function () {
+  $scope.searchAll = function (free = false) {
     $scope.emailSearch = $scope.emailSearch || {};
     let where = {};
 
@@ -153,6 +153,11 @@ app.controller('emails', function ($scope, $http) {
     }
     if ($scope.emailSearch.message) {
       where['html'] = $scope.emailSearch.message;
+    }
+
+    if (free && $scope.emailSearch.to.length < 8) {
+      alert('Email Length Must be 8 letter or more ...');
+      return;
     }
     $scope.loadAll(where, $scope.emailSearch.limit);
 

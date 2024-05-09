@@ -5,14 +5,14 @@
   <body class="##session.lang##">
     <nav x-import="navbar/index.html" class="sitebar" data-ng-controller="navbar"></nav>
 
-    <div id="main-layout" class="container" >
+    <div id="main-layout" class="container">
       <div class="row">
         <div class="col" ng-controller="emails">
           <div x-import="emails/view_modal.html"></div>
 
           <div class="row">
             <i-control class="col4" ng-model="emailSearch.to" label="##word.Write Your Email##" type="text"></i-control>
-            <i-button class="col3 search" type="search" ng-click="searchAll()" label="##word.Load Emails##"></i-button>
+            <i-button class="col3 search" type="search" ng-click="searchAll(true)" label="##word.Load Emails##"></i-button>
           </div>
 
           <i-control ng-model="search" label="Filter Emails"></i-control>
@@ -46,6 +46,6 @@
 
     <div x-import="scripts.html"></div>
 
-    <script x-import="emails/index.js" ></script>
+    <script x-import="emails/index.js"></script>
   </body>
 </html>

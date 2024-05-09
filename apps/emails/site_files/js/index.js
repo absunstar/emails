@@ -1,6 +1,6 @@
 app.controller('emails', function ($scope, $http) {
   $scope.email = {};
-
+  $scope.emailSearch = { to: '', from: '' };
   $scope.newEmail = function () {
     $scope.error = '';
     $scope.email = {};
@@ -142,7 +142,6 @@ app.controller('emails', function ($scope, $http) {
   };
 
   $scope.searchAll = function (free = false) {
-    $scope.emailSearch = $scope.emailSearch || {};
     let where = {};
 
     if ($scope.emailSearch.from) {

@@ -151,11 +151,7 @@ module.exports = function init(site) {
     let response = {};
     response.done = false;
 
-    if (!req.session.user) {
-      res.json(response);
-      return;
-    }
-
+  
     let user_where = req.data.where || {};
     let where = {};
     if (user_where['from']) {

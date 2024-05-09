@@ -613,8 +613,9 @@ i-image img:hover {
 }
 
 fieldset {
-  margin: 15px !important;
-  padding: 0 5px 5px !important;
+  margin: 15px;
+  padding: 10px;
+  margin-bottom: 50px;
   border-radius: 0px;
 }
 legend {

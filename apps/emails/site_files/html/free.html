@@ -22,8 +22,8 @@
             <i-control ng-model="search" label="Filter Messages"></i-control>
 
             <i-button type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
-            <div class="row padding margin">
-              <div class="col4" ng-repeat="c in list | filter:search" ng-click="details(c)">
+            <div class="row">
+              <div class="col4 border padding margin pointer" ng-repeat="c in list | filter:search" ng-click="details(c)">
                 <h2>{{$index + 1}}</h2>
                 <p class="blue center">{{c.from}}</p>
                 <p class="bold center">{{c.subject}}</p>

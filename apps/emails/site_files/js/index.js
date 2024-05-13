@@ -204,6 +204,10 @@ app.controller('emails', function ($scope, $http) {
   };
 
   $scope.copy = function () {
-    navigator.clipboard.writeText($scope.emailSearch.to);
+    if (window.SOCIALBROWSER) {
+      SOCIALBROWSER.copy($scope.emailSearch.to);
+    } else {
+      navigator.clipboard.writeText($scope.emailSearch.to);
+    }
   };
 });

@@ -189,7 +189,7 @@ app.controller('emails', function ($scope, $http) {
 
   function makeid(length) {
     let result = '';
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
     const charactersLength = characters.length;
     let counter = 0;
     while (counter < length) {
@@ -200,6 +200,6 @@ app.controller('emails', function ($scope, $http) {
   }
 
   $scope.generateEmail = function () {
-    $scope.emailSearch.to = makeid(8) + '@egytag.com';
+    $scope.emailSearch.to = makeid(10) + '@egytag.com';
   };
 });

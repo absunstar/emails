@@ -154,7 +154,7 @@ app.controller('emails', function ($scope, $http) {
       where['html'] = $scope.emailSearch.message;
     }
 
-    if (free && $scope.emailSearch.to.length < 8) {
+    if (free && $scope.emailSearch.to.split('@')[0].length < 8) {
       alert('Email Length Must be 8 letter or more ...');
       return;
     }

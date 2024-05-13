@@ -202,4 +202,8 @@ app.controller('emails', function ($scope, $http) {
   $scope.generateEmail = function () {
     $scope.emailSearch.to = makeid(10) + '@egytag.com';
   };
+
+  $scope.copy = function () {
+    navigator.clipboard.writeText($scope.emailSearch.to);
+  };
 });

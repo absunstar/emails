@@ -204,9 +204,9 @@ module.exports = function init(site) {
       },
       (err, doc) => {
         if (!err && doc) {
-          res.html(doc.html || doc.text);
+          res.sendHTML(doc.html || doc.text);
         } else {
-          res.html('<h1> Email Not Exists</h1>');
+          res.sendTEXT('<h1> Email Not Exists</h1>');
         }
       }
     );

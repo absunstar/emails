@@ -187,9 +187,6 @@ app.controller('emails', function ($scope, $http) {
       function (response) {
         $scope.busy = false;
         if (response.data.done) {
-          response.data.list.forEach((email) => {
-            email.date = new Date(email.date);
-          });
           $scope.list = response.data.list;
         }
       },

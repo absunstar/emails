@@ -1,20 +1,34 @@
 <div id="deleteEmailModal" class="modal">
-
-    <div class="modal-content">
-        <div class="modal-header">
-            <span class="close">&times;</span>
-            <h2>
-                ##word.emails_delete## <i class="fa fa-trash"></i>
-            </h2>
-        </div>
-        <div class="modal-body">
-            <div x-import="emails/view.html"></div>
-
-            <h2>{{error}}</h2>
-            <div class="modal-footer center">
-                <i-button type="delete" ng-click="delete(gov)" label="##word.delete##"></i-button>
-                <i-button type="close" onclick="site.hideModal('#deleteEmailModal')" label="##word.close##"></i-button>
-            </div>
-        </div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <span class="close">&times;</span>
+      <h2>##word.emails_delete## <i class="fa fa-trash"></i></h2>
     </div>
+    <div class="modal-body">
+      <div ng-hide="busy" class="row">
+        <table class="table border">
+          <tr>
+            <td class="bold">##word.From##</td>
+            <td class="center blue">{{currentEmail.from}}</td>
+          </tr>
+
+          <tr>
+            <td class="bold">##word.To##</td>
+            <td class="center blue">{{currentEmail.to}}</td>
+          </tr>
+          <tr>
+            <td class="bold">##word.Subject##</td>
+            <td class="center">{{currentEmail.subject}}</td>
+          </tr>
+        </table>
+
+        <br />
+      </div>
+      <h2>{{error}}</h2>
+      <div class="modal-footer center">
+        <i-button type="delete" ng-click="delete(gov)" label="##word.delete##"></i-button>
+        <i-button type="close" onclick="site.hideModal('#deleteEmailModal')" label="##word.close##"></i-button>
+      </div>
+    </div>
+  </div>
 </div>

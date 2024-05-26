@@ -1,24 +1,17 @@
 <div ng-hide="busy" class="row">
-  <table class="table border">
-    <tr>
-      <td class="bold">##word.From##</td>
-      <td class="center blue">{{currentEmail.from}}</td>
-    </tr>
-
-    <tr>
-      <td class="bold">##word.To##</td>
-      <td class="center blue">{{currentEmail.to}}</td>
-    </tr>
-    <tr>
-      <td class="bold">##word.Subject##</td>
-      <td class="center">{{currentEmail.subject}}</td>
-    </tr>
-    <tr>
-      <td colspan="2">
-        <iframe id="div-message"></iframe>
-      </td>
-    </tr>
-  </table>
-
-  <br />
+  <div class="row padding margin">
+    <div class="col3"><p class="bold">##word.From##</p></div>
+    <div class="col9"><p class="blue">{{currentEmail.from}}</p></div>
+  </div>
+  <div class="row padding margin">
+    <div class="col3"><p class="bold">##word.To##</p></div>
+    <div class="col9"><p class="blue">{{currentEmail.to}}</p></div>
+  </div>
+  <div class="row padding margin">
+    <div class="col3"><p class="bold">##word.Subject##</p></div>
+    <div class="col9"><p class="blue">{{currentEmail.subject}}</p></div>
+  </div>
+  <div class="row border">
+    <iframe id="div-message"></iframe>
+  </div>
 </div>

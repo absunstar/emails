@@ -29,7 +29,7 @@
             <div class="row">
               <div class="col4 padding" ng-repeat="c in list | filter:search" ng-click="details(c)">
                 <div class="border pointer">
-                  <h2>{{$index + 1}}</h2>
+                  <p class="bold bg-blue white font-xx-large border-radius padding">{{$index + 1}}</p>
                   <p class="blue center">{{c.from}}</p>
                   <p class="bold center">{{c.subject}}</p>
                   <i-button type="delete" ng-click="delete(c)" label="##word.emails_delete##"></i-button>

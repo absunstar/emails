@@ -191,7 +191,7 @@ module.exports = function init(site) {
     );
   });
 
-  site.onGET('/viewEmail', (req, res) => {
+  site.onGET({ name: '/viewEmail' }, (req, res) => {
     $emails.find(
       {
         where: {

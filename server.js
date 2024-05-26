@@ -74,8 +74,8 @@ const server = new SMTPServer({
 
           message.folder = 'inbox';
           message.subject = parsed.subject;
-          message.from = parsed.from.text;
-          message.to = parsed.to.text;
+          message.from = parsed.from?.text;
+          message.to = parsed.to?.text;
           message.date = new Date(parsed.date);
           message.text = parsed.text;
           message.html = parsed.html;

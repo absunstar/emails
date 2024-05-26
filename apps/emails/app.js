@@ -135,6 +135,13 @@ module.exports = function init(site) {
         where: {
           id: req.body.id,
         },
+        select : {
+          id : 1,
+          subject : 1,
+          from : 1,
+          to : 1,
+          folder : 1,
+        }
       },
       (err, doc) => {
         if (!err) {

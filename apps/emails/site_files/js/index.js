@@ -91,8 +91,7 @@ app.controller('emails', function ($scope, $http) {
         $scope.busy = false;
         if (response.data.done) {
           $scope.currentEmail = response.data.doc;
-          $scope.currentEmail.html = $scope.currentEmail.html || $scope.currentEmail.text;
-          document.querySelector('#div-message').src = 'data:text/html;charset=utf-8,' + $scope.currentEmail.html;
+          document.querySelector('#div-message').src = '//' + document.location.hostname + '/viewEmail?id=' + $scope.currentEmail.id;
         } else {
           $scope.error = response.data.error;
         }

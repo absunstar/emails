@@ -22,10 +22,12 @@
 
           <fieldset>
             <legend>##word.Messages##</legend>
+            <div class="row">
+              <i-control ng-model="search" label="Filter Messages"></i-control>
 
-            <i-control ng-model="search" label="Filter Messages"></i-control>
+              <i-button type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
+            </div>
 
-            <i-button type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
             <div class="row">
               <div class="col4 padding" ng-repeat="c in list | filter:search" ng-click="details(c)">
                 <div class="border pointer">

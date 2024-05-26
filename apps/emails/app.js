@@ -3,16 +3,17 @@ module.exports = function init(site) {
   const $emails = site.connectCollection('emails');
 
   site.onGET({
-    name: 'emails',
+    name: 'admin',
     path: __dirname + '/site_files/html/index.html',
-    parser: 'html',
+    parser: 'html css js',
     compress: true,
+    require: { features: ['browser.social'] },
   });
 
   site.onGET({
-    name: 'free',
+    name: ['', 'free', 'vip'],
     path: __dirname + '/site_files/html/free.html',
-    parser: 'html',
+    parser: 'html css js',
     compress: true,
   });
 
@@ -151,7 +152,6 @@ module.exports = function init(site) {
     let response = {};
     response.done = false;
 
-  
     let user_where = req.data.where || {};
     let where = {};
     if (user_where['from']) {

@@ -143,6 +143,10 @@ app.controller('emails', function ($scope, $http) {
 
   $scope.searchAll = function (free = false) {
     let where = {};
+    let minEmailLength = 8;
+    if ('##req.url##'.indexOf('vip') !== -1) {
+      minEmailLength = 1;
+    }
 
     if ($scope.emailSearch.from) {
       where['from'] = $scope.emailSearch.from;
@@ -154,9 +158,15 @@ app.controller('emails', function ($scope, $http) {
       where['html'] = $scope.emailSearch.message;
     }
 
-    if (free && $scope.emailSearch.to.split('@')[0].length < 8) {
-      alert('Email Length Must be 8 letter or more ...');
-      return;
+    if (free) {
+      if (!$scope.emailSearch.to || $scope.emailSearch.to.indexOf('@') === -1) {
+        alert('Email Must include @ ');
+        return;
+      }
+      if (!$scope.emailSearch.to || $scope.emailSearch.to.split('@')[0].length < minEmailLength) {
+        alert('Email Length Must be 8 letter or more ...');
+        return;
+      }
     }
     $scope.loadAll(where, $scope.emailSearch.limit);
 

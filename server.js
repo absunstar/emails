@@ -105,12 +105,6 @@ server.on('error', (err) => {
 server.listen(25);
 
 site.onGET({
-  name: '/',
-  path: site.dir + '/html/index.html',
-  parser: 'html css js',
-});
-
-site.onGET({
   name: '/js',
   path: site.dir + '/js',
 });

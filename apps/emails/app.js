@@ -135,13 +135,13 @@ module.exports = function init(site) {
         where: {
           id: req.body.id,
         },
-        select : {
-          id : 1,
-          subject : 1,
-          from : 1,
-          to : 1,
-          folder : 1,
-        }
+        select: {
+          id: 1,
+          subject: 1,
+          from: 1,
+          to: 1,
+          folder: 1,
+        },
       },
       (err, doc) => {
         if (!err) {
@@ -187,6 +187,27 @@ module.exports = function init(site) {
           response.error = err.message;
         }
         res.json(response);
+      }
+    );
+  });
+
+  site.onGET('/viewEmails', (req, res) => {
+    $emails.find(
+      {
+        where: {
+          id: req.query.id,
+        },
+        select: {
+          html: 1,
+          text: 1,
+        },
+      },
+      (err, doc) => {
+        if (!err && doc) {
+          res.html(doc.html || doc.text);
+        } else {
+          res.html('<h1> Email Not Exists</h1>');
+        }
       }
     );
   });

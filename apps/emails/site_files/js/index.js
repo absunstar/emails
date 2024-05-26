@@ -92,6 +92,7 @@ app.controller('emails', function ($scope, $http) {
         if (response.data.done) {
           $scope.currentEmail = response.data.doc;
           $scope.currentEmail.html = $scope.currentEmail.html || $scope.currentEmail.text;
+          document.querySelector('#div-message').innerHTML = $scope.currentEmail.html;
         } else {
           $scope.error = response.data.error;
         }

@@ -91,7 +91,7 @@ app.controller('emails', function ($scope, $http) {
         $scope.busy = false;
         if (response.data.done) {
           $scope.currentEmail = response.data.doc;
-          document.querySelector('#div-message').src = document.location.protocol + '//' + document.location.hostname + '/viewEmail?id=' + $scope.currentEmail.id;
+          document.querySelector('#div-message').src = document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + $scope.currentEmail._id;
         } else {
           $scope.error = response.data.error;
         }
@@ -181,7 +181,6 @@ app.controller('emails', function ($scope, $http) {
       data: {
         where: where,
         limit: limit,
-        select: {},
       },
     }).then(
       function (response) {

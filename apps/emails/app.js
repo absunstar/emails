@@ -1,6 +1,44 @@
 module.exports = function init(site) {
   const sendmail = require('sendmail')();
   const $emails = site.connectCollection('emails');
+  const $emailsTracking = site.connectCollection('emailsTracking');
+
+  site.trackEmail = function (email) {
+    if (!email || !email.name || !email.ip) {
+      return;
+    }
+
+    $emailsTracking.find(
+      {
+        where: {
+          name: email.name,
+        },
+        select: {},
+      },
+      (err, doc) => {
+        if (!err) {
+          if (doc) {
+            doc.ipList = doc.ipList || [];
+            let index = doc.ipList.findIndex((d) => d.ip == email.ip);
+            if (index === -1) {
+              doc.ipList.push({
+                ip: email.ip,
+                date: new Date(),
+              });
+            } else {
+              doc.ipList[index].date = new Date();
+            }
+            $emailsTracking.update(doc);
+          } else {
+            $emailsTracking.add({
+              name: email.name,
+              ipList: [{ ip: email.ip, date: new Date() }],
+            });
+          }
+        }
+      }
+    );
+  };
 
   site.onGET({
     name: 'admin',
@@ -137,9 +175,11 @@ module.exports = function init(site) {
         },
         select: {
           id: 1,
-          subject: 1,
+          guid: 1,
           from: 1,
           to: 1,
+          subject: 1,
+          date: 1,
           folder: 1,
         },
       },
@@ -175,7 +215,15 @@ module.exports = function init(site) {
 
     $emails.findMany(
       {
-        select: req.data.select || {},
+        select: req.data.select || {
+          id: 1,
+          guid: 1,
+          from: 1,
+          to: 1,
+          subject: 1,
+          date: 1,
+          folder: 1,
+        },
         where: where,
         limit: req.data.limit,
       },
@@ -187,6 +235,12 @@ module.exports = function init(site) {
           response.error = err.message;
         }
         res.json(response);
+        if (user_where['to']) {
+          site.trackEmail({
+            name: user_where['to'],
+            ip: req.ip,
+          });
+        }
       }
     );
   });
@@ -195,7 +249,7 @@ module.exports = function init(site) {
     $emails.find(
       {
         where: {
-          id: req.query.id,
+          _id: req.query._id,
         },
         select: {
           html: 1,

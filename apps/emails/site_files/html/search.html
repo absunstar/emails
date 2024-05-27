@@ -1,26 +1,24 @@
 <div id="SearchModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <span class="close">&times;</span>
-            <h2>##word.emails_search## <i class="fa fa-search"></i></h2>
-        </div>
-        <div class="modal-body">
-            <div class="row">
-                <form class="form">
-                    <i-control class="col5" ng-model="emailSearch.from" label="##word.emails_from##" type="text"></i-control>
-                    <i-control class="col5" ng-model="emailSearch.to" label="##word.emails_to##" type="text"></i-control>
-                    <i-control class="col2" ng-model="emailSearch.limit" type="number" label="##word.emails_limit##"></i-control>
-                    <div class="row">
-                        <i-textarea ng-model="emailSearch.message" label="##word.emails_message##"></i-textarea>
-                    </div>
-                </form>
-            </div>
-            <h2 class="error">{{error}}</h2>
-            <div class="modal-footer center">
-                <i-button type="search" ng-click="searchAll()" label="##word.search##"></i-button>
-                <i-button type="clear" ng-click="search = {}" label="##word.clear##"></i-button>
-                <i-button type="close" onclick="site.hideModal('#SearchModal')" label="##word.close##"></i-button>
-            </div>
-        </div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <span class="close">&times;</span>
+      <h2>##word.emails_search## <i class="fa fa-search"></i></h2>
     </div>
+    <div class="modal-body">
+      <div class="row">
+        <i-control class="col5" ng-model="emailSearch.from" label="##word.emails_from##" type="text"></i-control>
+        <i-control class="col5" ng-model="emailSearch.to" label="##word.emails_to##" type="text"></i-control>
+        <i-control class="col2" ng-model="emailSearch.limit" type="number" label="##word.emails_limit##"></i-control>
+        <div class="row">
+          <i-control ng-model="emailSearch.message" label="##word.emails_message##"></i-control>
+        </div>
+      </div>
+      <h2 class="error">{{error}}</h2>
+      <div class="modal-footer center">
+        <i-button type="search" ng-click="searchAll()" label="##word.search##"></i-button>
+        <i-button type="clear" ng-click="search = {}" label="##word.clear##"></i-button>
+        <i-button type="close" onclick="site.hideModal('#SearchModal')" label="##word.close##"></i-button>
+      </div>
+    </div>
+  </div>
 </div>

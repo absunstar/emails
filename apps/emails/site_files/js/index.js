@@ -1,6 +1,6 @@
 app.controller('emails', function ($scope, $http) {
   $scope.email = {};
-  $scope.emailSearch = { to: '', from: '' };
+  $scope.emailSearch = { to: '', from: '' , limit : 0 , message : '' };
   $scope.newEmail = function () {
     $scope.error = '';
     $scope.email = {};

@@ -2,15 +2,15 @@
   <div class="modal-content">
     <div class="modal-header">
       <span class="close">&times;</span>
-      <h2>##word.emails_details## <i class="fa fa-file"></i></h2>
+      <h2>##word.View Email Message ##</h2>
     </div>
 
     <div class="modal-body">
       <div x-import="emails/view.html"></div>
-      <h2 class="error">{{error}}</h2>
+      <p class="error">{{error}}</p>
 
       <div class="modal-footer center">
-        <i-button type="close" onclick="site.hideModal('#viewEmailModal')" label="##word.close##"></i-button>
+        <i-button type="close" onclick="site.hideModal('#viewEmailModal')" label="##word.Close Email##"></i-button>
       </div>
     </div>
   </div>

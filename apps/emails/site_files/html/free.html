@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="en" data-ng-app="myApp">
-  <head x-import="head.html"> </head>
+  <head x-import="head.html">
+    <style>
+      .meeage {
+        transition: all 0.2s ease;
+      }
+      .message:hover {
+        transform: scale(1.1);
+      }
+    </style>
+  </head>
 
   <body class="##session.lang##">
     <nav x-import="navbar/index.html" class="sitebar" data-ng-controller="navbar"></nav>
@@ -29,7 +38,7 @@
             </div>
 
             <div class="row">
-              <div class="col4 padding" ng-repeat="c in list | filter:search" ng-click="details(c)">
+              <div class="col4 message" ng-repeat="c in list | filter:search" ng-click="details(c)">
                 <div class="border pointer">
                   <p class="bold bg-blue white font-xx-large border-radius padding">{{$index + 1}}</p>
                   <p class="blue center">{{c.from}}</p>

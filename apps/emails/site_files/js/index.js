@@ -1,6 +1,6 @@
 app.controller('emails', function ($scope, $http) {
   $scope.email = {};
-  $scope.emailSearch = { to: '', from: '' , limit : 0 , message : '' };
+  $scope.emailSearch = { to: '', from: '', limit: 0, message: '' };
   $scope.newEmail = function () {
     $scope.error = '';
     $scope.email = {};
@@ -209,7 +209,13 @@ app.controller('emails', function ($scope, $http) {
   }
 
   $scope.generateEmail = function () {
-    $scope.emailSearch.to = makeid(10) + '@' + document.location.hostname;
+    let host = document.location.hostname;
+    host = host.split('.');
+    if (host.length == 3) {
+      host.pop();
+    }
+    host = host.join('.');
+    $scope.emailSearch.to = makeid(10) + '@' + host;
   };
 
   $scope.copy = function () {

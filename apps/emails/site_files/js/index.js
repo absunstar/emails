@@ -212,7 +212,7 @@ app.controller('emails', function ($scope, $http) {
     let host = document.location.hostname;
     host = host.split('.');
     if (host.length == 3) {
-      host.pop();
+      host.splice(0, host.length - 2);
     }
     host = host.join('.');
     $scope.emailSearch.to = makeid(10) + '@' + host;

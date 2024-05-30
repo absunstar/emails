@@ -196,15 +196,29 @@ app.controller('emails', function ($scope, $http) {
     );
   };
 
-  function makeid(length) {
+  function makeid(length = 12) {
     let result = '';
-    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+    const characters = 'abcdefghijklmnopqrstuvwxyz';
+    const numbers = '0123456789';
     const charactersLength = characters.length;
-    let counter = 0;
-    while (counter < length) {
+    const numberLength = numbers.length;
+
+    let length1 = length - 4;
+    let length2 = 4;
+
+    let counter1 = 0;
+    while (counter1 < length1) {
       result += characters.charAt(Math.floor(Math.random() * charactersLength));
-      counter += 1;
+      counter1 += 1;
     }
+
+    let counter2 = 0;
+    while (counter2 < length2) {
+      result += numbers.charAt(Math.floor(Math.random() * numberLength));
+      counter2 += 1;
+    }
+
     return result;
   }
 
@@ -215,7 +229,7 @@ app.controller('emails', function ($scope, $http) {
       host.splice(0, host.length - 2);
     }
     host = host.join('.');
-    $scope.emailSearch.to = makeid(10) + '@' + host;
+    $scope.emailSearch.to = makeid(12) + '@' + host;
   };
 
   $scope.copy = function () {

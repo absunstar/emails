@@ -38,8 +38,8 @@
             </div>
 
             <div class="row">
-              <div class="col4 message" ng-repeat="c in list | filter:search" ng-click="details(c)">
-                <div class="border pointer">
+              <div class="col4 message" ng-repeat="c in list | filter:search">
+                <div class="border pointer" ng-click="details(c)">
                   <p class="bold bg-blue white font-xx-large border-radius padding">{{$index + 1}}</p>
                   <p class="blue center">{{c.from}}</p>
                   <p class="bold center">{{c.subject}}</p>

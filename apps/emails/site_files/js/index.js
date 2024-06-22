@@ -152,7 +152,7 @@ app.controller('emails', function ($scope, $http) {
       function (response) {
         $scope.busy = false;
         if (response.data.done) {
-          alert('All Matched Message Deleted');
+          alert('All Matched Message Deleted : ' + response.data.result.count);
         } else {
           $scope.error = response.data.error;
         }

@@ -5,18 +5,22 @@
       <h2>##word.emails_search## <i class="fa fa-search"></i></h2>
     </div>
     <div class="modal-body">
-      <div class="row">
+      <div class="row border">
         <i-control class="col5" ng-model="emailSearch.from" label="##word.emails_from##" type="text"></i-control>
         <i-control class="col5" ng-model="emailSearch.to" label="##word.emails_to##" type="text"></i-control>
         <i-control class="col2" ng-model="emailSearch.limit" type="number" label="##word.emails_limit##"></i-control>
         <div class="row">
-          <i-control ng-model="emailSearch.message" label="##word.emails_message##"></i-control>
+          <i-control ng-model="emailSearch.subject" label="##word.emails_subject##"></i-control>
+        </div>
+        <div class="row">
+          <i-control ng-model="emailSearch.text" label="##word.emails_message##"></i-control>
         </div>
       </div>
       <h2 class="error">{{error}}</h2>
       <div class="modal-footer center">
         <i-button type="search" ng-click="searchAll()" label="##word.search##"></i-button>
-        <i-button type="clear" ng-click="search = {}" label="##word.clear##"></i-button>
+        <i-button type="delete" ng-click="deleteAllEmails()" label="##word.Delete All Messages##"></i-button>
+        <i-button type="clear" ng-click="emailSearch = {}" label="##word.clear##"></i-button>
         <i-button type="close" onclick="site.hideModal('#SearchModal')" label="##word.close##"></i-button>
       </div>
     </div>

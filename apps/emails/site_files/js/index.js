@@ -140,7 +140,28 @@ app.controller('emails', function ($scope, $http) {
       }
     );
   };
-
+  $scope.deleteAllEmails = function () {
+    $scope.busy = true;
+    $http({
+      method: 'POST',
+      url: '/api/emails/delete-all',
+      data: {
+        where: $scope.emailSearch,
+      },
+    }).then(
+      function (response) {
+        $scope.busy = false;
+        if (response.data.done) {
+          alert('All Matched Message Deleted');
+        } else {
+          $scope.error = response.data.error;
+        }
+      },
+      function (err) {
+        console.log(err);
+      }
+    );
+  };
   $scope.searchAll = function (free = false) {
     let where = {};
     let minEmailLength = 8;
@@ -154,8 +175,11 @@ app.controller('emails', function ($scope, $http) {
     if ($scope.emailSearch.to) {
       where['to'] = $scope.emailSearch.to;
     }
-    if ($scope.emailSearch.message) {
-      where['html'] = $scope.emailSearch.message;
+    if ($scope.emailSearch.subject) {
+      where['subject'] = $scope.emailSearch.subject;
+    }
+    if ($scope.emailSearch.text) {
+      where['text'] = $scope.emailSearch.text;
     }
 
     if (free) {

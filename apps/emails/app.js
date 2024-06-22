@@ -209,8 +209,15 @@ module.exports = function init(site) {
       where['to'] = new RegExp(user_where['to'], 'i');
     }
 
-    if (user_where['message']) {
-      where['html'] = new RegExp(user_where['message'], 'i');
+    if (user_where['subject']) {
+      where['subject'] = new RegExp(user_where['subject'], 'i');
+    }
+
+    if (user_where['httml']) {
+      where['html'] = new RegExp(user_where['httml'], 'i');
+    }
+    if (user_where['text']) {
+      where['text'] = new RegExp(user_where['text'], 'i');
     }
 
     $emails.findMany(
@@ -262,6 +269,45 @@ module.exports = function init(site) {
         } else {
           res.sendTEXT('<h1> Email Not Exists</h1>');
         }
+      }
+    );
+  });
+
+  site.onPOST('/api/emails/delete-all', (req, res) => {
+    let response = {};
+    response.done = false;
+
+    let user_where = req.data.where || {};
+    let where = {};
+    if (user_where['from']) {
+      where['from'] = new RegExp(user_where['from'], 'i');
+    }
+
+    if (user_where['to']) {
+      where['to'] = new RegExp(user_where['to'], 'i');
+    }
+    if (user_where['subject']) {
+      where['subject'] = new RegExp(user_where['subject'], 'i');
+    }
+    if (user_where['html']) {
+      where['html'] = new RegExp(user_where['html'], 'i');
+    }
+    if (user_where['text']) {
+      where['text'] = new RegExp(user_where['text'], 'i');
+    }
+    $emails.deleteAll(
+      {
+        where: where,
+        limit: req.data.limit || 10,
+      },
+      (err, result) => {
+        if (!err) {
+          response.done = true;
+          response.result = result;
+        } else {
+          response.error = err.message;
+        }
+        res.json(response);
       }
     );
   });

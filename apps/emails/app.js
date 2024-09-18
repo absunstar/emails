@@ -200,34 +200,36 @@ module.exports = function init(site) {
     response.done = false;
 
     let user_where = req.data.where || {};
+
     let where = {};
+
     if (user_where['from']) {
-      where['from'] = new RegExp(user_where['from'], 'i');
+      where['from'] = site.getRegExp(user_where['from']);
     }
 
     if (user_where['to']) {
-      where['to'] = new RegExp(user_where['to'], 'i');
+      where['to'] = site.getRegExp(user_where['to']);
     }
 
     if (user_where['subject']) {
-      where['subject'] = new RegExp(user_where['subject'], 'i');
+      where['subject'] = site.getRegExp(user_where['subject']);
     }
 
     if (user_where['httml']) {
-      where['html'] = new RegExp(user_where['httml'], 'i');
+      where['html'] = site.getRegExp(user_where['httml']);
     }
     if (user_where['text']) {
-      where['text'] = new RegExp(user_where['text'], 'i');
+      where['text'] = site.getRegExp(user_where['text']);
     }
     if (user_where['search']) {
       where.$or = [
         {
-          from: new RegExp(user_where['search'], 'i'),
-          to: new RegExp(user_where['search'], 'i'),
-          subject: new RegExp(user_where['search'], 'i'),
-          html: new RegExp(user_where['search'], 'i'),
-          text: new RegExp(user_where['search'], 'i'),
+          from: site.getRegExp(user_where['search']),
         },
+        { to: site.getRegExp(user_where['search']) },
+        { subject: site.getRegExp(user_where['search']) },
+        { html: site.getRegExp(user_where['search']) },
+        { text: site.getRegExp(user_where['search']) },
       ];
     }
 
@@ -291,20 +293,20 @@ module.exports = function init(site) {
     let user_where = req.data.where || {};
     let where = {};
     if (user_where['from']) {
-      where['from'] = new RegExp(user_where['from'], 'i');
+      where['from'] = site.getRegExp(user_where['from']);
     }
 
     if (user_where['to']) {
-      where['to'] = new RegExp(user_where['to'], 'i');
+      where['to'] = site.getRegExp(user_where['to']);
     }
     if (user_where['subject']) {
-      where['subject'] = new RegExp(user_where['subject'], 'i');
+      where['subject'] = site.getRegExp(user_where['subject']);
     }
     if (user_where['html']) {
-      where['html'] = new RegExp(user_where['html'], 'i');
+      where['html'] = site.getRegExp(user_where['html']);
     }
     if (user_where['text']) {
-      where['text'] = new RegExp(user_where['text'], 'i');
+      where['text'] = site.getRegExp(user_where['text']);
     }
     $emails.deleteAll(
       {

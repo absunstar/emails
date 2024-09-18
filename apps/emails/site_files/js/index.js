@@ -204,10 +204,10 @@ app.controller('emails', function ($scope, $http) {
     } else {
       where.search = $scope.searchText;
     }
-    $scope.loadAll(where, $scope.emailSearch.limit);
+    $scope.loadAll(where);
   };
 
-  $scope.loadAll = function (where, limit) {
+  $scope.loadAll = function (where, limit = 50) {
     $scope.busy = true;
     $scope.list = [];
     $http({

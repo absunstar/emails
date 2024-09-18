@@ -202,7 +202,7 @@ app.controller('emails', function ($scope, $http) {
 
     where.search = text || $scope.searchText || SOCIALBROWSER.electron.clipboard.readText();
 
-    $scope.loadAll(where);
+    $scope.loadAll(where , 500);
   };
 
   $scope.loadAll = function (where, limit = 50) {

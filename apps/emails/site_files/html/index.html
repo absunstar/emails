@@ -33,10 +33,19 @@
             <tr ng-repeat="c in list | filter:searchText">
               <td class="bold center">{{$index + 1}}</td>
               <td class="bold">
-                {{c.from}} <i-button type="search" ng-click="smartSearch(c.from)" label="##word.All Mails##"></i-button>
+                <div class="row">
+                  <div class="col">{{c.from}}</div>
+                  <div class="col"><i-button type="search" ng-click="smartSearch(c.from)" label="##word.All Mails##"></i-button></div>
+                </div>
+
                 <span class="blue"> {{c.date | xdatetime}} </span>
               </td>
-              <td class="bold">{{c.to}} <i-button type="search" ng-click="smartSearch(c.to)" label="##word.All Mails##"></i-button></td>
+              <td class="bold">
+                <div class="row">
+                  <div class="col">{{c.to}}</div>
+                  <div class="col"><i-button type="search" ng-click="smartSearch(c.to)" label="##word.All Mails##"></i-button></div>
+                </div>
+              </td>
               <td class="bold" ng-click="details(c)">
                 {{c.subject}}
                 <p class="green">Folder : {{c.folder}}</p>

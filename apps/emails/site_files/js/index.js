@@ -205,7 +205,7 @@ app.controller('emails', function ($scope, $http) {
     $scope.loadAll(where , 500);
   };
 
-  $scope.loadAll = function (where, limit = 50) {
+  $scope.loadAll = function (where={}, limit = 200) {
     $scope.busy = true;
     $scope.list = [];
     $http({

@@ -219,6 +219,17 @@ module.exports = function init(site) {
     if (user_where['text']) {
       where['text'] = new RegExp(user_where['text'], 'i');
     }
+    if (user_where['search']) {
+      where.$or = [
+        {
+          from: new RegExp(user_where['search'], 'i'),
+          to: new RegExp(user_where['search'], 'i'),
+          subject: new RegExp(user_where['search'], 'i'),
+          html: new RegExp(user_where['search'], 'i'),
+          text: new RegExp(user_where['search'], 'i'),
+        },
+      ];
+    }
 
     $emails.findMany(
       {

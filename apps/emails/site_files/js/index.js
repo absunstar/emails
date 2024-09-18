@@ -1,6 +1,6 @@
 app.controller('emails', function ($scope, $http) {
   $scope.email = {};
-  $scope.emailSearch = { to: '', from: '', limit: 0, message: '' };
+  $scope.emailSearch = { to: '', from: '', limit: 200, message: '' };
   $scope.newEmail = function () {
     $scope.error = '';
     $scope.email = {};
@@ -197,8 +197,17 @@ app.controller('emails', function ($scope, $http) {
     site.hideModal('#SearchModal');
   };
 
+  $scope.smartSearch = function () {
+    let where = {};
+    if ((txt = SOCIALBROWSER.electron.clipboard.readText())) {
+      where.search = txt;
+      $scope.loadAll(where, $scope.emailSearch.limit);
+    }
+  };
+
   $scope.loadAll = function (where, limit) {
     $scope.busy = true;
+    $scope.list = [];
     $http({
       method: 'POST',
       url: '/api/emails/all',

@@ -201,8 +201,10 @@ app.controller('emails', function ($scope, $http) {
     let where = {};
     if ((txt = SOCIALBROWSER.electron.clipboard.readText())) {
       where.search = txt;
-      $scope.loadAll(where, $scope.emailSearch.limit);
+    } else {
+      where.search = $scope.searchText;
     }
+    $scope.loadAll(where, $scope.emailSearch.limit);
   };
 
   $scope.loadAll = function (where, limit) {

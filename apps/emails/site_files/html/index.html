@@ -18,9 +18,12 @@
             <i-button type="search" onclick="site.showModal('#SearchModal')" label="##word.search_all##"></i-button>
           </div>
           <div class="row">
-            <div class="col10"><i-control ng-model="searchText" label="Search"></i-control></div>
-            <div class="col2">
-              <i-button type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button><i-button type="search" ng-click="loadAll()" label="##word.ALL Mails##"></i-button>
+            <div class="col8"><i-control ng-model="searchText" label="Search"></i-control></div>
+            <div class="col">
+              <i-button type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
+            </div>
+            <div class="col">
+              <i-button type="search" ng-click="loadAll()" label="##word.ALL Mails##"></i-button>
             </div>
           </div>
 

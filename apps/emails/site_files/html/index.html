@@ -16,10 +16,12 @@
           <div class="top-actions">
             <i-button type="add" ng-click="newEmail()" label="##word.emails_new##"></i-button>
             <i-button type="search" onclick="site.showModal('#SearchModal')" label="##word.search_all##"></i-button>
-            <i-button type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
+          </div>
+          <div class="row">
+            <div class="col9"><i-control ng-model="searchText" label="Search"></i-control></div>
+            <div class="col3"><i-button type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button></div>
           </div>
 
-          <i-control ng-model="searchText" label="Search"></i-control>
           <table class="table hover loaded" id="t1">
             <tr>
               <th>Index</th>

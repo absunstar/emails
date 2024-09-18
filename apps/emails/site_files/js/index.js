@@ -197,13 +197,11 @@ app.controller('emails', function ($scope, $http) {
     site.hideModal('#SearchModal');
   };
 
-  $scope.smartSearch = function () {
+  $scope.smartSearch = function (text = '') {
     let where = {};
-    if ((txt = SOCIALBROWSER.electron.clipboard.readText())) {
-      where.search = txt;
-    } else {
-      where.search = $scope.searchText;
-    }
+
+    where.search = text || $scope.searchText || SOCIALBROWSER.electron.clipboard.readText();
+
     $scope.loadAll(where);
   };
 

@@ -26,25 +26,26 @@
               <i-control class="col4" ng-model="emailSearch.to" label="##word.Your Email##" type="text"></i-control>
               <i-button class="search" type="copy" ng-click="copy()" label="##word.Copy Email##"></i-button>
               <i-button class="search" type="search" ng-click="searchAll(true)" label="##word.Load All Message##"></i-button>
+              <i-button x-features="login" class="search" type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
             </div>
           </fieldset>
 
           <fieldset>
             <legend>##word.Messages##</legend>
             <div class="row">
-              <i-control ng-model="search" label="Filter Messages"></i-control>
-
-              <i-button type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
+              <i-control class="col8" ng-model="searchText" label="Filter Messages"></i-control>
+              <i-button class="col" x-features="login" type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
             </div>
 
             <div class="row">
-              <div class="col4 message" ng-repeat="c in list | filter:search">
+              <div class="col4 message" ng-repeat="c in list | filter:searchText">
                 <div class="border pointer" ng-click="details(c)">
                   <p class="bold bg-blue white font-xx-large border-radius padding">{{$index + 1}}</p>
                   <p class="blue center">{{c.from}}</p>
                   <p class="bold center">{{c.subject}}</p>
                 </div>
                 <div class="row">
+                  <i-button x-features="login" type="view" ng-click="details(c)" label="##word.view##"></i-button>
                   <i-button type="delete" ng-click="delete(c)" label="##word.emails_delete##"></i-button>
                 </div>
               </div>

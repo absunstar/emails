@@ -215,8 +215,8 @@ module.exports = function init(site) {
       where['subject'] = site.getRegExp(user_where['subject']);
     }
 
-    if (user_where['httml']) {
-      where['html'] = site.getRegExp(user_where['httml']);
+    if (user_where['html']) {
+      where['html'] = site.getRegExp(user_where['html']);
     }
     if (user_where['text']) {
       where['text'] = site.getRegExp(user_where['text']);
@@ -243,6 +243,8 @@ module.exports = function init(site) {
           subject: 1,
           date: 1,
           folder: 1,
+          html,
+          text : 1
         },
         where: where,
         limit: req.data.limit,

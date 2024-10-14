@@ -243,7 +243,7 @@ module.exports = function init(site) {
           subject: 1,
           date: 1,
           folder: 1,
-          html,
+          html : 1,
           text : 1
         },
         where: where,

@@ -78,6 +78,17 @@ app.controller('emails', function ($scope, $http) {
   }
 
   $scope.view = function (email) {
+    SOCIALBROWSER.ipc('[open new popup]', {
+      partition: SOCIALBROWSER.partition,
+      referrer: document.location.href,
+      url: document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + email._id,
+      show: true,
+      allowNewWindows: true,
+      allowPopup: true,
+      center: true,
+      vip: true,
+    });
+    return true;
     $scope.busy = true;
     $scope.currentEmail = {};
     $http({
@@ -202,10 +213,10 @@ app.controller('emails', function ($scope, $http) {
 
     where.search = text || $scope.searchText || SOCIALBROWSER.electron.clipboard.readText();
 
-    $scope.loadAll(where , 500);
+    $scope.loadAll(where, 500);
   };
 
-  $scope.loadAll = function (where={}, limit = 200) {
+  $scope.loadAll = function (where = {}, limit = 200) {
     $scope.busy = true;
     $scope.list = [];
     $http({

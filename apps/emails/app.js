@@ -172,6 +172,7 @@ module.exports = function init(site) {
     $emails.find(
       {
         where: where,
+        sort: { id: -1 },
         select: {
           id: 1,
           guid: 1,

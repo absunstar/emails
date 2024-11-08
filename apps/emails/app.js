@@ -167,12 +167,11 @@ module.exports = function init(site) {
 
   site.onPOST('/api/emails/view', (req, res) => {
     let response = {};
+    let where = req.body;
     response.done = false;
     $emails.find(
       {
-        where: {
-          id: req.body.id,
-        },
+        where: where,
         select: {
           id: 1,
           guid: 1,
@@ -181,6 +180,8 @@ module.exports = function init(site) {
           subject: 1,
           date: 1,
           folder: 1,
+          html: 1,
+          text: 1,
         },
       },
       (err, doc) => {
@@ -243,8 +244,8 @@ module.exports = function init(site) {
           subject: 1,
           date: 1,
           folder: 1,
-          html : 1,
-          text : 1
+          html: 1,
+          text: 1,
         },
         where: where,
         limit: req.data.limit,

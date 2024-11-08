@@ -280,4 +280,9 @@ app.controller('emails', function ($scope, $http) {
       navigator.clipboard.writeText($scope.emailSearch.to);
     }
   };
+
+  if ((email = '##req.query.email##')) {
+    $scope.emailSearch.to = email;
+    $scope.loadAll({ to: $scope.emailSearch }, $scope.emailSearch.limit);
+  }
 });

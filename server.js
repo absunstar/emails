@@ -49,16 +49,24 @@ const server = new SMTPServer({
 
     return callback(); // Accept the connection
   },
+  onSecure(socket, session, callback) {
+    if (session.servername !== "sni.example.com") {
+      return callback(new Error("Only connections for sni.example.com are allowed"));
+    }
+    return callback(); // Accept the connection
+  },
   onClose(session) {
     console.log(' ... Closing ... ' + session.remoteAddress);
   },
   onMailFrom(address, session, callback) {
+    console.log(' ... Mail From ... ' + address.address);
     if (address.address === 'xxxxx@xxx.xxx') {
       return callback(new Error('not allowed email from  xxxxx@xxx.xxx'));
     }
     return callback(); // Accept the address
   },
   onRcptTo(address, session, callback) {
+    console.log(' ... Mail To ... ' + address.address);
     if (address.address === 'xxxxx@xxx.xxx') {
       return callback(new Error('not allowed email to xxxxx@xxx.xxx'));
     }

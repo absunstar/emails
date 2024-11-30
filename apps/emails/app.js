@@ -116,8 +116,6 @@ module.exports = function init(site) {
             id: doc.id,
           },
           set: doc,
-          $req: req,
-          $res: res,
         },
         (err) => {
           if (!err) {
@@ -147,8 +145,6 @@ module.exports = function init(site) {
       $emails.delete(
         {
           id: id,
-          $req: req,
-          $res: res,
         },
         (err, result) => {
           if (!err) {

@@ -10,7 +10,8 @@ const parser = require('mailparser').simpleParser;
 
 const site = require('../isite')({
   port: 60025,
-  lang: 'en',
+  language: { id: 'EN', dir: 'ltr', text: 'left' },
+  lang: 'EN',
   version: new Date().getTime(),
   require: {
     features: [],
@@ -50,8 +51,8 @@ const server = new SMTPServer({
     return callback(); // Accept the connection
   },
   onSecure(socket, session, callback) {
-    if (session.servername !== "sni.example.com") {
-      return callback(new Error("Only connections for sni.example.com are allowed"));
+    if (session.servername !== 'sni.example.com') {
+      return callback(new Error('Only connections for sni.example.com are allowed'));
     }
     return callback(); // Accept the connection
   },

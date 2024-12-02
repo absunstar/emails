@@ -1,277 +1,277 @@
 [
     {
         "name": "brand_title",
-        "en": "Temp Emails",
-        "ar": "البريد الالكنرونى"
+        "EN": "Temp Emails",
+        "AR": "البريد الالكنرونى"
     },
     {
         "name": "brand_tag",
-        "en": "Full Access Any Time Any Where",
-        "ar": "نظام ديناميكى"
+        "EN": "Full Access Any Time Any Where",
+        "AR": "نظام ديناميكى"
     },
     {
         "name": "name",
-        "en": "Name",
-        "ar": "الاسم"
+        "EN": "Name",
+        "AR": "الاسم"
     },
     {
         "name": "description",
-        "en": "Description",
-        "ar": "الوصف"
+        "EN": "Description",
+        "AR": "الوصف"
     },
     {
         "name": "email",
-        "en": "Email",
-        "ar": "البريد الالكترونى"
+        "EN": "Email",
+        "AR": "البريد الالكترونى"
     },
     {
         "name": "phone",
-        "en": "Phone",
-        "ar": "رقم التليفون"
+        "EN": "Phone",
+        "AR": "رقم التليفون"
     },
     {
         "name": "mobile",
-        "en": "Mobile",
-        "ar": "رقم الموبيل"
+        "EN": "Mobile",
+        "AR": "رقم الموبيل"
     },
     {
         "name": "website",
-        "en": "WebSite",
-        "ar": "الموقع الالكترونى"
+        "EN": "WebSite",
+        "AR": "الموقع الالكترونى"
     },
     {
         "name": "password",
-        "en": "password",
-        "ar": "كلمة المرور"
+        "EN": "password",
+        "AR": "كلمة المرور"
     },
     {
         "name": "close",
-        "en": "Close",
-        "ar": "إغلاق"
+        "EN": "Close",
+        "AR": "إغلاق"
     },
     {
         "name": "add",
-        "en": "Add",
-        "ar": "أضف"
+        "EN": "Add",
+        "AR": "أضف"
     },
     {
         "name": "new",
-        "en": "New",
-        "ar": "جديد"
+        "EN": "New",
+        "AR": "جديد"
     },
     {
         "name": "save",
-        "en": "Save",
-        "ar": "حفظ التغيرات"
+        "EN": "Save",
+        "AR": "حفظ التغيرات"
     },
     {
         "name": "edit",
-        "en": "Edit",
-        "ar": "تعديل"
+        "EN": "Edit",
+        "AR": "تعديل"
     },
     {
         "name": "update",
-        "en": "Update",
-        "ar": "تعديل"
+        "EN": "Update",
+        "AR": "تعديل"
     },
     {
         "name": "delete",
-        "en": "Delete",
-        "ar": "حذف"
+        "EN": "Delete",
+        "AR": "حذف"
     },
     {
         "name": "remove",
-        "en": "Remove",
-        "ar": "حذف"
+        "EN": "Remove",
+        "AR": "حذف"
     },
     {
         "name": "details",
-        "en": "Details",
-        "ar": "تفاصيل"
+        "EN": "Details",
+        "AR": "تفاصيل"
     },
     {
         "name": "logo",
-        "en": "Logo",
-        "ar": "الشعار"
+        "EN": "Logo",
+        "AR": "الشعار"
     },
     {
         "name": "actions",
-        "en": "Actions",
-        "ar": "الاجراءات"
+        "EN": "Actions",
+        "AR": "الاجراءات"
     },
     {
         "name": "files",
-        "en": "Files",
-        "ar": "الملفات"
+        "EN": "Files",
+        "AR": "الملفات"
     },
     {
         "name": "export_to_excel",
-        "en": "Export To Excel",
-        "ar": "تصدير الى أكسل"
+        "EN": "Export To Excel",
+        "AR": "تصدير الى أكسل"
     },
     {
         "name": "notes",
-        "en": "Notes",
-        "ar": "ملاحظات"
+        "EN": "Notes",
+        "AR": "ملاحظات"
     },
     {
         "name": "add_to_notes",
-        "en": "Add To Notes",
-        "ar": "أضف الى الملاحظات"
+        "EN": "Add To Notes",
+        "AR": "أضف الى الملاحظات"
     },
     {
         "name": "date",
-        "en": "Date",
-        "ar": "التاريخ"
+        "EN": "Date",
+        "AR": "التاريخ"
     },
     {
         "name": "time",
-        "en": "Time",
-        "ar": "الوقت"
+        "EN": "Time",
+        "AR": "الوقت"
     },
     {
         "name": "print",
-        "en": "Print",
-        "ar": "طباعة"
+        "EN": "Print",
+        "AR": "طباعة"
     },
     {
         "name": "menus",
-        "en": "System Menus",
-        "ar": "قوائم النظام"
+        "EN": "System Menus",
+        "AR": "قوائم النظام"
     },
     {
         "name": "user_logo",
-        "en": "User Logo",
-        "ar": "صورة المستخدم "
+        "EN": "User Logo",
+        "AR": "صورة المستخدم "
     },
     {
         "name": "new_user",
-        "en": "New User",
-        "ar": "مستخدم جديد"
+        "EN": "New User",
+        "AR": "مستخدم جديد"
     },
     {
         "name": "add_new_user",
-        "en": "Add New User",
-        "ar": "أضافة مستخدم جديد"
+        "EN": "Add New User",
+        "AR": "أضافة مستخدم جديد"
     },
     {
         "name": "user_details",
-        "en": "User Details",
-        "ar": "بيانات المستخدم"
+        "EN": "User Details",
+        "AR": "بيانات المستخدم"
     },
     {
         "name": "permissions",
-        "en": "Permissions",
-        "ar": "الصلاحيات"
+        "EN": "Permissions",
+        "AR": "الصلاحيات"
     },
     {
         "name": "permission",
-        "en": "Permission",
-        "ar": "تصريح"
+        "EN": "Permission",
+        "AR": "تصريح"
     },
     {
         "name": "add_permission",
-        "en": "Add Permission",
-        "ar": "أضف الى الصلاحيات"
+        "EN": "Add Permission",
+        "AR": "أضف الى الصلاحيات"
     },
     {
         "name": "tickets",
-        "en": "Tickets",
-        "ar": "البلاغات"
+        "EN": "Tickets",
+        "AR": "البلاغات"
     },
     {
         "name": "customers",
-        "en": "Customers",
-        "ar": "العملاء"
+        "EN": "Customers",
+        "AR": "العملاء"
     },
     {
         "name": "stores",
-        "en": "Stores",
-        "ar": "المخازن"
+        "EN": "Stores",
+        "AR": "المخازن"
     },
     {
         "name": "accounts",
-        "en": "Accounts",
-        "ar": "الحسابات"
+        "EN": "Accounts",
+        "AR": "الحسابات"
     },
     {
         "name": "insurances",
-        "en": "Insurances",
-        "ar": "التامينات"
+        "EN": "Insurances",
+        "AR": "التامينات"
     },
     {
         "name": "tickets",
-        "en": "Tickets",
-        "ar": "البلاغات"
+        "EN": "Tickets",
+        "AR": "البلاغات"
     },
     {
         "name": "address",
-        "en": "Address",
-        "ar": "العناوين"
+        "EN": "Address",
+        "AR": "العناوين"
     },
     {
         "name": "img",
-        "en": "Image",
-        "ar": "صورة"
+        "EN": "Image",
+        "AR": "صورة"
     },
     {
         "name": "error",
-        "en": "Error While Working",
-        "ar": "حدثت مشكلة اثناء التنفيذ"
+        "EN": "Error While Working",
+        "AR": "حدثت مشكلة اثناء التنفيذ"
     },
     {
         "name": "search",
-        "en": "Search",
-        "ar": "بحـث"
+        "EN": "Search",
+        "AR": "بحـث"
     }, {
         "name": "search_all",
-        "en": "Search All",
-        "ar": "بحث شامل"
+        "EN": "Search All",
+        "AR": "بحث شامل"
     },  {
         "name": "clear",
-        "en": "Clear",
-        "ar": "تفريغ الحقول"
+        "EN": "Clear",
+        "AR": "تفريغ الحقول"
     },
     {
         "name": "select",
-        "en": "Select",
-        "ar": "أختيار"
+        "EN": "Select",
+        "AR": "أختيار"
     },
     {
         "name": "in_out_name",
-        "en": "In and Out Names",
-        "ar": "مسميات الوارد والمنصرف"
+        "EN": "In and Out Names",
+        "AR": "مسميات الوارد والمنصرف"
     },
     {
         "name": "loading",
-        "en": "Loading",
-        "ar": "جارى التحميل"
+        "EN": "Loading",
+        "AR": "جارى التحميل"
     },
     {
         "name": "menu_class",
-        "en": "left-fixed-menu",
-        "ar": "right-fixed-menu"
+        "EN": "left-fixed-menu",
+        "AR": "right-fixed-menu"
     },
     {
         "name": "load_more",
-        "en": "Load More",
-        "ar": "عرض المزيـد"
+        "EN": "Load More",
+        "AR": "عرض المزيـد"
     },
     {
         "name": "from_date",
-        "en": "From Date",
-        "ar": "من تاريخ"
+        "EN": "From Date",
+        "AR": "من تاريخ"
     }, {
         "name": "to_date",
-        "en": "To Date",
-        "ar": "الى تاريخ"
+        "EN": "To Date",
+        "AR": "الى تاريخ"
     }, {
         "name": "le",
-        "en": "LE",
-        "ar": "جنيه"
+        "EN": "LE",
+        "AR": "جنيه"
     }, {
         "name": "select_all",
-        "en": "Select All",
-        "ar": "أختيار الكل"
+        "EN": "Select All",
+        "AR": "أختيار الكل"
     }
 ]

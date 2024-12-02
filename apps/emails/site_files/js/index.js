@@ -103,16 +103,21 @@ app.controller('emails', function ($scope, $http) {
   };
 
   $scope.details = function (email) {
-    SOCIALBROWSER.ipc('[open new popup]', {
-      partition: SOCIALBROWSER.partition,
-      referrer: document.location.href,
-      url: document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + email._id,
-      show: true,
-      allowNewWindows: true,
-      allowPopup: true,
-      center: true,
-      vip: true,
-    });
+    let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + email._id;
+    if (window.SOCIALBROWSER) {
+      SOCIALBROWSER.ipc('[open new popup]', {
+        partition: SOCIALBROWSER.partition,
+        referrer: document.location.href,
+        url: url,
+        show: true,
+        allowNewWindows: true,
+        allowPopup: true,
+        center: true,
+        vip: true,
+      });
+    } else {
+      window.open(url);
+    }
   };
 
   $scope.deleteAll = function () {
@@ -208,8 +213,10 @@ app.controller('emails', function ($scope, $http) {
   $scope.smartSearch = function (text = '') {
     let where = {};
 
-    where.search = text || $scope.searchText || SOCIALBROWSER.electron.clipboard.readText();
-
+    where.search = text || $scope.searchText;
+    if (window.SOCIALBROWSER) {
+      where.search = where.search || SOCIALBROWSER.electron.clipboard.readText();
+    }
     $scope.loadAll(where, 500);
   };
 

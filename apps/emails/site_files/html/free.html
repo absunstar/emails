@@ -7,6 +7,9 @@
         --bs-body-bg: #a5d6a7;
         --body-background: #a5d6a7;
       }
+      ins {
+        background: #ddd;
+      }
       fieldset {
         margin: 15px;
         padding: 10px;
@@ -24,6 +27,9 @@
         padding: 10px;
         border-radius: 10px;
       }
+      .information h2 {
+        text-align: center;
+      }
       .information p {
         font-size: 18px;
       }
@@ -36,126 +42,145 @@
 
     <div id="main-layout" class="container loaded">
       <div class="row">
-        <div class="col" ng-controller="emails">
-          <div x-import="emails/view_modal.html"></div>
+        <div class="col2" x-features="host.social-browser">
+          <ins class="adsbygoogle" style="display: block" data-ad-client="ca-pub-3372007384613151" data-ad-slot="3239326915" data-ad-format="auto" data-full-width-responsive="true"></ins>
+          <script>
+            (adsbygoogle = window.adsbygoogle || []).push({});
+          </script>
+        </div>
+        <div class="col">
+          <div class="row">
+            <div class="col" ng-controller="emails">
+              <div x-import="emails/view_modal.html"></div>
 
-          <fieldset>
-            <legend>##word.Email Information##</legend>
-            <div class="row">
-              <i-button class="search" type="new" ng-click="generateEmail()" label="##word.Generate New Email##"></i-button>
-              <i-control class="col4" ng-model="emailSearch.to" label="##word.Write Your Exists Email##" type="text"></i-control>
-              <i-button class="search" type="copy" ng-click="copy()" label="##word.Copy Email##"></i-button>
-              <i-button class="search" type="search" ng-click="searchAll(true)" label="##word.Load All Message##"></i-button>
-              <i-button x-features="login" class="search" type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>##word.Messages##</legend>
-            <div class="row">
-              <i-control class="col8" ng-model="searchText" label="Filter Messages"></i-control>
-              <i-button class="col" x-features="login" type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
-            </div>
-
-            <div class="row">
-              <div class="col4 message" ng-repeat="c in list | filter:searchText">
-                <div class="border pointer" ng-click="details(c)">
-                  <p class="bold bg-blue white font-xx-large border-radius padding">{{$index + 1}}</p>
-                  <p class="blue center">{{c.from}}</p>
-                  <p class="bold center">{{c.subject}}</p>
-                </div>
+              <fieldset>
+                <legend>##word.Email Information##</legend>
                 <div class="row">
-                  <i-button x-features="login" type="delete" ng-click="delete(c)" label="##word.emails_delete##"></i-button>
+                  <i-button class="search" type="new" ng-click="generateEmail()" label="##word.Generate New Email##"></i-button>
+                  <i-control class="col4" ng-model="emailSearch.to" label="##word.Write Your Exists Email##" type="text"></i-control>
+                  <i-button class="search" type="copy" ng-click="copy()" label="##word.Copy Email##"></i-button>
+                  <i-button class="search" type="search" ng-click="searchAll(true)" label="##word.Load All Message##"></i-button>
+                  <i-button x-features="login" class="search" type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
                 </div>
-              </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>##word.Messages##</legend>
+                <div class="row">
+                  <i-control class="col8" ng-model="searchText" label="Filter Messages"></i-control>
+                  <i-button class="col" x-features="login" type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
+                </div>
+
+                <div class="row">
+                  <div class="col4 message" ng-repeat="c in list | filter:searchText">
+                    <div class="border pointer" ng-click="details(c)">
+                      <p class="bold bg-blue white font-xx-large border-radius padding">{{$index + 1}}</p>
+                      <p class="blue center">{{c.from}}</p>
+                      <p class="bold center">{{c.subject}}</p>
+                    </div>
+                    <div class="row">
+                      <i-button x-features="login" type="delete" ng-click="delete(c)" label="##word.emails_delete##"></i-button>
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
             </div>
-          </fieldset>
+          </div>
+          <div class="row">
+            <div x-features="host.social-browser">
+              <script async src="https://www.googletagmanager.com/gtag/js?id=G-3591JBECHZ"></script>
+              <script>
+                window.dataLayer = window.dataLayer || [];
+                function gtag() {
+                  dataLayer.push(arguments);
+                }
+                gtag('js', new Date());
+
+                gtag('config', 'G-3591JBECHZ');
+              </script>
+
+              <ins class="adsbygoogle" style="display: block" data-ad-client="ca-pub-3372007384613151" data-ad-slot="2472938527" data-ad-format="auto" data-full-width-responsive="true"></ins>
+              <script>
+                (adsbygoogle = window.adsbygoogle || []).push({});
+              </script>
+            </div>
+            <div class="information">
+              <h2>What is Temp Mail?</h2>
+              <p>
+                <strong>Temp Mail</strong>, short for "temporary email," is a service that provides users with a temporary, disposable email address. These addresses are designed to last for a short
+                period, typically ranging from a few minutes to a few hours, and are automatically discarded after their expiration. Temp Mail services are widely used for various purposes, including
+                protecting privacy, avoiding spam, and signing up for websites or services without revealing your primary email address.
+              </p>
+              <h2>How Temp Mail Works</h2>
+              <p>When you use a Temp Mail service, you are assigned a temporary email address that you can use to receive emails. Here’s a step-by-step overview of how it typically works:</p>
+              <ol>
+                <li>
+                  <strong>Generate an Email Address:</strong> Visit a Temp Mail website or use a Temp Mail app to generate a temporary email address. This is usually done with a single click, and you
+                  don’t need to provide any personal information.
+                </li>
+                <li>
+                  <strong>Use the Email Address:</strong> Use the temporary email address to sign up for websites, services, or newsletters. The address can receive emails just like a regular email
+                  account.
+                </li>
+                <li><strong>Access Emails:</strong> Check the inbox on the Temp Mail website or app to access any incoming emails. You can read, reply to, and delete emails as needed.</li>
+                <li><strong>Expiration:</strong> Your temporary email address <b>Not Expire</b> .</li>
+              </ol>
+              <h2>Benefits of Using Temp Mail</h2>
+              <p>Using Temp Mail offers several advantages:</p>
+              <ul>
+                <li>
+                  <strong>Privacy Protection:</strong> Temp Mail helps protect your primary email address from being exposed to potential spam, phishing attacks, or unwanted newsletters. It allows you
+                  to interact with websites and services without sharing your personal email address.
+                </li>
+                <li><strong>Avoiding Spam:</strong> By using a disposable email address for sign-ups, you can keep your primary inbox free from spam and promotional emails.</li>
+                <li>
+                  <strong>Quick and Easy:</strong> Temp Mail services are quick and easy to use, requiring no registration or personal information. This makes them convenient for temporary needs.
+                </li>
+                <li><strong>Enhanced Security:</strong> Temp Mail reduces the risk of your personal email address being targeted by cybercriminals or sold to third parties.</li>
+              </ul>
+              <h2>Common Use Cases for Temp Mail</h2>
+              <ul>
+                <li><strong>Website Sign-Ups:</strong> Use Temp Mail when signing up for websites, forums, or newsletters that you may not trust with your personal email address.</li>
+                <li>
+                  <strong>Free Trials:</strong> Use Temp Mail to sign up for free trials of software, services, or subscriptions without risking your primary email address being spammed after the
+                  trial period ends.
+                </li>
+                <li>
+                  <strong>Testing and Development:</strong> Developers and testers can use Temp Mail to test registration and email verification processes without cluttering their primary inboxes.
+                </li>
+                <li><strong>Online Shopping:</strong> Use Temp Mail when making one-time purchases from online stores to avoid receiving marketing emails.</li>
+              </ul>
+              <h2>Limitations of Temp Mail</h2>
+              <p>While Temp Mail offers many benefits, there are some limitations to be aware of:</p>
+              <ul>
+                <li>
+                  <strong>Limited Time:</strong> Temporary email addresses have a short lifespan and are automatically deleted after a certain period. This means you may not be able to access emails
+                  after the address expires.
+                </li>
+                <li>
+                  <strong>No Reply Guarantee:</strong> Some websites or services may recognize and block temporary email addresses, preventing you from completing the registration or verification
+                  process.
+                </li>
+                <li>
+                  <strong>Lack of Security:</strong> Since Temp Mail services are publicly accessible, the emails received on these addresses may not be private or secure. Sensitive information should
+                  not be sent or received via Temp Mail.
+                </li>
+              </ul>
+
+              <h2>Conclusion</h2>
+              <p>
+                Temp Mail services are valuable tools for protecting your privacy and managing your online presence. By understanding how they work and their benefits, you can make informed decisions
+                about when and how to use them effectively.
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div class="row">
-        <div class="information">
-          <h1>What is Temp Mail?</h1>
-          <p>
-            <strong>Temp Mail</strong>, short for "temporary email," is a service that provides users with a temporary, disposable email address. These addresses are designed to last for a short
-            period, typically ranging from a few minutes to a few hours, and are automatically discarded after their expiration. Temp Mail services are widely used for various purposes, including
-            protecting privacy, avoiding spam, and signing up for websites or services without revealing your primary email address.
-          </p>
-          <h2>How Temp Mail Works</h2>
-          <p>When you use a Temp Mail service, you are assigned a temporary email address that you can use to receive emails. Here’s a step-by-step overview of how it typically works:</p>
-          <ol>
-            <li>
-              <strong>Generate an Email Address:</strong> Visit a Temp Mail website or use a Temp Mail app to generate a temporary email address. This is usually done with a single click, and you
-              don’t need to provide any personal information.
-            </li>
-            <li>
-              <strong>Use the Email Address:</strong> Use the temporary email address to sign up for websites, services, or newsletters. The address can receive emails just like a regular email
-              account.
-            </li>
-            <li><strong>Access Emails:</strong> Check the inbox on the Temp Mail website or app to access any incoming emails. You can read, reply to, and delete emails as needed.</li>
-            <li><strong>Expiration:</strong> Your temporary email address <b>Not Expire</b> .</li>
-          </ol>
-          <h2>Benefits of Using Temp Mail</h2>
-          <p>Using Temp Mail offers several advantages:</p>
-          <ul>
-            <li>
-              <strong>Privacy Protection:</strong> Temp Mail helps protect your primary email address from being exposed to potential spam, phishing attacks, or unwanted newsletters. It allows you to
-              interact with websites and services without sharing your personal email address.
-            </li>
-            <li><strong>Avoiding Spam:</strong> By using a disposable email address for sign-ups, you can keep your primary inbox free from spam and promotional emails.</li>
-            <li><strong>Quick and Easy:</strong> Temp Mail services are quick and easy to use, requiring no registration or personal information. This makes them convenient for temporary needs.</li>
-            <li><strong>Enhanced Security:</strong> Temp Mail reduces the risk of your personal email address being targeted by cybercriminals or sold to third parties.</li>
-          </ul>
-          <h2>Common Use Cases for Temp Mail</h2>
-          <ul>
-            <li><strong>Website Sign-Ups:</strong> Use Temp Mail when signing up for websites, forums, or newsletters that you may not trust with your personal email address.</li>
-            <li>
-              <strong>Free Trials:</strong> Use Temp Mail to sign up for free trials of software, services, or subscriptions without risking your primary email address being spammed after the trial
-              period ends.
-            </li>
-            <li><strong>Testing and Development:</strong> Developers and testers can use Temp Mail to test registration and email verification processes without cluttering their primary inboxes.</li>
-            <li><strong>Online Shopping:</strong> Use Temp Mail when making one-time purchases from online stores to avoid receiving marketing emails.</li>
-          </ul>
-          <h2>Limitations of Temp Mail</h2>
-          <p>While Temp Mail offers many benefits, there are some limitations to be aware of:</p>
-          <ul>
-            <li>
-              <strong>Limited Time:</strong> Temporary email addresses have a short lifespan and are automatically deleted after a certain period. This means you may not be able to access emails after
-              the address expires.
-            </li>
-            <li>
-              <strong>No Reply Guarantee:</strong> Some websites or services may recognize and block temporary email addresses, preventing you from completing the registration or verification process.
-            </li>
-            <li>
-              <strong>Lack of Security:</strong> Since Temp Mail services are publicly accessible, the emails received on these addresses may not be private or secure. Sensitive information should not
-              be sent or received via Temp Mail.
-            </li>
-          </ul>
-
-          <h2>Conclusion</h2>
-          <p>
-            Temp Mail services are valuable tools for protecting your privacy and managing your online presence. By understanding how they work and their benefits, you can make informed decisions
-            about when and how to use them effectively.
-          </p>
+        <div class="col2" x-features="host.social-browser">
+          <ins class="adsbygoogle" style="display: block" data-ad-client="ca-pub-3372007384613151" data-ad-slot="7537664573" data-ad-format="auto" data-full-width-responsive="true"></ins>
+          <script>
+            (adsbygoogle = window.adsbygoogle || []).push({});
+          </script>
         </div>
-      </div>
-
-      <div x-features="host.social-browser">
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-3591JBECHZ"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag() {
-            dataLayer.push(arguments);
-          }
-          gtag('js', new Date());
-
-          gtag('config', 'G-3591JBECHZ');
-        </script>
-
-        <ins class="adsbygoogle" style="display: block" data-ad-client="ca-pub-3372007384613151" data-ad-slot="2472938527" data-ad-format="auto" data-full-width-responsive="true"></ins>
-        <script>
-          (adsbygoogle = window.adsbygoogle || []).push({});
-        </script>
       </div>
     </div>
 

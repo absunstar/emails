@@ -3,114 +3,114 @@
       
         {
             "id": 2,
-            "name": "Egypt", "ar":"مصر",
+            "name": "Egypt", "Ar":"مصر",
             "selected": true,
             "regions": [
                 {
-                    "name": "Cairo", "ar":"القاهرة"
+                    "name": "Cairo", "Ar":"القاهرة"
                 },
                 {
-                    "name": "Alex", "ar":"الاسكندرية"
+                    "name": "Alex", "Ar":"الاسكندرية"
                 },
                 {
-                    "name": "Tanta", "ar":"طنطا"
+                    "name": "Tanta", "Ar":"طنطا"
                 }
             ]
         },
         {
-            "name": "Saudi","ar":"السعودية",
+            "name": "Saudi","Ar":"السعودية",
             "regions": [
                 {
-                    "name": "Madina", "ar":"المدينة"
+                    "name": "Madina", "Ar":"المدينة"
                 },
                 {
-                    "name": "Macca", "ar":"مكة"
+                    "name": "Macca", "Ar":"مكة"
                 },
                 {
-                    "name": "Gada", "ar":"جادة"
+                    "name": "Gada", "Ar":"جادة"
                 }
             ]
         }
     ],
     "currencies": [
         {
-            "name": "USD", "ar":"دولار"
+            "name": "USD", "Ar":"دولار"
         },
         {
-            "name": "EGP", "ar":"جنيه مصرى"
+            "name": "EGP", "Ar":"جنيه مصرى"
         }
     ],
     "objectives": [
         {
-            "name": "Sell", "ar":"للبيع"
+            "name": "Sell", "Ar":"للبيع"
         },
         {
-            "name": "Rent", "ar":"للايجار"
+            "name": "Rent", "Ar":"للايجار"
         },
         {
-            "name": "Exchange", "ar":"للتبادل"
+            "name": "Exchange", "Ar":"للتبادل"
         },
         {
-            "name": "Purchase", "ar":"مطلوب للشراء"
+            "name": "Purchase", "Ar":"مطلوب للشراء"
         }
     ],
     "categories": [
         {
-            "name": "Department", "ar":"عقارات", "brands":[
+            "name": "Department", "Ar":"عقارات", "brands":[
                 {
-                    "name": "n1", "ar":"شقه"
+                    "name": "n1", "Ar":"شقه"
                 },
                 {
-                    "name": "n2", "ar":"بيت"
+                    "name": "n2", "Ar":"بيت"
                 },
                 {
-                    "name": "n3", "ar":"ارض"
+                    "name": "n3", "Ar":"ارض"
                 },
                 {
-                    "name": "n4", "ar":"عمارة"
+                    "name": "n4", "Ar":"عمارة"
                 },
                 {
-                    "name": "n5", "ar":"مكتب"
+                    "name": "n5", "Ar":"مكتب"
                 },
                 {
-                    "name": "n6", "ar":"استديو"
+                    "name": "n6", "Ar":"استديو"
                 },
                 {
-                    "name": "n7", "ar":"شاليه" 
+                    "name": "n7", "Ar":"شاليه" 
                 },
                 {
-                    "name": "n8", "ar":"فله"
+                    "name": "n8", "Ar":"فله"
                 },
                 {
-                    "name": "n9", "ar":"قصر"
+                    "name": "n9", "Ar":"قصر"
                 }
             ]
         },
         {
-            "name": "Mobile", "ar":"موبيل" , "brands":[
+            "name": "Mobile", "Ar":"موبيل" , "brands":[
                 {
-                    "name": "Samsung", "ar":"سامسونج"
+                    "name": "Samsung", "Ar":"سامسونج"
                 },
                 {
-                    "name": "Apple", "ar":"أبل"
+                    "name": "Apple", "Ar":"أبل"
                 },
                 {
-                    "name": "Microsoft", "ar":"مايكروسوفت"
+                    "name": "Microsoft", "Ar":"مايكروسوفت"
                 },
                 {
-                    "name": "HP", "ar":"اتش بى"
+                    "name": "HP", "Ar":"اتش بى"
                 },
                 {
-                    "name": "DELL", "ar":"ديل"
+                    "name": "DELL", "Ar":"ديل"
                 },
                 {
-                    "name": "Toshiba", "ar":"توشيبا"
+                    "name": "Toshiba", "Ar":"توشيبا"
                 },
                 {
-                    "name": "LG", "ar":"ال جى"
+                    "name": "LG", "Ar":"ال جى"
                 },
                 {
-                    "name": "Lenevo", "ar":"لينفو"
+                    "name": "Lenevo", "Ar":"لينفو"
                 }
             ]
         }

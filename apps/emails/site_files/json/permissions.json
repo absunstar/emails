@@ -1,6 +1,6 @@
 [
-    {"name" : "emails" , "ar" : "ادارة المحافظات" , "en" : "Emails Management"} ,
-    {"name" : "cities" , "ar" : "ادارة المدن" , "en" : "Cities Management"} ,
-    {"name" : "towns" , "ar" : "ادارة القرى" , "en" : "Towns Management"} ,
-    {"name" : "regions" , "ar" : "ادارة المناطق" , "en" : "Regions Management"}
+    {"name" : "emails" , "Ar" : "ادارة المحافظات" , "En" : "Emails Management"} ,
+    {"name" : "cities" , "Ar" : "ادارة المدن" , "En" : "Cities Management"} ,
+    {"name" : "towns" , "Ar" : "ادارة القرى" , "En" : "Towns Management"} ,
+    {"name" : "regions" , "Ar" : "ادارة المناطق" , "En" : "Regions Management"}
 ]

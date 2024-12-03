@@ -10,8 +10,8 @@ const parser = require('mailparser').simpleParser;
 
 const site = require('../isite')({
   port: 60025,
-  language: { id: 'EN', dir: 'ltr', text: 'left' },
-  lang: 'EN',
+  language: { id: 'En', dir: 'ltr', text: 'left' },
+  lang: 'En',
   version: new Date().getTime(),
   require: {
     features: [],

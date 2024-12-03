@@ -1,6 +1,6 @@
 [{
     "name": "address",
-    "ar": "ادارة العناوين",
-    "en": "Address",
+    "Ar": "ادارة العناوين",
+    "En": "Address",
     "permissions": ["emails", "towns", "cities", "regions"]
 }]

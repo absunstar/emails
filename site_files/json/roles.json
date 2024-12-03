@@ -1,8 +1,8 @@
 [
     {
         "name": "owner",
-        "ar": "مدير",
-        "en": "Owner",
+        "Ar": "مدير",
+        "En": "Owner",
         "permissions": [
             "owner",
             "eng",

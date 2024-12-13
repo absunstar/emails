@@ -34,6 +34,10 @@ $emails.createUnique({
   guid: 1,
 });
 
+site.get('robots.txt', (req, res) => {
+  res.txt('robots.txt');
+});
+
 const server = new SMTPServer({
   onAuth(auth, session, callback) {
     // if (auth.username !== "abc" || auth.password !== "def") {

@@ -8,13 +8,14 @@
   --color4: #b1b1b1;
   --color5: #e9ecef;
   --label-color: #d1d1d1;
-  --table-color: #FFEB3B;
-  
+
+  --table-color: #000;
+  --bs-table-bg: #fff;
+
   --theme-color: var(--color1);
   --modal-color: var(--color1);
   --bs-body-bg: var(--color2);
   --bs-body-color: var(--label-color);
-  --bs-table-bg: var(--color3);
 
   --body-background: var(--color2);
 

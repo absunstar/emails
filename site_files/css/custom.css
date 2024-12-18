@@ -5,8 +5,8 @@
   --color1: #1a2a32;
   --color2: #324955;
   --color3: #607d8b;
-  --color4: #198754;
-
+  --color4: #b1b1b1;
+  --color5: #e9ecef;
   --label-color: #d1d1d1;
 
   --theme-color: var(--color1);
@@ -282,8 +282,8 @@ nav h2.brand a {
 }
 
 nav h2.brand a span {
-  font-size: 14px;
-  color: #ffffff;
+  font-size: 16px;
+  color: var(--color5);
   vertical-align: baseline;
 }
 nav h2.brand .title a img {

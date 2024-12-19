@@ -40,7 +40,13 @@ h1 {
   font-weight: bold;
   text-shadow: 0 0 8px var(--color1);
 }
-
+.v-center {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-content: center;
+}
 .information {
   background: var(--color3);
   padding: 10px;

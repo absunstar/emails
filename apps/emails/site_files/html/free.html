@@ -3,7 +3,7 @@
   <head x-import="head.html">
     <style>
       ins {
-        background: #ddd;
+        background: var(--color1);
       }
       fieldset {
         margin: 15px !important;
@@ -39,8 +39,7 @@
               <div x-import="emails/view_modal.html"></div>
 
               <fieldset>
-                <legend>##word.Email Information##</legend>
-                <div class="row">
+                <div class="row v-center">
                   <i-button class="search" type="new" ng-click="generateEmail()" label="##word.Generate New Email##"></i-button>
                   <i-control class="col4" ng-model="emailSearch.to" label="##word.Write Your Exists Email##" type="text"></i-control>
                   <i-button class="search" type="copy" ng-click="copy()" label="##word.Copy Email##"></i-button>
@@ -49,11 +48,11 @@
               </fieldset>
 
               <fieldset>
-                <legend>##word.Messages##</legend>
+                <legend>##word.Your Mail Inbox##</legend>
                 <div class="row">
-                  <i-control class="col8" ng-model="searchText" label="Filter Messages"></i-control>
-                  <i-button class="search" type="search" ng-click="searchAll(true)" label="##word.Load All Message##"></i-button>
-                  <i-button class="col" x-features="login" type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
+                  <i-control ng-show="list.length > 0" class="col8" ng-model="searchText" label="Filter Inbox Messages"></i-control>
+                  <i-button class="reset" type="search" ng-click="searchAll(true)" label="##word.re-Load Mail Inbox##"></i-button>
+                  <i-button class="col2" x-features="login" type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
                 </div>
 
                 <div class="row">

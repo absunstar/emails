@@ -109,18 +109,12 @@
                 <div class="row">
                   <table class="table hover">
                     <tr>
-                      <th>Index</th>
-                      <th>From</th>
-                      <th>Subject</th>
-                      <th>Actions</th>
+                      <th>Message</th>
                     </tr>
                     <tr ng-repeat="c in list | filter:searchText">
                       <td>
-                        <p class="bold center">{{$index + 1}}</p>
-                      </td>
-                      <td><p class="green center">{{c.from}}</p></td>
-                      <td><p class="bold center">{{c.subject}}</p></td>
-                      <td>
+                        <p class="green center">{{c.from}}</p>
+                        <p class="bold center">{{c.subject}}</p>
                         <div class="row center">
                           <i-button type="view" ng-click="details(c)" label="##word.View##"></i-button>
                           <i-button x-features="login" type="delete" ng-click="delete(c)" label="##word.Delete##"></i-button>

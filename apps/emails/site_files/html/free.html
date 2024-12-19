@@ -23,12 +23,14 @@
         font-size: 26px !important;
         line-height: 1.8 !important;
       }
-      .reset-btn button{
+      .reset-btn button {
         font-size: 2rem;
         line-height: 1.8;
         max-height: fit-content;
         background: var(--color);
         color: var(--color5);
+      }
+      .reset-btn button span {
         --bs-spinner-width: 2rem;
         --bs-spinner-height: 2rem;
         --bs-spinner-border-width: 0.2em;
@@ -57,7 +59,7 @@
               <fieldset>
                 <div class="row">
                   <i-button class="col4 reset-btn" type="reset" ng-click="generateEmail()" label="##word.Generate New Email##"></i-button>
-                  <i-control class="col7" ng-model="emailSearch.to" label="##word.If You Have Exists Mail , write it##" type="text"></i-control>
+                  <i-control class="col6" ng-model="emailSearch.to" label="##word.If You Have Exists Mail , write it##" type="text"></i-control>
                   <i-button class="col2" type="copy" ng-click="copy()" label="##word.Copy Email##"></i-button>
                   <i-button x-features="login" class="col" type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
                 </div>

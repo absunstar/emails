@@ -61,14 +61,18 @@
                       <th>Index</th>
                       <th>From</th>
                       <th>Subject</th>
+                      <th>Actions</th>
                     </tr>
                     <tr ng-repeat="c in list | filter:searchText">
                       <td>
                         <p class="bold">{{$index + 1}}</p>
-                        <i-button x-features="login" type="delete" ng-click="delete(c)" label="##word.emails_delete##"></i-button>
                       </td>
                       <td><p class="blue center">{{c.from}}</p></td>
                       <td><p class="bold center">{{c.subject}}</p></td>
+                      <td>
+                        <i-button type="view" ng-click="details(c)" label="##word.View##"></i-button>
+                        <i-button x-features="login" type="delete" ng-click="delete(c)" label="##word.Delete##"></i-button>
+                      </td>
                     </tr>
                   </table>
                 </div>

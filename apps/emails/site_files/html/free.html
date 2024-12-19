@@ -20,7 +20,7 @@
       input {
         background-color: var(--color2) !important;
         color: yellow !important;
-        font-size: 26px !important;
+        font-size: 2rem !important;
         line-height: 1.8 !important;
       }
       .reset-btn button {
@@ -60,7 +60,7 @@
                 <div class="row">
                   <i-button class="col4 reset-btn" type="reset" ng-click="generateEmail()" label="##word.Generate New Email##"></i-button>
                   <i-control class="col6" ng-model="emailSearch.to" label="##word.If You Have Exists Mail , write it##" type="text"></i-control>
-                  <i-button class="col2" type="copy" ng-click="copy()" label="##word.Copy Email##"></i-button>
+                  <i-button class="col2" type="copy" ng-click="copy()"></i-button>
                   <i-button x-features="login" class="col" type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
                 </div>
               </fieldset>

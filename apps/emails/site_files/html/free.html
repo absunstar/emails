@@ -23,6 +23,12 @@
         font-size: 2rem !important;
         line-height: 1.8 !important;
       }
+      .btn {
+        transition: all 0.2s ease;
+      }
+      .btn:hover {
+        transform: scale(1.1);
+      }
       .reset-btn button {
         font-size: 2rem;
         line-height: 1.8;
@@ -34,6 +40,20 @@
         --bs-spinner-width: 2rem;
         --bs-spinner-height: 2rem;
         --bs-spinner-border-width: 0.2em;
+      }
+      .copy-btn button {
+        max-height: fit-content;
+        background: var(--color1);
+        color: var(--color5);
+        font-size: 2rem;
+      }
+      .search-btn button {
+        font-size: 2rem;
+        max-height: fit-content;
+        background: var(--color1);
+        color: var(--color5);
+        line-height: 1.8;
+        margin-bottom: 50px !important;
       }
     </style>
     <script x-features="host.social-browser" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3372007384613151" crossorigin="anonymous"></script>
@@ -60,7 +80,7 @@
                 <div class="row">
                   <i-button class="col4 reset-btn" type="reset" ng-click="generateEmail()" label="##word.Generate New Email##"></i-button>
                   <i-control class="col6" ng-model="emailSearch.to" label="##word.If You Have Exists Mail , write it##" type="text"></i-control>
-                  <i-button class="col2" type="copy" ng-click="copy()"></i-button>
+                  <i-button class="col2 copy-btn" type="copy" ng-click="copy()"></i-button>
                   <i-button x-features="login" class="col" type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
                 </div>
               </fieldset>

@@ -19,7 +19,7 @@
       }
       input {
         background-color: var(--color2) !important;
-        color: #0dcaf0  !important;
+        color: #0dcaf0 !important;
         font-size: 2rem !important;
         line-height: 1.8 !important;
         font-weight: bold !important;
@@ -59,6 +59,15 @@
         color: var(--color5);
         line-height: 1.8;
         margin-bottom: 50px !important;
+      }
+      @media screen and (max-width: 768px /*mobile*/) {
+        input {
+          font-size: 1rem !important;
+        }
+        .table > tbody {
+          display: table;
+          width: 100%;
+        }
       }
     </style>
     <script x-features="host.social-browser" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3372007384613151" crossorigin="anonymous"></script>

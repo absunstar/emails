@@ -39,11 +39,11 @@
               <div x-import="emails/view_modal.html"></div>
 
               <fieldset>
-                <div class="row v-center">
-                  <i-button class="search" type="new" ng-click="generateEmail()" label="##word.Generate New Email##"></i-button>
+                <div class="row">
+                  <i-button class="col2" type="new" ng-click="generateEmail()" label="##word.Generate New Email##"></i-button>
                   <i-control class="col8" ng-model="emailSearch.to" label="##word.If You Have Exists Mail , write it##" type="text"></i-control>
-                  <i-button class="search" type="copy" ng-click="copy()" label="##word.Copy Email##"></i-button>
-                  <i-button x-features="login" class="search" type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
+                  <i-button class="col2" type="copy" ng-click="copy()" label="##word.Copy Email##"></i-button>
+                  <i-button x-features="login" class="col" type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
                 </div>
               </fieldset>
 

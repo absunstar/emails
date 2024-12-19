@@ -18,8 +18,20 @@
         transform: scale(1.05);
       }
       input {
-        background: var(--color2);
-        color: yellow;
+        background-color: var(--color2) !important;
+        color: yellow !important;
+        font-size: 26px !important;
+        line-height: 1.8 !important;
+      }
+      .reset-btn {
+        font-size: 2rem;
+        line-height: 1.8;
+        max-height: fit-content;
+        background: var(--color);
+        color: var(--color5);
+        --bs-spinner-width: 2rem;
+        --bs-spinner-height: 2rem;
+        --bs-spinner-border-width: 0.2em;
       }
     </style>
     <script x-features="host.social-browser" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3372007384613151" crossorigin="anonymous"></script>
@@ -44,7 +56,7 @@
 
               <fieldset>
                 <div class="row">
-                  <i-button class="col3" type="reset" ng-click="generateEmail()" label="##word.Generate New Email##"></i-button>
+                  <i-button class="col4 reset-btn" type="reset" ng-click="generateEmail()" label="##word.Generate New Email##"></i-button>
                   <i-control class="col7" ng-model="emailSearch.to" label="##word.If You Have Exists Mail , write it##" type="text"></i-control>
                   <i-button class="col2" type="copy" ng-click="copy()" label="##word.Copy Email##"></i-button>
                   <i-button x-features="login" class="col" type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>

@@ -207,19 +207,6 @@ app.controller('emails', function ($scope, $http) {
       minEmailLength = 1;
     }
 
-    if ($scope.emailSearch.from) {
-      where['from'] = $scope.emailSearch.from;
-    }
-    if ($scope.emailSearch.to) {
-      where['to'] = $scope.emailSearch.to;
-    }
-    if ($scope.emailSearch.subject) {
-      where['subject'] = $scope.emailSearch.subject;
-    }
-    if ($scope.emailSearch.text) {
-      where['text'] = $scope.emailSearch.text;
-    }
-
     if (free) {
       if (!$scope.emailSearch.to) {
         alert('Write Your Email Address');
@@ -235,6 +222,20 @@ app.controller('emails', function ($scope, $http) {
         return;
       }
     }
+
+    if ($scope.emailSearch.from) {
+      where['from'] = $scope.emailSearch.from;
+    }
+    if ($scope.emailSearch.to) {
+      where['to'] = $scope.emailSearch.to;
+    }
+    if ($scope.emailSearch.subject) {
+      where['subject'] = $scope.emailSearch.subject;
+    }
+    if ($scope.emailSearch.text) {
+      where['text'] = $scope.emailSearch.text;
+    }
+
     $scope.loadAll(where, $scope.emailSearch.limit);
 
     site.hideModal('#SearchModal');

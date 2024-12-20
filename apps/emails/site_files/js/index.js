@@ -221,12 +221,17 @@ app.controller('emails', function ($scope, $http) {
     }
 
     if (free) {
-      if (!$scope.emailSearch.to || $scope.emailSearch.to.indexOf('@') === -1) {
-        alert('Email Must include @ ');
+      if (!$scope.emailSearch.to) {
+        alert('Write Your Email Address');
         return;
       }
-      if (!$scope.emailSearch.to || $scope.emailSearch.to.split('@')[0].length < minEmailLength) {
-        alert('Email Length Must be 8 letter or more ...');
+
+      if ($scope.emailSearch.to.indexOf('@') === -1) {
+        $scope.emailSearch.to = $scope.emailSearch.to + '@' + document.location.hostname.replace('emails.', '');
+      }
+
+      if ($scope.emailSearch.to.split('@')[0].length < minEmailLength) {
+        alert('Email Length Must be ' + minEmailLength + ' letter or more ...');
         return;
       }
     }

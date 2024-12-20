@@ -18,7 +18,8 @@
   --bs-body-color: var(--label-color);
 
   --body-background: var(--color2);
-
+  --bs-modal-bg: var(--color2);
+  
   --fieldset-background: var(--color1);
   --legend-color: var(--color);
 

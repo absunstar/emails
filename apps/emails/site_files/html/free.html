@@ -19,8 +19,8 @@
       }
       input {
         background-color: var(--color2) !important;
-        color: #0dcaf0 !important;
-        font-size: 2rem !important;
+        color: #607d8b !important;
+        font-size: 1.5rem !important;
         line-height: 1.8 !important;
         font-weight: bold !important;
         text-align: center;
@@ -95,7 +95,6 @@
                   <i-button class="col4 reset-btn" type="reset" ng-click="generateEmail()" label="##word.New Email##"></i-button>
                   <i-control class="col" ng-model="emailSearch.to" label="##word.If You Have Exists Mail , write it##" type="text"></i-control>
                   <i-button class="col2 copy-btn" type="copy" ng-click="copy()"></i-button>
-                  <i-button x-features="login" class="col" type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
                 </div>
               </fieldset>
 
@@ -103,7 +102,7 @@
                 <legend>##word.Your Mail Inbox##</legend>
                 <div class="row center">
                   <i-button class="search-btn" type="search" ng-click="searchAll(true)" label="##word.Check Mail Inbox##"></i-button>
-                  <i-button class="col2" x-features="login" type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
+                  <i-button ng-show="list.length > 0" class="col2" x-features="login" type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
                 </div>
 
                 <div class="row">

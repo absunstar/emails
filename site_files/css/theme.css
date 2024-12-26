@@ -5,7 +5,8 @@
   --float: right;
   --direction: rtl;
   --color: #030303;
-  --background-color: #ffffff;
+  --background-color: var(--body-background-color);
+  --bs-modal-bg: var(--body-background-color);
   --box-shadow-color: #000;
   --navbar-color: #fff;
   --navbar-background-color: #283e4a;
@@ -14,7 +15,6 @@
   --modal-header-color: #fff;
   --modal-footer-color: #fff;
   --modal-background-color: #607d8b;
-  --bs-modal-bg: var(--body-background);
   --modal-header-background-color: #283e4a;
   --modal-footer-background-color: #607d8b;
   --modal-box-shadow-color: #191919;

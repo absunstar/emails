@@ -13,12 +13,12 @@
   --bs-table-bg: #fff;
 
   --theme-color: var(--color1);
-  --modal-color: var(--color1);
+
   --bs-body-bg: var(--color2);
   --bs-body-color: var(--label-color);
 
   --body-background: var(--color2);
-  --bs-modal-bg: var(--color2);
+
   --fieldset-background: var(--color1);
   --legend-color: var(--color);
 
@@ -28,6 +28,10 @@
   --scrollbar-outline: 1px solid var(--scrollbar-color);
   --scrollbar-background-color: var(--theme-color);
   --scrollbar-box-shadow: inset 0 0 6px #000000;
+}
+.modal {
+  --bs-modal-bg: var(--color2);
+  --modal-color: var(--color1);
 }
 body {
   user-select: auto;

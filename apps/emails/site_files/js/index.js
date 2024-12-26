@@ -203,7 +203,7 @@ app.controller('emails', function ($scope, $http) {
   $scope.searchAll = function (free = false) {
     let where = {};
     let minEmailLength = 8;
-    if ('##req.url##'.indexOf('vip') !== -1) {
+    if (document.location.href.like('*vip*')) {
       minEmailLength = 1;
     }
 

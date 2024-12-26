@@ -1,7 +1,9 @@
 :root {
- 
-  --float : right;
-  --direction : rtl;
+  --body-color: #030303;
+  --body-background-color: #607d8b;
+  --body-border: 1px solid #353535;
+  --float: right;
+  --direction: rtl;
   --color: #030303;
   --background-color: #ffffff;
   --box-shadow-color: #000;
@@ -11,13 +13,12 @@
   --modal-color: #fff;
   --modal-header-color: #fff;
   --modal-footer-color: #fff;
-  --modal-background-color: #607D8B;
+  --modal-background-color: #607d8b;
+  --bs-modal-bg: var(--body-background);
   --modal-header-background-color: #283e4a;
-  --modal-footer-background-color: #607D8B;
+  --modal-footer-background-color: #607d8b;
   --modal-box-shadow-color: #191919;
-  --body-color: #030303;
-  --body-background-color: #607D8B;
-  --body-border: 1px solid #353535;
+
   --table-color: #030303;
   --table-background-color: #ffffff;
   --table-border: 1px solid #bbb;

@@ -324,3 +324,8 @@ app.controller('emails', function ($scope, $http) {
     $scope.loadAll({ to: $scope.emailSearch.to }, 500);
   }
 });
+if (document.location.href.like('*vip*')) {
+  document.querySelectorAll('.side1 , .side2').forEach((s) => {
+    s.remove();
+  });
+}

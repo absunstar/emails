@@ -1,4 +1,17 @@
 app.controller('emails', function ($scope, $http) {
+  $scope.isVIP = false;
+  $scope.minEmailLength = 10;
+  $scope.emailLength = 12;
+
+  if (document.location.href.like('*vip*')) {
+    $scope.isVIP = true;
+    $scope.minEmailLength = 6;
+    $scope.emailLength = 8;
+    document.querySelectorAll('.side1 , .side2').forEach((s) => {
+      s.remove();
+    });
+  }
+
   $scope.email = {};
   $scope.emailSearch = { to: '', from: '', limit: 200, message: '' };
   $scope.newEmail = function () {
@@ -202,10 +215,6 @@ app.controller('emails', function ($scope, $http) {
   };
   $scope.searchAll = function (free = false) {
     let where = {};
-    let minEmailLength = 8;
-    if (document.location.href.like('*vip*')) {
-      minEmailLength = 1;
-    }
 
     if (free) {
       if (!$scope.emailSearch.to) {
@@ -217,8 +226,8 @@ app.controller('emails', function ($scope, $http) {
         $scope.emailSearch.to = $scope.emailSearch.to + '@' + document.location.hostname.replace('emails.', '');
       }
 
-      if ($scope.emailSearch.to.split('@')[0].length < minEmailLength) {
-        alert('Email Length Must be ' + minEmailLength + ' letter or more ...');
+      if ($scope.emailSearch.to.split('@')[0].length < $scope.minEmailLength) {
+        alert('Email Length Must be ' + $scope.minEmailLength + ' letter or more ...');
         return;
       }
     }
@@ -275,27 +284,16 @@ app.controller('emails', function ($scope, $http) {
     );
   };
 
-  function makeid(length = 12) {
+  function makeid() {
     let result = '';
 
-    const characters = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
-    const charactersLength = characters.length;
-    const numberLength = numbers.length;
+    let characters = 'abcdefghijklmnopqrstuvwxyz' + '0123456789';
+    let charactersLength = characters.length;
 
-    let length1 = length - 4;
-    let length2 = 4;
-
-    let counter1 = 0;
-    while (counter1 < length1) {
+    let counter = 0;
+    while (counter < $scope.emailLength) {
       result += characters.charAt(Math.floor(Math.random() * charactersLength));
-      counter1 += 1;
-    }
-
-    let counter2 = 0;
-    while (counter2 < length2) {
-      result += numbers.charAt(Math.floor(Math.random() * numberLength));
-      counter2 += 1;
+      counter += 1;
     }
 
     return result;
@@ -304,11 +302,11 @@ app.controller('emails', function ($scope, $http) {
   $scope.generateEmail = function () {
     let host = document.location.hostname;
     host = host.split('.');
-    if (host.length == 3) {
+    if (host.length > 2) {
       host.splice(0, host.length - 2);
     }
     host = host.join('.');
-    $scope.emailSearch.to = makeid(12) + '@' + host;
+    $scope.emailSearch.to = makeid() + '@' + host;
   };
 
   $scope.copy = function () {
@@ -324,8 +322,3 @@ app.controller('emails', function ($scope, $http) {
     $scope.loadAll({ to: $scope.emailSearch.to }, 500);
   }
 });
-if (document.location.href.like('*vip*')) {
-  document.querySelectorAll('.side1 , .side2').forEach((s) => {
-    s.remove();
-  });
-}

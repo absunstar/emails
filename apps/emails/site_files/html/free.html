@@ -1,272 +1,290 @@
 <!DOCTYPE html>
-<html lang="##session.language.id##" dir="##session.language.dir##" class="##session.language.id##" data-ng-app="myApp">
-  <head x-import="head.html">
-    <style>
-      ins {
-        background: var(--color1);
-      }
-      fieldset {
-        margin: 15px !important;
-        padding: 10px;
-        margin-bottom: 30px !important;
-        border-radius: 10px;
-      }
-      .message {
-        transition: all 0.2s ease;
-      }
-      .message:hover {
-        transform: scale(1.05);
-      }
-      input {
-        background-color: var(--color2) !important;
-        color: #607d8b !important;
-        font-size: 1.5rem !important;
-        line-height: 1.8 !important;
-        font-weight: bold !important;
-        text-align: center;
-      }
-      .btn {
-        transition: all 0.2s ease;
-      }
-      .btn:hover,
-      .btn:focus {
-        background-color: var(--color1);
-        border-color: var(--color5);
-        color: var(--color5);
-      }
-      .reset-btn button {
-        font-size: 2rem;
-        line-height: 1.8;
-        max-height: fit-content;
-        background: var(--color);
-        color: var(--color5);
-      }
-      button .spinner-border-sm {
-        --bs-spinner-width: 2rem;
-        --bs-spinner-height: 2rem;
-        --bs-spinner-border-width: 0.2em;
-      }
-      .copy-btn button {
-        max-height: fit-content;
-        background: var(--color1);
-        color: var(--color5);
-        font-size: 2rem;
-      }
-      .search-btn button {
-        font-size: 2rem;
-        max-height: fit-content;
-        background: var(--color1);
-        color: var(--color5);
-        line-height: 1.8;
-        margin-bottom: 50px !important;
-      }
-      @media screen and (max-width: 768px /*mobile*/) {
-        input {
-          font-size: 1rem !important;
-        }
-        .table > tbody {
-          display: table;
-          width: 100%;
-        }
-      }
-    </style>
-    <script x-features="host.social-browser" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3372007384613151" crossorigin="anonymous"></script>
-  </head>
+<html lang="##session.language.id##" dir="##session.language.dir##" class="##session.language.id##" ng-app="myApp">
+    <head x-import="head.html">
+        <style>
+            ins {
+                background: var(--color1);
+            }
+            fieldset {
+                margin: 15px !important;
+                padding: 10px;
+                margin-bottom: 30px !important;
+                border-radius: 10px;
+            }
+            .message {
+                transition: all 0.2s ease;
+            }
+            .message:hover {
+                transform: scale(1.05);
+            }
+            input {
+                background-color: var(--color2) !important;
+                color: #607d8b !important;
+                font-size: 1.5rem !important;
+                line-height: 1.8 !important;
+                font-weight: bold !important;
+                text-align: center;
+            }
+            .btn {
+                transition: all 0.2s ease;
+            }
+            .btn:hover,
+            .btn:focus {
+                background-color: var(--color1);
+                border-color: var(--color5);
+                color: var(--color5);
+            }
+            .reset-btn button {
+                font-size: 2rem;
+                line-height: 1.8;
+                max-height: fit-content;
+                background: var(--color);
+                color: var(--color5);
+            }
+            button .spinner-border-sm {
+                --bs-spinner-width: 2rem;
+                --bs-spinner-height: 2rem;
+                --bs-spinner-border-width: 0.2em;
+            }
+            .copy-btn button {
+                max-height: fit-content;
+                background: var(--color1);
+                color: var(--color5);
+                font-size: 2rem;
+            }
+            .search-btn button {
+                font-size: 2rem;
+                max-height: fit-content;
+                background: var(--color1);
+                color: var(--color5);
+                line-height: 1.8;
+                margin-bottom: 50px !important;
+            }
+            @media screen and (max-width: 768px /*mobile*/) {
+                input {
+                    font-size: 1rem !important;
+                }
+                .table > tbody {
+                    display: table;
+                    width: 100%;
+                }
+            }
+        </style>
+        <script x-features="host.social-browser" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3372007384613151" crossorigin="anonymous"></script>
+    </head>
 
-  <body>
-    <nav x-import="navbar/index.html" class="sitebar" data-ng-controller="navbar"></nav>
+    <body>
+        <nav x-import="navbar/index.html" class="sitebar" ng-controller="navbar"></nav>
 
-    <div id="main-layout" class="container loaded">
-      <h1>##word.h1##</h1>
-      <div class="row">
-        <div class="col2 side1" x-features="host.social-browser && os.desktop">
-          <ins class="adsbygoogle" style="display: block" data-ad-client="ca-pub-3372007384613151" data-ad-slot="3239326915" data-ad-format="auto" data-full-width-responsive="true"></ins>
-          <script>
-            (adsbygoogle = window.adsbygoogle || []).push({});
-          </script>
-        </div>
-        <div class="col">
-          <div class="row">
-            <div class="col" ng-controller="emails">
-              <div x-import="emails/view_modal.html"></div>
-
-              <fieldset>
-                <div class="row">
-                  <i-button class="col4 reset-btn" type="reset" ng-click="generateEmail()" label="##word.New Email##"></i-button>
-                  <i-control class="col" ng-model="emailSearch.to" label="##word. If You Have ( Temp Mail ) ? Write it here or Click New Email##" type="text"></i-control>
-                  <i-button class="col2 copy-btn" type="copy" ng-click="copy()"></i-button>
+        <div id="main-layout" class="container loaded">
+            <h1>##word.h1##</h1>
+            <div class="row">
+                <div class="col2 side1" x-features="host.social-browser && os.desktop">
+                    <ins class="adsbygoogle" style="display: block" data-ad-client="ca-pub-3372007384613151" data-ad-slot="3239326915" data-ad-format="auto" data-full-width-responsive="true"></ins>
+                    <script>
+                        (adsbygoogle = window.adsbygoogle || []).push({});
+                    </script>
                 </div>
-              </fieldset>
+                <div class="col">
+                    <div class="row">
+                        <div class="col" ng-controller="emails">
+                            <div x-import="emails/view_modal.html"></div>
 
-              <fieldset>
-                <legend>##word.Your Mail Inbox##</legend>
-                <div class="row center">
-                  <i-button class="search-btn" type="search" ng-click="searchAll(true)" label="##word.Check Mail Inbox##"></i-button>
-                  <i-button ng-show="list.length > 0" class="col2" x-features="login" type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
-                </div>
+                            <fieldset>
+                                <div class="row">
+                                    <i-button class="col4 reset-btn" type="reset" ng-click="generateEmail()" label="##word.New Email##"></i-button>
+                                    <i-control class="col" ng-model="emailSearch.to" label="##word. If You Have ( Temp Mail ) ? Write it here or Click New Email##" type="text"></i-control>
+                                    <i-button class="col2 copy-btn" type="copy" ng-click="copy()"></i-button>
+                                </div>
+                            </fieldset>
 
-                <div class="row">
-                  <table class="table hover">
-                    <tr>
-                      <th>Messages</th>
-                    </tr>
-                    <tr ng-repeat="c in list | filter:searchText">
-                      <td>
-                        <p class="green center">{{c.from}}</p>
-                        <p class="bold center">{{c.subject}}</p>
-                        <div class="row center">
-                          <i-button type="view" ng-click="details(c)" label="##word.View##"></i-button>
-                          <i-button x-features="login" type="delete" ng-click="delete(c)" label="##word.Delete##"></i-button>
+                            <fieldset>
+                                <legend>##word.Your Mail Inbox##</legend>
+                                <div class="row center">
+                                    <i-button class="search-btn" type="search" ng-click="searchAll(true)" label="##word.Check Mail Inbox##"></i-button>
+                                    <i-button ng-show="list.length > 0" class="col2" x-features="login" type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button>
+                                </div>
+
+                                <div class="row">
+                                    <table class="table hover">
+                                        <tr>
+                                            <th>Messages</th>
+                                        </tr>
+                                        <tr ng-repeat="c in list | filter:searchText">
+                                            <td>
+                                                <p class="green center">{{c.from}}</p>
+                                                <p class="bold center">{{c.subject}}</p>
+                                                <div class="row center">
+                                                    <i-button type="view" ng-click="details(c)" label="##word.View##"></i-button>
+                                                    <i-button x-features="login" type="delete" ng-click="delete(c)" label="##word.Delete##"></i-button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </fieldset>
                         </div>
-                      </td>
-                    </tr>
-                  </table>
+                    </div>
+                    <div class="row">
+                        <div class="information">
+                            <h2>Social Temp Mail: Enhancing Privacy in the Social Media Age</h2>
+                            <p>
+                                In today's digital age, privacy is a growing concern for social media users. With the increasing number of websites and services requiring email addresses for
+                                registration, many individuals are turning to temporary email services, also known as Temp Mail, to protect their personal information. Social Temp Mail offers a
+                                convenient solution for maintaining privacy while interacting on social media platforms. This article explores what Social Temp Mail is, how it works, its benefits, and
+                                how it can be used effectively.
+                            </p>
+                            <h2>What is Social Temp Mail?</h2>
+                            <div x-features="host.social-browser">
+                                <script async src="https://www.googletagmanager.com/gtag/js?id=G-3591JBECHZ"></script>
+                                <script>
+                                    window.dataLayer = window.dataLayer || [];
+                                    function gtag() {
+                                        dataLayer.push(arguments);
+                                    }
+                                    gtag('js', new Date());
+
+                                    gtag('config', 'G-3591JBECHZ');
+                                </script>
+
+                                <ins
+                                    class="adsbygoogle"
+                                    style="display: block"
+                                    data-ad-client="ca-pub-3372007384613151"
+                                    data-ad-slot="2472938527"
+                                    data-ad-format="auto"
+                                    data-full-width-responsive="true"
+                                ></ins>
+                                <script>
+                                    (adsbygoogle = window.adsbygoogle || []).push({});
+                                </script>
+                            </div>
+                            <p>
+                                Social Temp Mail is a temporary email service designed specifically for use with social media platforms. It provides users with disposable email addresses that can be
+                                used for a short period, typically ranging from a few minutes to a few hours. These email addresses allow users to sign up for social media accounts, verify profiles,
+                                and interact with websites without revealing their primary email address.
+                            </p>
+                            <h2>How Social Temp Mail Works</h2>
+                            <p>Using Social Temp Mail involves a few simple steps:</p>
+                            <ol>
+                                <li>
+                                    <strong>Generate a Temporary Email Address:</strong> Visit a Social Temp Mail website or use a mobile app to generate a temporary email address. This process
+                                    usually requires no registration and can be completed with a single click.
+                                </li>
+                                <li>
+                                    <strong>Use the Temporary Email Address:</strong> Use the generated email address to register for social media accounts, participate in online communities, or sign
+                                    up for newsletters. The temporary email address functions like a regular email address for receiving messages.
+                                </li>
+                                <li>
+                                    <strong>Access Emails:</strong> Check the inbox on the Social Temp Mail website or app to view any incoming emails. You can read, reply to, and delete emails as
+                                    needed.
+                                </li>
+                                <li>
+                                    <strong>Expiration:</strong> The temporary email address will automatically expire after a predetermined period, and all associated emails will be permanently
+                                    deleted. This ensures that your information is not stored indefinitely.
+                                </li>
+                            </ol>
+                            <h2>Benefits of Using Social Temp Mail</h2>
+                            <p>Social Temp Mail offers several advantages for social media users:</p>
+                            <ul>
+                                <li>
+                                    <strong>Enhanced Privacy:</strong> By using a temporary email address, you can protect your primary email from being exposed to potential spam, phishing attempts,
+                                    and unwanted marketing messages.
+                                </li>
+                                <li>
+                                    <strong>Avoiding Spam:</strong> Social Temp Mail helps keep your primary inbox clean by filtering out promotional emails and spam that often accompany social media
+                                    sign-ups.
+                                </li>
+                                <li>
+                                    <strong>Anonymity:</strong> Temporary email addresses allow you to interact with social media platforms and online communities without revealing your true identity.
+                                    This can be particularly useful for maintaining anonymity in forums and discussion boards.
+                                </li>
+                                <li>
+                                    <strong>Reduced Risk of Data Breaches:</strong> Using Social Temp Mail reduces the risk of your personal email being compromised in data breaches, as the temporary
+                                    address is not linked to your sensitive information.
+                                </li>
+                                <li>
+                                    <strong>Convenience:</strong> Social Temp Mail services are quick and easy to use, requiring no registration or personal information. This makes them convenient for
+                                    temporary needs.
+                                </li>
+                            </ul>
+                            <h2>Common Use Cases for Social Temp Mail</h2>
+                            <p>There are several scenarios where Social Temp Mail can be particularly useful:</p>
+                            <ul>
+                                <li>
+                                    <strong>Creating Multiple Social Media Accounts:</strong> Whether you need multiple accounts for managing different aspects of your online presence or for testing
+                                    purposes, Social Temp Mail can help you create and verify these accounts without cluttering your primary inbox.
+                                </li>
+                                <li>
+                                    <strong>Signing Up for Newsletters and Promotions:</strong> If you want to access exclusive content, promotions, or newsletters without receiving follow-up
+                                    marketing emails, Social Temp Mail provides a temporary solution.
+                                </li>
+                                <li>
+                                    <strong>Participating in Online Communities:</strong> Use Social Temp Mail to join forums, discussion boards, and online communities while maintaining your privacy
+                                    and anonymity.
+                                </li>
+                                <li>
+                                    <strong>Free Trials and Temporary Services:</strong> When signing up for free trials or temporary services, Social Temp Mail allows you to test the service without
+                                    committing your primary email address to potential spam.
+                                </li>
+                            </ul>
+                            <h2>Limitations of Social Temp Mail</h2>
+                            <p>While Social Temp Mail offers many benefits, there are some limitations to consider:</p>
+                            <ul>
+                                <li>
+                                    <strong>Limited Time:</strong> Temporary email addresses have a short lifespan and are automatically deleted after a certain period. This means you may not be able
+                                    to access emails after the address expires.
+                                </li>
+                                <li>
+                                    <strong>No Reply Guarantee:</strong> Some websites or services may recognize and block temporary email addresses, preventing you from completing the registration or
+                                    verification process.
+                                </li>
+                                <li>
+                                    <strong>Lack of Security:</strong> Since Social Temp Mail services are publicly accessible, the emails received on these addresses may not be private or secure.
+                                    Sensitive information should not be sent or received via Social Temp Mail.
+                                </li>
+                            </ul>
+                            <h2>Popular Social Temp Mail Services</h2>
+                            <p>Here are some popular Social Temp Mail services that you can use:</p>
+                            <ul>
+                                <li><strong>TempMail:</strong> A widely used Temp Mail service that provides disposable email addresses with a simple and user-friendly interface.</li>
+                                <li><strong>Guerrilla Mail:</strong> Offers temporary email addresses with additional features like email attachments and the ability to reply to emails.</li>
+                                <li><strong>10 Minute Mail:</strong> Provides email addresses that last for 10 minutes, with the option to extend the time if needed.</li>
+                                <li><strong>Mailinator:</strong> A public Temp Mail service that allows you to choose your email address and access a shared inbox.</li>
+                            </ul>
+                            <h2>Best Practices for Using Social Temp Mail</h2>
+                            <p>To maximize the benefits of Social Temp Mail, consider the following best practices:</p>
+                            <ul>
+                                <li>
+                                    <strong>Use for Temporary Needs:</strong> Reserve Social Temp Mail for temporary or one-time interactions. For long-term use, rely on your primary email address or
+                                    create a secondary email account.
+                                </li>
+                                <li><strong>Avoid Sensitive Information:</strong> Do not use Social Temp Mail for sending or receiving sensitive information, as the emails are not secure.</li>
+                                <li>
+                                    <strong>Regularly Clear Temporary Addresses:</strong> Keep track of the temporary email addresses you generate and ensure they are cleared after use to maintain
+                                    privacy.
+                                </li>
+                                <li><strong>Check Expiration Times:</strong> Be aware of the expiration times for temporary email addresses to avoid losing access to important messages.</li>
+                            </ul>
+                            <h2>What Should You Know</h2>
+                            <p>
+                                Social Temp Mail is a valuable tool for enhancing privacy and managing your online presence. By providing temporary, disposable email addresses, it allows you to
+                                interact with social media platforms and online communities without compromising your personal information. Understanding the benefits and limitations of Social Temp
+                                Mail can help you use it effectively and protect your privacy in the digital age.
+                            </p>
+                        </div>
+                    </div>
                 </div>
-              </fieldset>
+                <div class="col2 side2" x-features="host.social-browser">
+                    <ins class="adsbygoogle" style="display: block" data-ad-client="ca-pub-3372007384613151" data-ad-slot="7537664573" data-ad-format="auto" data-full-width-responsive="true"></ins>
+                    <script>
+                        (adsbygoogle = window.adsbygoogle || []).push({});
+                    </script>
+                </div>
             </div>
-          </div>
-          <div class="row">
-            <div class="information">
-              <h2>Social Temp Mail: Enhancing Privacy in the Social Media Age</h2>
-              <p>
-                In today's digital age, privacy is a growing concern for social media users. With the increasing number of websites and services requiring email addresses for registration, many
-                individuals are turning to temporary email services, also known as Temp Mail, to protect their personal information. Social Temp Mail offers a convenient solution for maintaining
-                privacy while interacting on social media platforms. This article explores what Social Temp Mail is, how it works, its benefits, and how it can be used effectively.
-              </p>
-              <h2>What is Social Temp Mail?</h2>
-              <div x-features="host.social-browser">
-                <script async src="https://www.googletagmanager.com/gtag/js?id=G-3591JBECHZ"></script>
-                <script>
-                  window.dataLayer = window.dataLayer || [];
-                  function gtag() {
-                    dataLayer.push(arguments);
-                  }
-                  gtag('js', new Date());
-
-                  gtag('config', 'G-3591JBECHZ');
-                </script>
-
-                <ins class="adsbygoogle" style="display: block" data-ad-client="ca-pub-3372007384613151" data-ad-slot="2472938527" data-ad-format="auto" data-full-width-responsive="true"></ins>
-                <script>
-                  (adsbygoogle = window.adsbygoogle || []).push({});
-                </script>
-              </div>
-              <p>
-                Social Temp Mail is a temporary email service designed specifically for use with social media platforms. It provides users with disposable email addresses that can be used for a short
-                period, typically ranging from a few minutes to a few hours. These email addresses allow users to sign up for social media accounts, verify profiles, and interact with websites without
-                revealing their primary email address.
-              </p>
-              <h2>How Social Temp Mail Works</h2>
-              <p>Using Social Temp Mail involves a few simple steps:</p>
-              <ol>
-                <li>
-                  <strong>Generate a Temporary Email Address:</strong> Visit a Social Temp Mail website or use a mobile app to generate a temporary email address. This process usually requires no
-                  registration and can be completed with a single click.
-                </li>
-                <li>
-                  <strong>Use the Temporary Email Address:</strong> Use the generated email address to register for social media accounts, participate in online communities, or sign up for
-                  newsletters. The temporary email address functions like a regular email address for receiving messages.
-                </li>
-                <li><strong>Access Emails:</strong> Check the inbox on the Social Temp Mail website or app to view any incoming emails. You can read, reply to, and delete emails as needed.</li>
-                <li>
-                  <strong>Expiration:</strong> The temporary email address will automatically expire after a predetermined period, and all associated emails will be permanently deleted. This ensures
-                  that your information is not stored indefinitely.
-                </li>
-              </ol>
-              <h2>Benefits of Using Social Temp Mail</h2>
-              <p>Social Temp Mail offers several advantages for social media users:</p>
-              <ul>
-                <li>
-                  <strong>Enhanced Privacy:</strong> By using a temporary email address, you can protect your primary email from being exposed to potential spam, phishing attempts, and unwanted
-                  marketing messages.
-                </li>
-                <li><strong>Avoiding Spam:</strong> Social Temp Mail helps keep your primary inbox clean by filtering out promotional emails and spam that often accompany social media sign-ups.</li>
-                <li>
-                  <strong>Anonymity:</strong> Temporary email addresses allow you to interact with social media platforms and online communities without revealing your true identity. This can be
-                  particularly useful for maintaining anonymity in forums and discussion boards.
-                </li>
-                <li>
-                  <strong>Reduced Risk of Data Breaches:</strong> Using Social Temp Mail reduces the risk of your personal email being compromised in data breaches, as the temporary address is not
-                  linked to your sensitive information.
-                </li>
-                <li>
-                  <strong>Convenience:</strong> Social Temp Mail services are quick and easy to use, requiring no registration or personal information. This makes them convenient for temporary needs.
-                </li>
-              </ul>
-              <h2>Common Use Cases for Social Temp Mail</h2>
-              <p>There are several scenarios where Social Temp Mail can be particularly useful:</p>
-              <ul>
-                <li>
-                  <strong>Creating Multiple Social Media Accounts:</strong> Whether you need multiple accounts for managing different aspects of your online presence or for testing purposes, Social
-                  Temp Mail can help you create and verify these accounts without cluttering your primary inbox.
-                </li>
-                <li>
-                  <strong>Signing Up for Newsletters and Promotions:</strong> If you want to access exclusive content, promotions, or newsletters without receiving follow-up marketing emails, Social
-                  Temp Mail provides a temporary solution.
-                </li>
-                <li>
-                  <strong>Participating in Online Communities:</strong> Use Social Temp Mail to join forums, discussion boards, and online communities while maintaining your privacy and anonymity.
-                </li>
-                <li>
-                  <strong>Free Trials and Temporary Services:</strong> When signing up for free trials or temporary services, Social Temp Mail allows you to test the service without committing your
-                  primary email address to potential spam.
-                </li>
-              </ul>
-              <h2>Limitations of Social Temp Mail</h2>
-              <p>While Social Temp Mail offers many benefits, there are some limitations to consider:</p>
-              <ul>
-                <li>
-                  <strong>Limited Time:</strong> Temporary email addresses have a short lifespan and are automatically deleted after a certain period. This means you may not be able to access emails
-                  after the address expires.
-                </li>
-                <li>
-                  <strong>No Reply Guarantee:</strong> Some websites or services may recognize and block temporary email addresses, preventing you from completing the registration or verification
-                  process.
-                </li>
-                <li>
-                  <strong>Lack of Security:</strong> Since Social Temp Mail services are publicly accessible, the emails received on these addresses may not be private or secure. Sensitive information
-                  should not be sent or received via Social Temp Mail.
-                </li>
-              </ul>
-              <h2>Popular Social Temp Mail Services</h2>
-              <p>Here are some popular Social Temp Mail services that you can use:</p>
-              <ul>
-                <li><strong>TempMail:</strong> A widely used Temp Mail service that provides disposable email addresses with a simple and user-friendly interface.</li>
-                <li><strong>Guerrilla Mail:</strong> Offers temporary email addresses with additional features like email attachments and the ability to reply to emails.</li>
-                <li><strong>10 Minute Mail:</strong> Provides email addresses that last for 10 minutes, with the option to extend the time if needed.</li>
-                <li><strong>Mailinator:</strong> A public Temp Mail service that allows you to choose your email address and access a shared inbox.</li>
-              </ul>
-              <h2>Best Practices for Using Social Temp Mail</h2>
-              <p>To maximize the benefits of Social Temp Mail, consider the following best practices:</p>
-              <ul>
-                <li>
-                  <strong>Use for Temporary Needs:</strong> Reserve Social Temp Mail for temporary or one-time interactions. For long-term use, rely on your primary email address or create a secondary
-                  email account.
-                </li>
-                <li><strong>Avoid Sensitive Information:</strong> Do not use Social Temp Mail for sending or receiving sensitive information, as the emails are not secure.</li>
-                <li><strong>Regularly Clear Temporary Addresses:</strong> Keep track of the temporary email addresses you generate and ensure they are cleared after use to maintain privacy.</li>
-                <li><strong>Check Expiration Times:</strong> Be aware of the expiration times for temporary email addresses to avoid losing access to important messages.</li>
-              </ul>
-              <h2>What Should You Know</h2>
-              <p>
-                Social Temp Mail is a valuable tool for enhancing privacy and managing your online presence. By providing temporary, disposable email addresses, it allows you to interact with social
-                media platforms and online communities without compromising your personal information. Understanding the benefits and limitations of Social Temp Mail can help you use it effectively
-                and protect your privacy in the digital age.
-              </p>
-            </div>
-          </div>
         </div>
-        <div class="col2 side2" x-features="host.social-browser">
-          <ins class="adsbygoogle" style="display: block" data-ad-client="ca-pub-3372007384613151" data-ad-slot="7537664573" data-ad-format="auto" data-full-width-responsive="true"></ins>
-          <script>
-            (adsbygoogle = window.adsbygoogle || []).push({});
-          </script>
-        </div>
-      </div>
-    </div>
 
-    <div x-import="scripts.html"></div>
-
-    <script x-import="emails/index.js"></script>
-  </body>
+        <div x-import="scripts.html"></div>
+        <script x-import="emails/index.js"></script>
+    </body>
 </html>

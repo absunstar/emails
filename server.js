@@ -38,7 +38,7 @@ site.get('robots.txt', (req, res) => {
     res.txt('robots.txt');
 });
 
-site.$blockAny = '*vmi1093391.contaboserver.net*';
+site.$blockAny = '*contaboserver.net*';
 
 const server = new SMTPServer({
     onAuth(auth, session, callback) {

@@ -323,7 +323,8 @@ module.exports = function init(site) {
                     response.error = err.message;
                 }
                 res.json(response);
-            }
+            },
+            true
         );
     });
 };

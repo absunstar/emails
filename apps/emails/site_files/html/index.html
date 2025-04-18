@@ -37,20 +37,20 @@
                         </tr>
                         <tr ng-repeat="c in list | filter:searchText">
                             <td>
-                                <p class="bold blue center">{{$index + 1}}</p>
+                                <p class="bold white center">{{$index + 1}}</p>
                             </td>
                             <td class="bold">
                                 <div class="row">
                                     <div class="col">{{c.from}}</div>
-                                    <div class="col"><i-button type="search" ng-click="smartSearch(c.from)" label="##word.All Mails##"></i-button></div>
+                                    <div class="col center"><i-button type="search" ng-click="smartSearch(c.from)" label="##word.All Mails##"></i-button></div>
                                 </div>
 
-                                <span class="brown"> {{c.date | xdatetime}} </span>
+                                <span class="white"> {{c.date | xdatetime}} </span>
                             </td>
                             <td class="bold">
                                 <div class="row">
                                     <div class="col">{{c.to}}</div>
-                                    <div class="col"><i-button type="search" ng-click="smartSearch(c.to)" label="##word.All Mails##"></i-button></div>
+                                    <div class="col center"><i-button type="search" ng-click="smartSearch(c.to)" label="##word.All Mails##"></i-button></div>
                                 </div>
                             </td>
                             <td class="bold">
@@ -59,7 +59,7 @@
                                         <p>{{c.subject}}</p>
                                         <p class="orange">Folder : {{c.folder}}</p>
                                     </div>
-                                    <div class="col"><i-button type="view" ng-click="details(c)" label="##word.View##"></i-button></div>
+                                    <div class="col center"><i-button type="view" ng-click="details(c)" label="##word.View##"></i-button></div>
                                 </div>
                             </td>
                             <td class="center">

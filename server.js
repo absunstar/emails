@@ -68,7 +68,7 @@ const server = new SMTPServer({
     onMailFrom(address, session, callback) {
         console.log(' ... Mail From ... ' + address.address);
         if (address.address.like(site.$blockAny)) {
-            console.og('Block From Address : ' + address.address);
+            console.log('Block From Address : ' + address.address);
             return callback(new Error('not allowed email from : ' + address.address));
         }
         return callback(); // Accept the address
@@ -76,7 +76,7 @@ const server = new SMTPServer({
     onRcptTo(address, session, callback) {
         console.log(' ... Mail To ... ' + address.address);
         if (address.address.like(site.$blockAny)) {
-            console.og('Block From Address : ' + address.address);
+            console.log('Block From Address : ' + address.address);
             return callback(new Error('not allowed email to : ' + address.address));
         }
         return callback(); // Accept the address

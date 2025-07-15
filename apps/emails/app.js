@@ -36,7 +36,7 @@ module.exports = function init(site) {
                         });
                     }
                 }
-            }
+            },
         );
     };
 
@@ -88,7 +88,7 @@ module.exports = function init(site) {
                             new_doc.folder = 'send';
                             $emails.update(new_doc);
                         }
-                    }
+                    },
                 );
             } else {
                 response.error = err.message;
@@ -124,7 +124,7 @@ module.exports = function init(site) {
                         response.error = err.message;
                     }
                     res.json(response);
-                }
+                },
             );
         } else {
             res.json(response);
@@ -153,7 +153,7 @@ module.exports = function init(site) {
                         response.error = err.message;
                     }
                     res.json(response);
-                }
+                },
             );
         } else {
             response.error = 'no id';
@@ -189,7 +189,7 @@ module.exports = function init(site) {
                     response.error = err.message;
                 }
                 res.json(response);
-            }
+            },
         );
     });
 
@@ -247,10 +247,11 @@ module.exports = function init(site) {
                 where: where,
                 limit: req.data.limit,
             },
-            (err, docs) => {
+            (err, docs, count) => {
                 if (!err) {
                     response.done = true;
                     response.list = docs;
+                    response.count = count;
                 } else {
                     response.error = err.message;
                 }
@@ -262,7 +263,7 @@ module.exports = function init(site) {
                     });
                 }
             },
-            true
+            true,
         );
     });
 
@@ -284,7 +285,7 @@ module.exports = function init(site) {
                     res.sendTEXT('<h1> Email Not Exists</h1>');
                 }
             },
-            true
+            true,
         );
     });
 
@@ -324,7 +325,7 @@ module.exports = function init(site) {
                 }
                 res.json(response);
             },
-            true
+            true,
         );
     });
 };

@@ -263,6 +263,7 @@ app.controller('emails', function ($scope, $http) {
     $scope.loadAll = function (where = {}, limit = 200) {
         $scope.busy = true;
         $scope.list = [];
+        $scope.count = -1;
         $http({
             method: 'POST',
             url: '/api/emails/all',
@@ -275,6 +276,7 @@ app.controller('emails', function ($scope, $http) {
                 $scope.busy = false;
                 if (response.data.done) {
                     $scope.list = response.data.list;
+                    $scope.count = response.data.count;
                 }
             },
             function (err) {

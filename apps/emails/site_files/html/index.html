@@ -16,6 +16,10 @@
                     <div class="top-actions">
                         <i-button type="add" ng-click="newEmail()" label="##word.emails_new##"></i-button>
                         <i-button type="search" onclick="site.showModal('#SearchModal')" label="##word.search_all##"></i-button>
+                        <div class="col">
+                            <h2 class="center">Emails Count : {{count}}</h2>
+                            
+                        </div>
                     </div>
                     <div class="row">
                         <div class="col8"><i-control ng-model="searchText" label="Search"></i-control></div>

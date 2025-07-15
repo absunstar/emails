@@ -39,6 +39,7 @@ site.get('robots.txt', (req, res) => {
 });
 
 site.$blockAny = '*contaboserver.net*';
+site.$allowEmailTo = '*egytag.com*|*social-browser.com*|*mama-services.net*';
 
 const server = new SMTPServer({
     onAuth(auth, session, callback) {
@@ -77,6 +78,9 @@ const server = new SMTPServer({
         console.log(' ... Mail To ... ' + address.address);
         if (address.address.like(site.$blockAny)) {
             console.log('Block From Address : ' + address.address);
+            return callback(new Error('not allowed email to : ' + address.address));
+        } else if (!address.address.like(site.$allowEmailTo)) {
+            console.log('Block to Address : ' + address.address);
             return callback(new Error('not allowed email to : ' + address.address));
         }
         return callback(); // Accept the address

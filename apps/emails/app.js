@@ -148,6 +148,7 @@ module.exports = function init(site) {
 
         let index = site.vipEmailList.findIndex((v) => v.email === doc.email);
         if (index === -1) {
+            site.vipEmailList.push(doc);
             $emailsVIP.add(doc, (err, new_doc) => {
                 if (!err) {
                     response.done = true;
@@ -158,6 +159,7 @@ module.exports = function init(site) {
                 res.json(response);
             });
         } else {
+            site.vipEmailList[index] = doc;
             $emailsVIP.update(
                 {
                     where: {

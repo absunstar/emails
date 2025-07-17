@@ -45,7 +45,7 @@ app.controller('emails', function ($scope, $http) {
             },
             function (err) {
                 console.log(err);
-            }
+            },
         );
     };
 
@@ -77,7 +77,31 @@ app.controller('emails', function ($scope, $http) {
             },
             function (err) {
                 console.log(err);
-            }
+            },
+        );
+    };
+
+    $scope.setvip = function (email) {
+        $scope.busy = true;
+        $http({
+            method: 'POST',
+            url: '/api/emails/set-vip',
+            data: {
+                email: email,
+                vip: true,
+            },
+        }).then(
+            function (response) {
+                $scope.busy = false;
+                if (response.data.done) {
+                    alert('VIP Set');
+                } else {
+                    $scope.error = '##word.error##';
+                }
+            },
+            function (err) {
+                console.log(err);
+            },
         );
     };
 
@@ -111,7 +135,7 @@ app.controller('emails', function ($scope, $http) {
             },
             function (err) {
                 console.log(err);
-            }
+            },
         );
     };
 
@@ -134,7 +158,7 @@ app.controller('emails', function ($scope, $http) {
       height=${h / systemZoom}, 
       top=${top}, 
       left=${left}
-      `
+      `,
         );
 
         if (window.focus) newWindow.focus();
@@ -188,7 +212,7 @@ app.controller('emails', function ($scope, $http) {
             },
             function (err) {
                 console.log(err);
-            }
+            },
         );
     };
     $scope.deleteAllEmails = function () {
@@ -210,7 +234,7 @@ app.controller('emails', function ($scope, $http) {
             },
             function (err) {
                 console.log(err);
-            }
+            },
         );
     };
     $scope.searchAll = function (free = false) {
@@ -282,7 +306,7 @@ app.controller('emails', function ($scope, $http) {
             function (err) {
                 $scope.busy = false;
                 $scope.error = err;
-            }
+            },
         );
     };
 

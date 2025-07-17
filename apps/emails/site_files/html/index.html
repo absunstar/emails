@@ -18,7 +18,6 @@
                         <i-button type="search" onclick="site.showModal('#SearchModal')" label="##word.search_all##"></i-button>
                         <div class="col">
                             <h2 class="center">Emails Count : {{count}}</h2>
-                            
                         </div>
                     </div>
                     <div class="row">
@@ -48,7 +47,6 @@
                                     <div class="col">{{c.from}}</div>
                                     <div class="col center">
                                         <i-button type="search" ng-click="smartSearch(c.from)" label="##word.All Mails##"></i-button>
-                                        <i-button type="add" ng-click="setvip(c.from)" label="##word.vip##"></i-button>
                                     </div>
                                 </div>
 
@@ -57,6 +55,7 @@
                             <td class="bold">
                                 <div class="row">
                                     <div class="col">{{c.to}}</div>
+                                    <div class="col"><i-button type="add" ng-click="setvip(c.to)" label="##word.vip##"></i-button></div>
                                     <div class="col center"><i-button type="search" ng-click="smartSearch(c.to)" label="##word.All Mails##"></i-button></div>
                                 </div>
                             </td>

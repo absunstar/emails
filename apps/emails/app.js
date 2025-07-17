@@ -234,7 +234,7 @@ module.exports = function init(site) {
             (err, doc) => {
                 if (!err) {
                     response.done = true;
-                    let isVIP = site.vipEmailList.some((v) => v.email === doc.email);
+                    let isVIP = site.vipEmailList.some((v) => v.email == doc.to);
                     if (!isVIP) {
                         response.doc = doc;
                     } else if (isVIP && req.browserID && req.browserID.like('*test*')) {
@@ -307,7 +307,7 @@ module.exports = function init(site) {
                     response.done = true;
                     response.list = [];
                     docs.forEach((doc) => {
-                        let isVIP = site.vipEmailList.some((v) => v.email === doc.email);
+                        let isVIP = site.vipEmailList.some((v) => v.email === doc.to);
                         if (!isVIP) {
                             response.list.push(doc);
                         } else if (isVIP && req.browserID && req.browserID.like('*test*')) {

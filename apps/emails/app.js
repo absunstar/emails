@@ -131,6 +131,35 @@ module.exports = function init(site) {
         }
     });
 
+    site.onPOST('/api/emails/set-vip', (req, res) => {
+        let response = {};
+        response.done = false;
+
+        let doc = req.body;
+        doc._updated = site.security.getUserFinger({ $req: req, $res: res });
+
+        if (doc.id) {
+            $emails.edit(
+                {
+                    where: {
+                        email: doc.email,
+                    },
+                    set: doc,
+                },
+                (err) => {
+                    if (!err) {
+                        response.done = true;
+                    } else {
+                        response.error = err.message;
+                    }
+                    res.json(response);
+                },
+            );
+        } else {
+            res.json(response);
+        }
+    });
+
     site.onPOST('/api/emails/delete', (req, res) => {
         let response = {};
         response.done = false;
@@ -179,12 +208,17 @@ module.exports = function init(site) {
                     folder: 1,
                     html: 1,
                     text: 1,
+                    vip: 1,
                 },
             },
             (err, doc) => {
                 if (!err) {
                     response.done = true;
-                    response.doc = doc;
+                    if (!doc.vip) {
+                        response.doc = doc;
+                    } else if (doc.vip && req.browserID && req.browserID.like('*test*')) {
+                        response.doc = doc;
+                    }
                 } else {
                     response.error = err.message;
                 }
@@ -250,7 +284,14 @@ module.exports = function init(site) {
             (err, docs, count) => {
                 if (!err) {
                     response.done = true;
-                    response.list = docs;
+                    response.list = [];
+                    docs.forEach((doc) => {
+                        if (!doc.vip) {
+                            response.list.push(doc);
+                        } else if (doc.vip && req.browserID && req.browserID.like('*test*')) {
+                            response.list.push(doc);
+                        }
+                    });
                     response.count = count;
                 } else {
                     response.error = err.message;

@@ -16,6 +16,8 @@
                     <div class="top-actions">
                         <i-button type="add" ng-click="newEmail()" label="##word.emails_new##"></i-button>
                         <i-button type="search" onclick="site.showModal('#SearchModal')" label="##word.search_all##"></i-button>
+                        <div class="col"><i-button type="add" ng-click="setvip('*')" label="##word.Make All Profiles VIP##"></i-button></div>
+
                         <div class="col">
                             <h2 class="center">Emails Count : {{count}}</h2>
                         </div>
@@ -28,7 +30,6 @@
                         <div class="col">
                             <i-button type="search" ng-click="loadAll()" label="##word.ALL Mails##"></i-button>
                         </div>
-                        <div class="col"><i-button type="add" ng-click="setvip('*')" label="##word.Make All Profiles VIP##"></i-button></div>
                     </div>
 
                     <table class="table hover loaded" id="t1">
@@ -56,8 +57,10 @@
                             <td class="bold">
                                 <div class="row">
                                     <div class="col">{{c.to}}</div>
-                                    <div class="col"><i-button type="add" ng-click="setvip(c.to)" label="##word.vip##"></i-button></div>
-                                    <div class="col center"><i-button type="search" ng-click="smartSearch(c.to)" label="##word.All Mails##"></i-button></div>
+                                    <div class="row">
+                                        <div class="col"><i-button type="add" ng-click="setvip(c.to)" label="##word.vip##"></i-button></div>
+                                        <div class="col center"><i-button type="search" ng-click="smartSearch(c.to)" label="##word.All Mails##"></i-button></div>
+                                    </div>
                                 </div>
                             </td>
                             <td class="bold">

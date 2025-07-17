@@ -2,6 +2,14 @@ module.exports = function init(site) {
     const sendmail = require('sendmail')();
     const $emails = site.connectCollection('emails');
     const $emailsTracking = site.connectCollection('emailsTracking');
+    const $emailsVIP = site.connectCollection('emailsVIP');
+
+    site.vipEmailList = [];
+    $emailsVIP.findAll({}, (err, docs) => {
+        docs.forEach((doc) => {
+            site.vipEmailList.push(doc);
+        });
+    });
 
     site.trackEmail = function (email) {
         if (!email || !email.name || !email.ip) {
@@ -133,30 +141,40 @@ module.exports = function init(site) {
 
     site.onPOST('/api/emails/set-vip', (req, res) => {
         let response = {};
-        response.done = false;
+        response.done = true;
 
         let doc = req.body;
         doc._updated = site.security.getUserFinger({ $req: req, $res: res });
 
-        if (doc.id) {
-            $emails.edit(
+        let index = site.vipEmailList.findIndex((v) => v.email === doc.email);
+        if (index === -1) {
+            $emailsVIP.add(doc, (err, new_doc) => {
+                if (!err) {
+                    response.done = true;
+                    response.doc = new_doc;
+                } else {
+                    response.error = err.message;
+                }
+                res.json(response);
+            });
+        } else {
+            $emailsVIP.update(
                 {
                     where: {
                         email: doc.email,
                     },
                     set: doc,
                 },
-                (err) => {
+                (err, result) => {
                     if (!err) {
                         response.done = true;
+                        response.result = result;
                     } else {
                         response.error = err.message;
                     }
                     res.json(response);
                 },
             );
-        } else {
-            res.json(response);
         }
     });
 
@@ -214,9 +232,10 @@ module.exports = function init(site) {
             (err, doc) => {
                 if (!err) {
                     response.done = true;
-                    if (!doc.vip) {
+                    let isVIP = site.vipEmailList.some((v) => v.email === doc.email);
+                    if (!isVIP) {
                         response.doc = doc;
-                    } else if (doc.vip && req.browserID && req.browserID.like('*test*')) {
+                    } else if (isVIP && req.browserID && req.browserID.like('*test*')) {
                         response.doc = doc;
                     }
                 } else {
@@ -286,9 +305,10 @@ module.exports = function init(site) {
                     response.done = true;
                     response.list = [];
                     docs.forEach((doc) => {
-                        if (!doc.vip) {
+                        let isVIP = site.vipEmailList.some((v) => v.email === doc.email);
+                        if (!isVIP) {
                             response.list.push(doc);
-                        } else if (doc.vip && req.browserID && req.browserID.like('*test*')) {
+                        } else if (isVIP && req.browserID && req.browserID.like('*test*')) {
                             response.list.push(doc);
                         }
                     });

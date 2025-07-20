@@ -144,22 +144,20 @@ module.exports = function init(site) {
         response.done = true;
 
         let doc = req.body;
-        doc._updated = site.security.getUserFinger({ $req: req, $res: res });
 
         let index = site.vipEmailList.findIndex((v) => v.email === doc.email);
         if (index === -1) {
-            site.vipEmailList.push(doc);
             $emailsVIP.add(doc, (err, new_doc) => {
                 if (!err) {
                     response.done = true;
                     response.doc = new_doc;
+                    site.vipEmailList.push(new_doc);
                 } else {
                     response.error = err.message;
                 }
                 res.json(response);
             });
         } else {
-            site.vipEmailList[index] = doc;
             $emailsVIP.update(
                 {
                     where: {
@@ -171,6 +169,7 @@ module.exports = function init(site) {
                     if (!err) {
                         response.done = true;
                         response.result = result;
+                        site.vipEmailList[index] = result.doc;
                     } else {
                         response.error = err.message;
                     }
@@ -234,7 +233,7 @@ module.exports = function init(site) {
             (err, doc) => {
                 if (!err) {
                     response.done = true;
-                    let isVIP = site.vipEmailList.some((v) => v.email == doc.to);
+                    let isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                     if (!isVIP) {
                         response.doc = doc;
                     } else if (isVIP && req.browserID && req.browserID.like('*test*')) {
@@ -307,7 +306,7 @@ module.exports = function init(site) {
                     response.done = true;
                     response.list = [];
                     docs.forEach((doc) => {
-                        let isVIP = site.vipEmailList.some((v) => v.email === doc.to);
+                       let isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                         if (!isVIP) {
                             response.list.push(doc);
                         } else if (isVIP && req.browserID && req.browserID.like('*test*')) {

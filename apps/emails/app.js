@@ -233,10 +233,10 @@ module.exports = function init(site) {
             (err, doc) => {
                 if (!err) {
                     response.done = true;
-                    let isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
-                    if (!isVIP) {
+                    doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
+                    if (!doc.isVIP) {
                         response.doc = doc;
-                    } else if (isVIP && req.browserID && req.browserID.like('*test*')) {
+                    } else if (doc.isVIP && req.browserID && req.browserID.like('*test*')) {
                         response.doc = doc;
                     }
                 } else {
@@ -306,10 +306,10 @@ module.exports = function init(site) {
                     response.done = true;
                     response.list = [];
                     docs.forEach((doc) => {
-                       let isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
-                        if (!isVIP) {
+                        doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
+                        if (!doc.isVIP) {
                             response.list.push(doc);
-                        } else if (isVIP && req.browserID && req.browserID.like('*test*')) {
+                        } else if (doc.isVIP && req.browserID && req.browserID.like('*test*')) {
                             response.list.push(doc);
                         }
                     });

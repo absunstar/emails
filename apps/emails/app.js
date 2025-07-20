@@ -5,7 +5,8 @@ module.exports = function init(site) {
     const $emailsVIP = site.connectCollection('emailsVIP');
 
     site.vipEmailList = [];
-    $emailsVIP.findAll({}, (err, docs) => {
+    $emailsVIP.findAll({ limit: 100000 }, (err, docs, count) => {
+        console.log('VIP Emails Count : ' + count);
         docs.forEach((doc) => {
             site.vipEmailList.push(doc);
         });

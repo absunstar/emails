@@ -38,8 +38,10 @@ site.get('robots.txt', (req, res) => {
     res.txt('robots.txt');
 });
 
-site.$blockAny = '*contaboserver.net*';
-site.$allowEmailTo = '*egytag.com*|*social-browser.com*|*mama-services.net*';
+site.__allowEmailTo = '*egytag.com*|*social-browser.com*|*mama-services.net*';
+site.__blockFrom = '*contaboserver.net*';
+site.__ignoreFrom = '*friendsuggestion@facebookmail.com*|*friends@facebookmail.com*|*notification@facebookmail.com*|*pageupdates@facebookmail.com*|*groupupdates@facebookmail.com*';
+site.__ignoreSubject = '*just went live on Kick!*';
 
 const server = new SMTPServer({
     onAuth(auth, session, callback) {
@@ -68,7 +70,7 @@ const server = new SMTPServer({
     },
     onMailFrom(address, session, callback) {
         console.log(' ... Mail From ... ' + address.address);
-        if (address.address.like(site.$blockAny)) {
+        if (address.address.like(site.__blockFrom)) {
             console.log('Block From Address : ' + address.address);
             return callback(new Error('not allowed email from : ' + address.address));
         }
@@ -76,10 +78,7 @@ const server = new SMTPServer({
     },
     onRcptTo(address, session, callback) {
         console.log(' ... Mail To ... ' + address.address);
-        if (address.address.like(site.$blockAny)) {
-            console.log('Block From Address : ' + address.address);
-            return callback(new Error('not allowed email to : ' + address.address));
-        } else if (!address.address.like(site.$allowEmailTo)) {
+        if (!address.address.like(site.__allowEmailTo)) {
             console.log('Block to Address : ' + address.address);
             return callback(new Error('not allowed email to : ' + address.address));
         }
@@ -94,18 +93,20 @@ const server = new SMTPServer({
                     let message = {};
 
                     message.folder = 'inbox';
-                    message.subject = parsed.subject;
-                    message.from = parsed.from?.text;
-                    message.to = parsed.to?.text;
+                    message.subject = parsed.subject || '';
+                    message.from = parsed.from?.text || '';
+                    message.to = parsed.to?.text || '';
                     message.date = new Date(parsed.date);
-                    message.text = parsed.text;
-                    message.html = parsed.html;
+                    message.text = parsed.text || '';
+                    message.html = parsed.html || '';
                     message.guid = parsed.messageId || site.md5(message.date + message.subject + message.from + message.to);
-                    $emails.add(message, (err, docs) => {
-                        if (err) {
-                            console.error('Error:', err.message);
-                        }
-                    });
+                    if (!message.subject.like(site.__ignoreSubject) && !message.from.like(site.__ignoreFrom)) {
+                        $emails.add(message, (err, docs) => {
+                            if (err) {
+                                console.error('Error:', err.message);
+                            }
+                        });
+                    }
                 } catch (error) {
                     console.error(error);
                 }

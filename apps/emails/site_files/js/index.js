@@ -13,7 +13,7 @@ app.controller('emails', function ($scope, $http) {
     }
 
     $scope.email = {};
-    $scope.emailSearch = { to: '', from: '', limit: 200, message: '' };
+    $scope.emailSearch = { to: '', from: '', limit: 500, message: '' };
     $scope.newEmail = function () {
         $scope.error = '';
         $scope.email = {};
@@ -318,7 +318,7 @@ app.controller('emails', function ($scope, $http) {
         $scope.loadAll(where, 500);
     };
 
-    $scope.loadAll = function (where = {}, limit = 200) {
+    $scope.loadAll = function (where = {}, limit = 500) {
         $scope.busy = true;
         $scope.list = [];
         $scope.count = -1;

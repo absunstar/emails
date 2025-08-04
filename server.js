@@ -40,7 +40,7 @@ site.get('robots.txt', (req, res) => {
 
 site.__allowEmailTo = '*egytag.com*|*social-browser.com*|*mama-services.net*';
 site.__blockFrom = '*contaboserver.net*';
-site.__ignoreFrom = '*friendsuggestion@facebookmail.com*|*friends@facebookmail.com*|*notification@facebookmail.com*|*pageupdates@facebookmail.com*|*groupupdates@facebookmail.com*';
+site.__ignoreFrom = '*friendsuggestion@facebookmail.com*|*friends@facebookmail.com*|*notification@facebookmail.com*|*pageupdates@facebookmail.com*|*groupupdates@facebookmail.com*|*reminders@facebookmail.com*|*advertise-noreply@support.facebook.com*';
 site.__ignoreSubject = '*just went live on Kick!*';
 
 const server = new SMTPServer({

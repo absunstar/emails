@@ -1,12 +1,12 @@
 app.controller('emails', function ($scope, $http) {
     $scope.isVIP = false;
-    $scope.minEmailLength = 10;
-    $scope.emailLength = 12;
+    $scope.minEmailLength = 8;
+    $scope.emailLength = 14;
 
     if (document.location.href.like('*vip*')) {
         $scope.isVIP = true;
         $scope.minEmailLength = 6;
-        $scope.emailLength = 8;
+        $scope.emailLength = 10;
         document.querySelectorAll('.side1 , .side2').forEach((s) => {
             s.remove();
         });
@@ -344,17 +344,44 @@ app.controller('emails', function ($scope, $http) {
         );
     };
 
+    $scope.randomNumber = function (min, max) {
+        return Math.floor(Math.random() * (max - min) + min);
+    };
+
     function makeid() {
         let result = '';
 
-        let characters = 'abcdefghijklmnopqrstuvwxyz' + '0123456789';
-        let charactersLength = characters.length;
+        let characters = 'abcdefghijklmnopqrstuvwxyz';
+        let numbers = '0123456789';
+        let length = $scope.randomNumber($scope.minEmailLength, $scope.emailLength);
 
         let counter = 0;
-        while (counter < $scope.emailLength) {
-            result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        let first = $scope.randomNumber(4, 6);
+
+        while (counter < first) {
+            result += characters.charAt(Math.floor(Math.random() * characters.length));
             counter += 1;
         }
+
+        result += ['.', '', '_', '' , '-'][$scope.randomNumber(0, 4)] || '';
+
+        counter = 0;
+        let last = $scope.randomNumber(4, 6);
+        while (counter < last) {
+            result += characters.charAt(Math.floor(Math.random() * characters.length));
+            counter += 1;
+        }
+
+        if (length > first + last) {
+           result += ['.', '', '_', '' , '-'][$scope.randomNumber(0, 4)] || '';
+            counter = 0;
+            while (counter < length - (first + last)) {
+                result += numbers.charAt(Math.floor(Math.random() * numbers.length));
+                counter += 1;
+            }
+        }
+
+        console.log(length, first, last);
 
         return result;
     }

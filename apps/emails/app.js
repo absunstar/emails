@@ -237,7 +237,7 @@ module.exports = function init(site) {
                     doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                     if (!doc.isVIP) {
                         response.doc = doc;
-                    } else if (doc.isVIP && req.browserID && req.browserID.like('*test*')) {
+                    } else if (doc.isVIP && req.browserID && req.browserID.like('*test*|*vip*|*developer*')) {
                         response.doc = doc;
                     }
                 } else {
@@ -310,7 +310,7 @@ module.exports = function init(site) {
                         doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                         if (!doc.isVIP) {
                             response.list.push(doc);
-                        } else if (doc.isVIP && req.browserID && req.browserID.like('*test*')) {
+                        } else if (doc.isVIP && req.browserID && req.browserID.like('*test*|*vip*|*developer*')) {
                             response.list.push(doc);
                         }
                     });

@@ -391,6 +391,7 @@ app.controller('emails', function ($scope, $http , $timeout) {
     $scope.generateEmail = function () {
         if($scope.newEmailBusy) return;
         $scope.newEmailBusy = true;
+        $scope.emailSearch.to = '';
         let host = document.location.hostname;
         $timeout(() => {
             $scope.newEmailBusy = false;

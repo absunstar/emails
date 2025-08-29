@@ -320,7 +320,8 @@ app.controller('emails', function ($scope, $http , $timeout) {
     };
 
     $scope.loadAll = function (where = {}, limit = 500) {
-        $scope.busy = true;
+        if($scope.loadAllBusy) return;
+        $scope.loadAllBusy = true;
         $scope.list = [];
         $scope.count = -1;
         $http({
@@ -332,14 +333,14 @@ app.controller('emails', function ($scope, $http , $timeout) {
             },
         }).then(
             function (response) {
-                $scope.busy = false;
+                $scope.loadAllBusy = false;
                 if (response.data.done) {
                     $scope.list = response.data.list;
                     $scope.count = response.data.count;
                 }
             },
             function (err) {
-                $scope.busy = false;
+                $scope.loadAllBusy = false;
                 $scope.error = err;
             },
         );
@@ -388,10 +389,11 @@ app.controller('emails', function ($scope, $http , $timeout) {
     }
 
     $scope.generateEmail = function () {
-        $scope.busy = true;
+        if($scope.newEmailBusy) return;
+        $scope.newEmailBusy = true;
         let host = document.location.hostname;
         $timeout(() => {
-            $scope.busy = false;
+            $scope.newEmailBusy = false;
             host = host.split('.');
             if (host.length > 2) {
                 host.splice(0, host.length - 2);

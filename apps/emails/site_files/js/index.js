@@ -388,7 +388,7 @@ app.controller('emails', function ($scope, $http , $timeout) {
     }
 
     $scope.generateEmail = function () {
-        $scope.busy;
+        $scope.busy = true;
         let host = document.location.hostname;
         $timeout(() => {
             $scope.busy = false;

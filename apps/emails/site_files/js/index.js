@@ -1,4 +1,4 @@
-app.controller('emails', function ($scope, $http) {
+app.controller('emails', function ($scope, $http , $timeout) {
     $scope.isVIP = false;
     $scope.minEmailLength = 8;
     $scope.emailLength = 14;
@@ -272,6 +272,7 @@ app.controller('emails', function ($scope, $http) {
         );
     };
     $scope.searchAll = function (free = false) {
+      
         let where = {};
 
         if (free) {
@@ -363,7 +364,7 @@ app.controller('emails', function ($scope, $http) {
             counter += 1;
         }
 
-        result += ['.', '', '_', '' , '-'][$scope.randomNumber(0, 4)] || '';
+        result += ['.', '', '_', '', '-'][$scope.randomNumber(0, 4)] || '';
 
         counter = 0;
         let last = $scope.randomNumber(4, 6);
@@ -373,7 +374,7 @@ app.controller('emails', function ($scope, $http) {
         }
 
         if (length > first + last) {
-           result += ['.', '', '_', '' , '-'][$scope.randomNumber(0, 4)] || '';
+            result += ['.', '', '_', '', '-'][$scope.randomNumber(0, 4)] || '';
             counter = 0;
             while (counter < length - (first + last)) {
                 result += numbers.charAt(Math.floor(Math.random() * numbers.length));
@@ -387,13 +388,17 @@ app.controller('emails', function ($scope, $http) {
     }
 
     $scope.generateEmail = function () {
+        $scope.busy;
         let host = document.location.hostname;
-        host = host.split('.');
-        if (host.length > 2) {
-            host.splice(0, host.length - 2);
-        }
-        host = host.join('.');
-        $scope.emailSearch.to = makeid() + '@' + host;
+        $timeout(() => {
+            $scope.busy = false;
+            host = host.split('.');
+            if (host.length > 2) {
+                host.splice(0, host.length - 2);
+            }
+            host = host.join('.');
+            $scope.emailSearch.to = makeid() + '@' + host;
+        }, 1000 * 5);
     };
 
     $scope.copy = function () {

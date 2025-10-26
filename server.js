@@ -48,7 +48,7 @@ const server = new SMTPServer({
         // if (auth.username !== "abc" || auth.password !== "def") {
         //   return callback(new Error("Invalid username or password"));
         // }
-        callback(null, { user: 123 }); // where 123 is the user id or similar property
+        callback(null, {user: auth.username }); // where 123 is the user id or similar property
     },
 
     onConnect(session, callback) {
@@ -60,9 +60,9 @@ const server = new SMTPServer({
         return callback(); // Accept the connection
     },
     onSecure(socket, session, callback) {
-        if (session.servername !== 'sni.example.com') {
-            return callback(new Error('Only connections for sni.example.com are allowed'));
-        }
+        // if (session.servername !== 'sni.example.com') {
+        //     return callback(new Error('Only connections for sni.example.com are allowed'));
+        // }
         return callback(); // Accept the connection
     },
     onClose(session) {

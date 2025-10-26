@@ -69,8 +69,13 @@ module.exports = function init(site) {
         response.done = false;
         let doc = req.body;
 
-        if (doc.source !== 'isite' && !req.session.user) {
+        if (doc.source !== 'isite') {
             response.error = 'You Are Not Authorized';
+            res.json(response);
+            return;
+        }
+        if(!doc.from || !doc.to || !doc.subject || (!doc.message && !doc.text && !doc.html)) {
+            response.error = 'Invalid Email Fileds Request';
             res.json(response);
             return;
         }
@@ -79,6 +84,7 @@ module.exports = function init(site) {
         doc.date = new Date();
         doc.guid = new Date().getTime();
         doc._created = req.getUserFinger();
+        doc.ip = req.ip;
 
         $emails.add(doc, (err, new_doc) => {
             if (!err) {
@@ -89,7 +95,7 @@ module.exports = function init(site) {
                         from: doc.from,
                         to: doc.to,
                         subject: doc.subject,
-                        html: doc.html,
+                        html: doc.message || doc.text || doc.html,
                     },
                     function (err, reply) {
                         if (err) {

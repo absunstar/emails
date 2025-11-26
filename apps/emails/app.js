@@ -239,7 +239,7 @@ module.exports = function init(site) {
                 },
             },
             (err, doc) => {
-                if (!err) {
+                if (doc) {
                     response.done = true;
                     doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                     if (!doc.isVIP) {
@@ -248,7 +248,7 @@ module.exports = function init(site) {
                         response.doc = doc;
                     }
                 } else {
-                    response.error = err.message;
+                    response.error = err?.message || 'Not Found';
                 }
                 res.json(response);
             },

@@ -4,7 +4,7 @@ module.exports = function init(site) {
     const $emailsTracking = site.connectCollection('emailsTracking');
     const $emailsVIP = site.connectCollection('emailsVIP');
 
-    site.trustedBrowserIDs = '*test*|*vip*|*developer*|*ab35dfd05a28b240b91866b85acc8ef6'
+    site.trustedBrowserIDs = '*test*|*vip*|*developer*|*ab35dfd05a28b240b91866b85acc8ef6';
     site.vipEmailList = [];
     $emailsVIP.findAll({ limit: 100000 }, (err, docs, count) => {
         console.log('VIP Emails Count : ' + count);
@@ -75,7 +75,7 @@ module.exports = function init(site) {
             res.json(response);
             return;
         }
-        if(!doc.from || !doc.to || !doc.subject || (!doc.message && !doc.text && !doc.html)) {
+        if (!doc.from || !doc.to || !doc.subject || (!doc.message && !doc.text && !doc.html)) {
             response.error = 'Invalid Email Fileds Request';
             res.json(response);
             return;
@@ -397,5 +397,43 @@ module.exports = function init(site) {
             },
             true,
         );
+    });
+
+    site.onPOST({ name: '/generate-new-email' }, (req, res) => {
+        let response = { done: true };
+        let result = '';
+
+        let characters = 'abcdefghijklmnopqrstuvwxyz';
+        let numbers = '0123456789';
+        let length = site.random(8, 16);
+
+        let counter = 0;
+        let first = site.random(4, 6);
+
+        while (counter < first) {
+            result += characters.charAt(Math.floor(Math.random() * characters.length));
+            counter += 1;
+        }
+
+        result += ['.', '', '_', '', '-'][site.random(0, 4)] || '';
+
+        counter = 0;
+        let last = site.random(4, 6);
+        while (counter < last) {
+            result += characters.charAt(Math.floor(Math.random() * characters.length));
+            counter += 1;
+        }
+
+        if (length > first + last) {
+            result += ['.', '', '_', '', '-'][site.random(0, 4)] || '';
+            counter = 0;
+            while (counter < length - (first + last)) {
+                result += numbers.charAt(Math.floor(Math.random() * numbers.length));
+                counter += 1;
+            }
+        }
+        result += '@' + (req.data.domain || 'egytag.com');
+        response.email = result;
+        res.json(response);
     });
 };

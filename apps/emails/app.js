@@ -4,7 +4,7 @@ module.exports = function init(site) {
     const $emailsTracking = site.connectCollection('emailsTracking');
     const $emailsVIP = site.connectCollection('emailsVIP');
 
-    site.trustedBrowserIDs = '*test*|*vip*|*developer*|*ab35dfd05a28b240b91866b85acc8ef6';
+    site.trustedBrowserIDs = '*test*|*vip*|*developer*';
     site.vipEmailList = [];
     $emailsVIP.findAll({ limit: 100000 }, (err, docs, count) => {
         console.log('VIP Emails Count : ' + count);

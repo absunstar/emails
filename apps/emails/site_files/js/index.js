@@ -8,7 +8,9 @@ app.controller('emails', function ($scope, $http , $timeout) {
         $scope.minEmailLength = 6;
         $scope.emailLength = 10;
         document.querySelectorAll('.side1 , .side2').forEach((s) => {
-            s.remove();
+            if(s){
+                s.remove();
+            }
         });
     }
 

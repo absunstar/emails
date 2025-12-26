@@ -218,9 +218,8 @@ module.exports = function init(site) {
     });
 
     site.onPOST('/api/emails/view', (req, res) => {
-        let response = {};
+        let response = {done: false};
         let where = req.body;
-        response.done = false;
         $emails.find(
             {
                 where: where,
@@ -241,10 +240,10 @@ module.exports = function init(site) {
             (err, doc) => {
                 if (doc) {
                     response.done = true;
-                    doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
-                    if (!doc.isVIP) {
+                    response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
+                    if (!response.isVIP) {
                         response.doc = doc;
-                    } else if (doc.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
+                    } else if (response.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
                         response.doc = doc;
                     }
                 } else {

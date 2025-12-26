@@ -401,7 +401,7 @@ app.controller('emails', function ($scope, $http , $timeout) {
             }
             host = host.join('.');
             $scope.emailSearch.to = makeid() + '@' + host;
-        }, 1000 * 5);
+        }, 1000 * 2);
     };
 
     $scope.copy = function () {

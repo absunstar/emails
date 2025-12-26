@@ -7,11 +7,7 @@ app.controller('emails', function ($scope, $http , $timeout) {
         $scope.isVIP = true;
         $scope.minEmailLength = 6;
         $scope.emailLength = 10;
-        document.querySelectorAll('.side1 , .side2').forEach((s) => {
-            if(s){
-                s.remove();
-            }
-        });
+        
     }
 
     $scope.email = {};

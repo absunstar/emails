@@ -386,8 +386,6 @@ app.controller('emails', function ($scope, $http , $timeout) {
             }
         }
 
-        console.log(length, first, last);
-
         return result;
     }
 

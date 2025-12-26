@@ -334,6 +334,9 @@ app.controller('emails', function ($scope, $http , $timeout) {
         }).then(
             function (response) {
                 $scope.loadAllBusy = false;
+                if(response.data.isVIP){
+                    $scope.error = 'Some Emails are Blocked, You can not view them here.';
+                }
                 if (response.data.done) {
                     $scope.list = response.data.list;
                     $scope.count = response.data.count;

@@ -244,6 +244,7 @@ module.exports = function init(site) {
                     if (!response.isVIP) {
                         response.doc = doc;
                     } else if (response.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
+                        response.isVIP = false;
                         response.doc = doc;
                     }
                 } else {
@@ -320,6 +321,7 @@ module.exports = function init(site) {
                         if (!doc.isVIP) {
                             response.list.push(doc);
                         } else if (doc.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
+                            response.isVIP = false;
                             response.list.push(doc);
                         }
                     });

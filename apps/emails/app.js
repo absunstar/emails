@@ -240,6 +240,7 @@ module.exports = function init(site) {
             (err, doc) => {
                 if (doc) {
                     response.done = true;
+                    response.browserID = req.browserID;
                     response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                     if (!response.isVIP) {
                         response.doc = doc;
@@ -314,7 +315,7 @@ module.exports = function init(site) {
                     response.done = true;
                     response.list = [];
                     docs.forEach((doc) => {
-                        doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
+                        response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                         if(doc.isVIP){
                             response.isVIP = true;
                         }

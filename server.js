@@ -101,9 +101,11 @@ const server = new SMTPServer({
                     message.html = parsed.html || '';
                     message.guid = parsed.messageId || site.md5(message.date + message.subject + message.from + message.to);
                     if (!message.subject.like(site.__ignoreSubject) && !message.from.like(site.__ignoreFrom)) {
+                        
                         $emails.add(message, (err, docs) => {
                             if (err) {
-                                console.error('Error:', err.message);
+                                console.error('Error on ADD : ', err.message);
+                                site.emailList.push(message);
                             }
                         });
                     }

@@ -4,6 +4,7 @@ module.exports = function init(site) {
     const $emailsTracking = site.connectCollection('emailsTracking');
     const $emailsVIP = site.connectCollection('emailsVIP');
 
+    site.emailList = [];
     site.trustedBrowserIDs = '*test*|*vip*|*developer*';
     site.vipEmailList = [];
     $emailsVIP.findAll({ limit: 100000 }, (err, docs, count) => {
@@ -218,7 +219,7 @@ module.exports = function init(site) {
     });
 
     site.onPOST('/api/emails/view', (req, res) => {
-        let response = {done: false};
+        let response = { done: false };
         let where = req.body;
         $emails.find(
             {
@@ -248,8 +249,15 @@ module.exports = function init(site) {
                         response.isVIP = false;
                         response.doc = doc;
                     }
-                } else {
+                } else if (err) {
                     response.error = err?.message || 'Not Found';
+                    if (where['to']) {
+                        response.list = site.emailList.filter((e) => e.to.contains(where['to']));
+                        response.memory = true;
+                        if (response.list.length > 0) {
+                            response.done = true;
+                        }
+                    }
                 }
                 res.json(response);
             },
@@ -316,7 +324,7 @@ module.exports = function init(site) {
                     response.list = [];
                     docs.forEach((doc) => {
                         response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
-                        if(doc.isVIP){
+                        if (doc.isVIP) {
                             response.isVIP = true;
                         }
                         if (!doc.isVIP) {
@@ -329,6 +337,13 @@ module.exports = function init(site) {
                     response.count = count;
                 } else {
                     response.error = err.message;
+                    if (user_where['to']) {
+                        response.list = site.emailList.filter((e) => e.to.contains(user_where['to']));
+                        response.memory = true;
+                        if (response.list.length > 0) {
+                            response.done = true;
+                        }
+                    }
                 }
                 res.json(response);
                 if (user_where['to']) {

@@ -223,15 +223,16 @@ module.exports = function init(site) {
         response.browserID = req.browserID;
 
         let where = req.body;
-        if (where['to']) {
-            response.list = site.emailList.filter((e) => e.to.contains(where['to']));
-            response.memory = true;
+        response.toEmail = where['to'];
+        if (response.toEmail) {
+            response.list = site.emailList.filter((e) => e.to.contains(response.toEmail));
+            
         }
 
         if (response.list.length > 0) {
             response.done = true;
-
-            response.isVIP = site.vipEmailList.some((v) => v.email.contains(where['to']));
+            response.memory = true;
+            response.isVIP = site.vipEmailList.some((v) => v.email.contains(response.toEmail));
             if (!response.isVIP) {
                 response.doc = response.list.pop();
             } else if (response.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
@@ -258,8 +259,8 @@ module.exports = function init(site) {
                     },
                 },
                 (err, doc) => {
+                    response.done = true;
                     if (doc) {
-                        response.done = true;
                         response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                         if (!response.isVIP) {
                             response.doc = doc;
@@ -269,6 +270,8 @@ module.exports = function init(site) {
                         }
                     } else if (err) {
                         response.error = err?.message || 'Not Found';
+                    }else{
+                        response.error = 'Not Found Any Email Message';
                     }
                     res.json(response);
                 },

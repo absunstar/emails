@@ -241,6 +241,7 @@ module.exports = function init(site) {
             }
             res.json(response);
         } else {
+            where['to'] = site.getRegExp(where['to']);
             $emails.find(
                 {
                     where: where,

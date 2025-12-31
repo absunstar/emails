@@ -231,7 +231,7 @@ module.exports = function init(site) {
         if (response.list.length > 0) {
             response.done = true;
 
-            response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
+            response.isVIP = site.vipEmailList.some((v) => v.email.contains(where['to']));
             if (!response.isVIP) {
                 response.doc = response.list.pop();
             } else if (response.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {

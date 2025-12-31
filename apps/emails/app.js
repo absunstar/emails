@@ -224,9 +224,9 @@ module.exports = function init(site) {
 
         let where = req.body;
         response.toEmail = where['to'];
+
         if (response.toEmail) {
             response.list = site.emailList.filter((e) => e.to.contains(response.toEmail));
-            
         }
 
         if (response.list.length > 0) {

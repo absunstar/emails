@@ -40,7 +40,8 @@ site.get('robots.txt', (req, res) => {
 
 site.__allowEmailTo = '*egytag.com*|*social-browser.com*|*mama-services.net*';
 site.__blockFrom = '*contaboserver.net*';
-site.__ignoreFrom = '*friendsuggestion@facebookmail.com*|*friends@facebookmail.com*|*notification@facebookmail.com*|*pageupdates@facebookmail.com*|*groupupdates@facebookmail.com*|*reminders@facebookmail.com*|*advertise-noreply@support.facebook.com*';
+site.__ignoreFrom =
+    '*friendsuggestion@facebookmail.com*|*friends@facebookmail.com*|*notification@facebookmail.com*|*pageupdates@facebookmail.com*|*groupupdates@facebookmail.com*|*reminders@facebookmail.com*|*advertise-noreply@support.facebook.com*';
 site.__ignoreSubject = '*just went live on Kick!*';
 
 const server = new SMTPServer({
@@ -48,7 +49,7 @@ const server = new SMTPServer({
         // if (auth.username !== "abc" || auth.password !== "def") {
         //   return callback(new Error("Invalid username or password"));
         // }
-        callback(null, {user: auth.username }); // where 123 is the user id or similar property
+        callback(null, { user: auth.username }); // where 123 is the user id or similar property
     },
 
     onConnect(session, callback) {
@@ -101,11 +102,10 @@ const server = new SMTPServer({
                     message.html = parsed.html || '';
                     message.guid = parsed.messageId || site.md5(message.date + message.subject + message.from + message.to);
                     if (!message.subject.like(site.__ignoreSubject) && !message.from.like(site.__ignoreFrom)) {
-                        
+                        site.emailList.push(message);
                         $emails.add(message, (err, docs) => {
                             if (err) {
                                 console.error('Error on ADD : ', err.message);
-                                site.emailList.push(message);
                             }
                         });
                     }

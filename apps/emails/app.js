@@ -219,54 +219,65 @@ module.exports = function init(site) {
     });
 
     site.onPOST('/api/emails/view', (req, res) => {
-        let response = { done: false };
+        let response = { done: false, list: [] };
+        response.browserID = req.browserID;
+
         let where = req.body;
-        $emails.find(
-            {
-                where: where,
-                sort: { id: -1 },
-                select: {
-                    id: 1,
-                    guid: 1,
-                    from: 1,
-                    to: 1,
-                    subject: 1,
-                    date: 1,
-                    folder: 1,
-                    html: 1,
-                    text: 1,
-                    vip: 1,
+        if (where['to']) {
+            response.list = site.emailList.filter((e) => e.to.contains(where['to']));
+            response.memory = true;
+        }
+
+        if (response.list.length > 0) {
+            response.done = true;
+
+            response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
+            if (!response.isVIP) {
+                response.doc = response.list.pop();
+            } else if (response.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
+                response.isVIP = false;
+                response.doc = response.list.pop();
+            }
+            res.json(response);
+        } else {
+            $emails.find(
+                {
+                    where: where,
+                    sort: { id: -1 },
+                    select: {
+                        id: 1,
+                        guid: 1,
+                        from: 1,
+                        to: 1,
+                        subject: 1,
+                        date: 1,
+                        folder: 1,
+                        html: 1,
+                        text: 1,
+                        vip: 1,
+                    },
                 },
-            },
-            (err, doc) => {
-                if (doc) {
-                    response.done = true;
-                    response.browserID = req.browserID;
-                    response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
-                    if (!response.isVIP) {
-                        response.doc = doc;
-                    } else if (response.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
-                        response.isVIP = false;
-                        response.doc = doc;
-                    }
-                } else if (err) {
-                    response.error = err?.message || 'Not Found';
-                    if (where['to']) {
-                        response.list = site.emailList.filter((e) => e.to.contains(where['to']));
-                        response.memory = true;
-                        if (response.list.length > 0) {
-                            response.done = true;
+                (err, doc) => {
+                    if (doc) {
+                        response.done = true;
+                        response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
+                        if (!response.isVIP) {
+                            response.doc = doc;
+                        } else if (response.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
+                            response.isVIP = false;
+                            response.doc = doc;
                         }
+                    } else if (err) {
+                        response.error = err?.message || 'Not Found';
                     }
-                }
-                res.json(response);
-            },
-        );
+                    res.json(response);
+                },
+            );
+        }
     });
 
     site.onPOST('/api/emails/all', (req, res) => {
-        let response = {};
-        response.done = false;
+        let response = { done: false, list: [] };
 
         let user_where = req.data.where || {};
 
@@ -302,59 +313,76 @@ module.exports = function init(site) {
             ];
         }
 
-        $emails.findMany(
-            {
-                select: req.data.select || {
-                    id: 1,
-                    guid: 1,
-                    from: 1,
-                    to: 1,
-                    subject: 1,
-                    date: 1,
-                    folder: 1,
-                    html: 1,
-                    text: 1,
-                },
-                where: where,
-                limit: req.data.limit,
-            },
-            (err, docs, count) => {
-                if (!err) {
-                    response.done = true;
-                    response.list = [];
-                    docs.forEach((doc) => {
-                        response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
-                        if (doc.isVIP) {
-                            response.isVIP = true;
-                        }
-                        if (!doc.isVIP) {
-                            response.list.push(doc);
-                        } else if (doc.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
-                            response.isVIP = false;
-                            response.list.push(doc);
-                        }
-                    });
-                    response.count = count;
-                } else {
-                    response.error = err.message;
-                    if (user_where['to']) {
-                        response.list = site.emailList.filter((e) => e.to.contains(user_where['to']));
-                        response.memory = true;
-                        if (response.list.length > 0) {
-                            response.done = true;
-                        }
+        if (user_where['to']) {
+            response.list = site.emailList.filter((e) => e.to.contains(user_where['to']));
+            response.memory = true;
+            if (response.list.length > 0) {
+                response.done = true;
+                response.list.forEach((doc) => {
+                    doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
+                    if (doc.isVIP) {
+                        response.isVIP = true;
                     }
-                }
+                    if (doc.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
+                        doc.isVIP = false;
+                    }
+                });
+                response.list = response.list.filter((d) => !d.isVIP);
+
                 res.json(response);
-                if (user_where['to']) {
-                    site.trackEmail({
-                        name: user_where['to'],
-                        ip: req.ip,
-                    });
-                }
-            },
-            true,
-        );
+                return;
+            }
+        }
+
+        if (response.list.length === 0) {
+            {
+                $emails.findMany(
+                    {
+                        select: req.data.select || {
+                            id: 1,
+                            guid: 1,
+                            from: 1,
+                            to: 1,
+                            subject: 1,
+                            date: 1,
+                            folder: 1,
+                            html: 1,
+                            text: 1,
+                        },
+                        where: where,
+                        limit: req.data.limit,
+                    },
+                    (err, docs, count) => {
+                        if (!err) {
+                            response.done = true;
+                            docs.forEach((doc) => {
+                                response.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
+                                if (doc.isVIP) {
+                                    response.isVIP = true;
+                                }
+                                if (!doc.isVIP) {
+                                    response.list.push(doc);
+                                } else if (doc.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
+                                    response.isVIP = false;
+                                    response.list.push(doc);
+                                }
+                            });
+                            response.count = count;
+                        } else {
+                            response.error = err.message;
+                        }
+                        res.json(response);
+                        if (user_where['to']) {
+                            site.trackEmail({
+                                name: user_where['to'],
+                                ip: req.ip,
+                            });
+                        }
+                    },
+                    true,
+                );
+            }
+        }
     });
 
     site.onGET({ name: '/viewEmail' }, (req, res) => {

@@ -27,6 +27,9 @@ const site = require('../isite')({
             enabled: !0,
         },
     },
+    session: {
+        enabled: false,
+    },
 });
 
 let $emails = site.connectCollection('emails');

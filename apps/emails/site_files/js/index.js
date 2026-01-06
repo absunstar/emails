@@ -214,6 +214,7 @@ app.controller('emails', function ($scope, $http, $timeout) {
                 show: true,
                 allowNewWindows: true,
                 allowPopup: true,
+                alwaysOnTop: true,
                 center: true,
                 vip: true,
             });

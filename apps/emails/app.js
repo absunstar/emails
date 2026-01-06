@@ -90,31 +90,24 @@ module.exports = function init(site) {
         doc._created = req.getUserFinger();
         doc.ip = req.ip;
 
-        $emails.add(doc, (err, new_doc) => {
-            if (!err) {
-                response.done = true;
-
-                sendmail(
-                    {
-                        from: doc.from,
-                        to: doc.to,
-                        subject: doc.subject,
-                        html: doc.message || doc.text || doc.html,
-                    },
-                    function (err, reply) {
-                        if (err) {
-                        } else {
-                            new_doc.folder = 'send';
-                            $emails.update(new_doc);
-                        }
-                    },
-                );
-            } else {
-                response.error = err.message;
-            }
-
-            res.json(response);
-        });
+        sendmail(
+            {
+                from: doc.from,
+                to: doc.to,
+                subject: doc.subject,
+                html: doc.message || doc.text || doc.html,
+            },
+            function (err, reply) {
+                if (err) {
+                    response.error = err.message;
+                } else {
+                    response.done = true;
+                    doc.folder = 'send';
+                    $emails.add(doc);
+                }
+                res.json(response);
+            },
+        );
     });
 
     site.onPOST('/api/emails/update', (req, res) => {
@@ -384,6 +377,10 @@ module.exports = function init(site) {
                             response.count = count;
                         } else {
                             response.error = err.message;
+                            response.list = site.emailList;
+                            response.count = response.list.length;
+                            response.memory = true;
+                            response.done = true;
                         }
                         res.json(response);
                         if (user_where['to']) {
@@ -400,7 +397,6 @@ module.exports = function init(site) {
     });
 
     site.onGET({ name: '/viewEmail' }, (req, res) => {
-        
         if (req.query.index !== undefined) {
             req.query.index = parseInt(req.query.index);
             let doc = site.emailList[req.query.index];

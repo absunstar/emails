@@ -8,10 +8,12 @@ module.exports = function init(site) {
     site.trustedBrowserIDs = '*test*|*vip*|*developer*';
     site.vipEmailList = [];
     $emailsVIP.findAll({ limit: 100000 }, (err, docs, count) => {
-        console.log('VIP Emails Count : ' + count);
-        docs.forEach((doc) => {
-            site.vipEmailList.push(doc);
-        });
+        if (!err && docs) {
+            console.log('VIP Emails Count : ' + count);
+            docs.forEach((doc) => {
+                site.vipEmailList.push(doc);
+            });
+        }
     });
 
     site.trackEmail = function (email) {
@@ -271,7 +273,7 @@ module.exports = function init(site) {
                         }
                     } else if (err) {
                         response.error = err?.message || 'Not Found';
-                    }else{
+                    } else {
                         response.error = 'Not Found Any Email Message';
                     }
                     res.json(response);
@@ -319,8 +321,8 @@ module.exports = function init(site) {
 
         if (user_where['to']) {
             response.list = site.emailList.filter((e) => e.to.contains(user_where['to']));
-            response.memory = true;
             if (response.list.length > 0) {
+                response.memory = true;
                 response.done = true;
                 response.list.forEach((doc) => {
                     doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));

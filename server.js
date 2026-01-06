@@ -21,6 +21,7 @@ const site = require('../isite')({
         keys: ['a2797cd0076d385e86663865dc4d855b'],
     },
     mongodb: {
+        enabled: !1,
         db: 'smpt-server',
         limit: 100,
         identity: {

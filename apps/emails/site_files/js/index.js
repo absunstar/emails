@@ -162,7 +162,7 @@ app.controller('emails', function ($scope, $http, $timeout) {
                     if ($scope.currentEmail.index !== undefined) {
                         document.querySelector('#div-message').src = document.location.protocol + '//' + document.location.hostname + '/viewEmail?index=' + $scope.currentEmail.index;
                     } else {
-                        document.querySelector('#div-message').src = document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + $scope.currentEmail._id;
+                        document.querySelector('#div-message').src = document.location.protocol + '//' + document.location.hostname + '/viewEmail?id=' + $scope.currentEmail.id;
                     }
                 } else {
                     $scope.error = response.data.error;
@@ -200,7 +200,7 @@ app.controller('emails', function ($scope, $http, $timeout) {
     };
 
     $scope.details = function (email) {
-        let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + email._id;
+        let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?id=' + email.id;
         if (email.index !== undefined) {
             url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?index=' + email.index;
         }

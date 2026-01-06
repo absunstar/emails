@@ -369,7 +369,7 @@ module.exports = function init(site) {
                             response.count = count;
                         } else {
                             response.error = err.message;
-                            response.list = site.emailList.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder }));
+                            response.list = site.emailList.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder , index: e.index }));
                             response.count = response.list.length;
                             response.memory = true;
                             response.done = true;
@@ -389,17 +389,22 @@ module.exports = function init(site) {
     });
 
     site.onGET({ name: '/viewEmail' }, (req, res) => {
+
         if (req.query.index !== undefined) {
             req.query.index = parseInt(req.query.index);
             let doc = site.emailList[req.query.index];
             res.sendHTML(doc.html || doc.text);
             return;
         }
-
+        let doc = site.emailList.find((e) => e.id == req.query.id);
+        if (doc) {
+            res.sendHTML(doc.html || doc.text);
+            return;
+        }
         $emails.find(
             {
                 where: {
-                    _id: req.query._id,
+                    id: req.query.id,
                 },
                 select: {
                     html: 1,

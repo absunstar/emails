@@ -200,8 +200,9 @@ app.controller('emails', function ($scope, $http, $timeout) {
     };
 
     $scope.details = function (email) {
+
         let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + email._id;
-        if (email.index === undefined) {
+        if (email.index !== undefined) {
             url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?index=' + email.index;
         }
 

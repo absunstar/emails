@@ -231,7 +231,7 @@ module.exports = function init(site) {
         if (response.toEmail) {
             response.list = site.emailList.filter((e) => e.to.contains(response.toEmail));
         }
-        
+
         if (response.index) {
             response.done = true;
             response.doc = site.emailList[response.index];
@@ -332,7 +332,7 @@ module.exports = function init(site) {
             if (response.list.length > 0) {
                 response.memory = true;
                 response.done = true;
-                response.list.forEach((doc ) => {
+                response.list.forEach((doc) => {
                     doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                     if (doc.isVIP) {
                         response.isVIP = true;
@@ -400,6 +400,14 @@ module.exports = function init(site) {
     });
 
     site.onGET({ name: '/viewEmail' }, (req, res) => {
+        
+        if (req.query.index !== undefined) {
+            req.query.index = parseInt(req.query.index);
+            let doc = site.emailList[req.query.index];
+            res.sendHTML(doc.html || doc.text);
+            return;
+        }
+
         $emails.find(
             {
                 where: {

@@ -1,4 +1,4 @@
-app.controller('emails', function ($scope, $http , $timeout) {
+app.controller('emails', function ($scope, $http, $timeout) {
     $scope.isVIP = false;
     $scope.minEmailLength = 8;
     $scope.emailLength = 14;
@@ -7,7 +7,6 @@ app.controller('emails', function ($scope, $http , $timeout) {
         $scope.isVIP = true;
         $scope.minEmailLength = 6;
         $scope.emailLength = 10;
-        
     }
 
     $scope.email = {};
@@ -153,7 +152,8 @@ app.controller('emails', function ($scope, $http , $timeout) {
             method: 'POST',
             url: '/api/emails/view',
             data: {
-                id: email.id            },
+                id: email.id,
+            },
         }).then(
             function (response) {
                 $scope.busy = false;
@@ -196,8 +196,11 @@ app.controller('emails', function ($scope, $http , $timeout) {
     };
 
     $scope.details = function (email) {
-        
-        let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?index=' + email.index;
+        let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + email._id;
+        if (email.index === undefined) {
+            url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?index=' + email.index;
+        }
+
         if (window.SOCIALBROWSER) {
             SOCIALBROWSER.ipc('[open new popup]', {
                 partition: SOCIALBROWSER.partition,
@@ -270,7 +273,6 @@ app.controller('emails', function ($scope, $http , $timeout) {
         );
     };
     $scope.searchAll = function (free = false) {
-      
         let where = {};
 
         if (free) {
@@ -318,7 +320,7 @@ app.controller('emails', function ($scope, $http , $timeout) {
     };
 
     $scope.loadAll = function (where = {}, limit = 500) {
-        if($scope.loadAllBusy) return;
+        if ($scope.loadAllBusy) return;
         $scope.loadAllBusy = true;
         $scope.list = [];
         $scope.count = -1;
@@ -332,7 +334,7 @@ app.controller('emails', function ($scope, $http , $timeout) {
         }).then(
             function (response) {
                 $scope.loadAllBusy = false;
-                if(response.data.isVIP){
+                if (response.data.isVIP) {
                     $scope.error = 'Some Emails are Blocked, You can not view them here.';
                 }
                 if (response.data.done) {
@@ -388,7 +390,7 @@ app.controller('emails', function ($scope, $http , $timeout) {
     }
 
     $scope.generateEmail = function () {
-        if($scope.newEmailBusy) return;
+        if ($scope.newEmailBusy) return;
         $scope.newEmailBusy = true;
         $scope.emailSearch.to = '';
         let host = document.location.hostname;

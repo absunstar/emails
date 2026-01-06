@@ -153,8 +153,7 @@ app.controller('emails', function ($scope, $http , $timeout) {
             method: 'POST',
             url: '/api/emails/view',
             data: {
-                id: email.id,
-            },
+                id: email.id            },
         }).then(
             function (response) {
                 $scope.busy = false;
@@ -197,7 +196,8 @@ app.controller('emails', function ($scope, $http , $timeout) {
     };
 
     $scope.details = function (email) {
-        let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + email._id;
+        
+        let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?index=' + email.index;
         if (window.SOCIALBROWSER) {
             SOCIALBROWSER.ipc('[open new popup]', {
                 partition: SOCIALBROWSER.partition,

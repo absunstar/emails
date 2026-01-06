@@ -226,9 +226,17 @@ module.exports = function init(site) {
 
         let where = req.body;
         response.toEmail = where['to'];
+        response.index = where['index'];
 
         if (response.toEmail) {
             response.list = site.emailList.filter((e) => e.to.contains(response.toEmail));
+        }
+        
+        if (response.index) {
+            response.done = true;
+            response.doc = site.emailList[response.index];
+            res.json(response);
+            return;
         }
 
         if (response.list.length > 0) {
@@ -324,7 +332,7 @@ module.exports = function init(site) {
             if (response.list.length > 0) {
                 response.memory = true;
                 response.done = true;
-                response.list.forEach((doc) => {
+                response.list.forEach((doc ) => {
                     doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                     if (doc.isVIP) {
                         response.isVIP = true;

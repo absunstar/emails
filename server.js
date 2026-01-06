@@ -28,7 +28,7 @@ const site = require('../isite')({
         },
     },
     session: {
-        enabled: false,
+        save: false,
     },
 });
 

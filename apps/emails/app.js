@@ -184,8 +184,7 @@ module.exports = function init(site) {
     });
 
     site.onPOST('/api/emails/delete', (req, res) => {
-        let response = {};
-        response.done = false;
+        let response = { done: false };
 
         if (!req.session.user) {
             res.json(response);
@@ -193,23 +192,16 @@ module.exports = function init(site) {
         }
 
         let id = req.body.id;
+        site.emailList = site.emailList.filter((e) => e.id != id);
+        response.done = true;
+        res.json(response);
         if (id) {
             $emails.delete(
                 {
                     id: id,
                 },
-                (err, result) => {
-                    if (!err) {
-                        response.done = true;
-                    } else {
-                        response.error = err.message;
-                    }
-                    res.json(response);
-                },
+                (err, result) => {},
             );
-        } else {
-            response.error = 'no id';
-            res.json(response);
         }
     });
 
@@ -377,7 +369,7 @@ module.exports = function init(site) {
                             response.count = count;
                         } else {
                             response.error = err.message;
-                            response.list = site.emailList.map(e=> ({id : e.id, guid : e.guid, from : e.from, to : e.to, subject : e.subject, date : e.date, folder : e.folder}));
+                            response.list = site.emailList.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder }));
                             response.count = response.list.length;
                             response.memory = true;
                             response.done = true;

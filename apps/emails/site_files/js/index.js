@@ -159,7 +159,11 @@ app.controller('emails', function ($scope, $http, $timeout) {
                 $scope.busy = false;
                 if (response.data.done) {
                     $scope.currentEmail = response.data.doc;
-                    document.querySelector('#div-message').src = document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + $scope.currentEmail._id;
+                    if ($scope.currentEmail.index !== undefined) {
+                        document.querySelector('#div-message').src = document.location.protocol + '//' + document.location.hostname + '/viewEmail?index=' + $scope.currentEmail.index;
+                    } else {
+                        document.querySelector('#div-message').src = document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + $scope.currentEmail._id;
+                    }
                 } else {
                     $scope.error = response.data.error;
                 }

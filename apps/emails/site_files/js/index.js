@@ -200,7 +200,6 @@ app.controller('emails', function ($scope, $http, $timeout) {
     };
 
     $scope.details = function (email) {
-
         let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?_id=' + email._id;
         if (email.index !== undefined) {
             url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?index=' + email.index;
@@ -336,6 +335,15 @@ app.controller('emails', function ($scope, $http, $timeout) {
             data: {
                 where: where,
                 limit: limit,
+                select: {
+                    id: 1,
+                    guid: 1,
+                    from: 1,
+                    to: 1,
+                    subject: 1,
+                    date: 1,
+                    folder: 1,
+                },
             },
         }).then(
             function (response) {

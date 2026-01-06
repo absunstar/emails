@@ -377,7 +377,7 @@ module.exports = function init(site) {
                             response.count = count;
                         } else {
                             response.error = err.message;
-                            response.list = site.emailList;
+                            response.list = site.emailList.map(e=> ({id : e.id, guid : e.guid, from : e.from, to : e.to, subject : e.subject, date : e.date, folder : e.folder}));
                             response.count = response.list.length;
                             response.memory = true;
                             response.done = true;

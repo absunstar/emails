@@ -212,16 +212,18 @@ module.exports = function init(site) {
         let where = req.body;
         response.toEmail = where['to'];
         response.index = where['index'];
+        response.id = where['id'];
+
+        let doc = site.emailList.find((e) => e.id == response.id);
+        if (doc) {
+            response.doc = doc;
+            response.done = true;
+            res.json(response);
+            return;
+        }
 
         if (response.toEmail) {
             response.list = site.emailList.filter((e) => e.to.contains(response.toEmail));
-        }
-
-        if (response.index) {
-            response.done = true;
-            response.doc = site.emailList[response.index];
-            res.json(response);
-            return;
         }
 
         if (response.list.length > 0) {
@@ -369,7 +371,7 @@ module.exports = function init(site) {
                             response.count = count;
                         } else {
                             response.error = err.message;
-                            response.list = site.emailList.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder , index: e.index }));
+                            response.list = site.emailList.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder, index: e.index }));
                             response.count = response.list.length;
                             response.memory = true;
                             response.done = true;
@@ -389,13 +391,6 @@ module.exports = function init(site) {
     });
 
     site.onGET({ name: '/viewEmail' }, (req, res) => {
-
-        if (req.query.index !== undefined) {
-            req.query.index = parseInt(req.query.index);
-            let doc = site.emailList[req.query.index];
-            res.sendHTML(doc.html || doc.text);
-            return;
-        }
         let doc = site.emailList.find((e) => e.id == req.query.id);
         if (doc) {
             res.sendHTML(doc.html || doc.text);

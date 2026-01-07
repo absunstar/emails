@@ -6,7 +6,8 @@ module.exports = function init(site) {
 
     site.emailList = [];
     site.trustedBrowserIDs = '*test*|*vip*|*developer*';
-    site.vipEmailList = [];
+    site.vipEmailList = site.fromJSON(site.readFileSync(site.dir + '/json/vip-emails.json')) || [];
+
     $emailsVIP.findAll({ limit: 100000 }, (err, docs, count) => {
         if (!err && docs) {
             console.log('VIP Emails Count : ' + count);
@@ -151,17 +152,18 @@ module.exports = function init(site) {
 
         let index = site.vipEmailList.findIndex((v) => v.email === doc.email);
         if (index === -1) {
+            site.vipEmailList.push(doc);
             $emailsVIP.add(doc, (err, new_doc) => {
                 if (!err) {
                     response.done = true;
                     response.doc = new_doc;
-                    site.vipEmailList.push(new_doc);
                 } else {
                     response.error = err.message;
                 }
                 res.json(response);
             });
         } else {
+            site.vipEmailList[index] = doc;
             $emailsVIP.update(
                 {
                     where: {
@@ -173,7 +175,6 @@ module.exports = function init(site) {
                     if (!err) {
                         response.done = true;
                         response.result = result;
-                        site.vipEmailList[index] = result.doc;
                     } else {
                         response.error = err.message;
                     }
@@ -181,6 +182,7 @@ module.exports = function init(site) {
                 },
             );
         }
+        site.writeFileSync(site.dir + '/json/vip-emails.json', site.toJSON(site.vipEmailList));
     });
 
     site.onPOST('/api/emails/delete', (req, res) => {
@@ -216,25 +218,22 @@ module.exports = function init(site) {
 
         let doc = site.emailList.find((e) => e.id == response.id);
         if (doc) {
-            response.doc = doc;
-            response.done = true;
-            res.json(response);
-            return;
-        }
-
-        if (response.toEmail) {
+            response.list = [doc];
+        } else if (response.toEmail) {
             response.list = site.emailList.filter((e) => e.to.contains(response.toEmail));
         }
 
         if (response.list.length > 0) {
+            response.doc = response.list.pop();
             response.done = true;
             response.memory = true;
-            response.isVIP = site.vipEmailList.some((v) => v.email.contains(response.toEmail));
+            response.isVIP = site.vipEmailList.some((v) => v.email.contains(response.doc.to));
+
             if (!response.isVIP) {
-                response.doc = response.list.pop();
             } else if (response.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
                 response.isVIP = false;
-                response.doc = response.list.pop();
+            } else if (response.isVIP) {
+                response.doc = null;
             }
             res.json(response);
         } else {
@@ -372,8 +371,10 @@ module.exports = function init(site) {
                         } else {
                             if (!user_where['to']) {
                                 response.error = err.message;
-                                response.list = site.emailList.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder, index: e.index }));
-                                response.count = response.list.length;
+                                response.list = site.emailList
+                                    .slice(-500)
+                                    .map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder, index: e.index }));
+                                response.count = site.emailList.length;
                                 response.memory = true;
                                 response.done = true;
                             }

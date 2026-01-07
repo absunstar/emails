@@ -6,7 +6,9 @@ module.exports = function init(site) {
 
     site.emailList = [];
     site.trustedBrowserIDs = '*test*|*vip*|*developer*';
-    site.vipEmailList = site.fromJSON(site.readFileSync(site.dir + '/json/vip-emails.json')) || [];
+    site.vipEmailListPath = site.path.join(site.dir  , '/json/vip-emails.json');
+    site.log('VIP Emails Path : ' + site.vipEmailListPath);
+    site.vipEmailList = site.fromJSON(site.readFileSync(site.vipEmailListPath)) || [];
 
     $emailsVIP.findAll({ limit: 100000 }, (err, docs, count) => {
         if (!err && docs) {
@@ -182,7 +184,7 @@ module.exports = function init(site) {
                 },
             );
         }
-        site.writeFileSync(site.dir + '/json/vip-emails.json', site.toJSON(site.vipEmailList));
+        site.writeFileSync(site.vipEmailListPath, site.toJSON(site.vipEmailList));
     });
 
     site.onPOST('/api/emails/delete', (req, res) => {

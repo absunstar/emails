@@ -13,6 +13,7 @@ const site = require('../isite')({
     language: { id: 'En', dir: 'ltr', text: 'left' },
     lang: 'En',
     version: new Date().getTime(),
+    log : true,
     require: {
         features: [],
         permissions: [],

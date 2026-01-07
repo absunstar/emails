@@ -6,7 +6,8 @@ module.exports = function init(site) {
 
     site.emailList = [];
     site.trustedBrowserIDs = '*test*|*vip*|*developer*';
-    site.vipEmailListPath = site.path.join(site.dir  , '/json/vip-emails.json');
+    site.createDirSync(site.path.join(site.cwd, 'localStorage'));
+    site.vipEmailListPath = site.path.join(site.cwd, 'localStorage', 'vip-emails.json');
     site.log('VIP Emails Path : ' + site.vipEmailListPath);
     site.vipEmailList = site.fromJSON(site.readFileSync(site.vipEmailListPath)) || [];
 

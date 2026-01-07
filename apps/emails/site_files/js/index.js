@@ -64,8 +64,8 @@ app.controller('emails', function ($scope, $http, $timeout) {
                 if (response.data.done) {
                     site.hideModal('#updateEmailModal');
                     $scope.list.forEach((mail, i) => {
-                        if (mail.id == $scope.email.id) {
-                            $scope.list.splice(i, 1);
+                        if (mail.guid == $scope.email.guid) {
+                            $scope.list[i] = $scope.email;
                         }
                     });
                 } else {
@@ -152,7 +152,7 @@ app.controller('emails', function ($scope, $http, $timeout) {
             method: 'POST',
             url: '/api/emails/view',
             data: {
-                id: email.id,
+                guid: email.guid,
             },
         }).then(
             function (response) {
@@ -160,7 +160,7 @@ app.controller('emails', function ($scope, $http, $timeout) {
                 if (response.data.done) {
                     $scope.currentEmail = response.data.doc;
 
-                    document.querySelector('#div-message').src = document.location.protocol + '//' + document.location.hostname + '/viewEmail?id=' + $scope.currentEmail.id;
+                    document.querySelector('#div-message').src = document.location.protocol + '//' + document.location.hostname + '/viewEmail?guid=' + $scope.currentEmail.guid;
                 } else {
                     $scope.error = response.data.error;
                 }
@@ -197,7 +197,7 @@ app.controller('emails', function ($scope, $http, $timeout) {
     };
 
     $scope.details = function (email) {
-        let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?id=' + email.id;
+        let url = document.location.protocol + '//' + document.location.hostname + '/viewEmail?guid=' + email.guid;
 
         if (window.SOCIALBROWSER) {
             SOCIALBROWSER.ipc('[open new popup]', {
@@ -227,8 +227,7 @@ app.controller('emails', function ($scope, $http, $timeout) {
             method: 'POST',
             url: '/api/emails/delete',
             data: {
-                id: email.id,
-                name: email.name,
+                guid: email.guid,
             },
         }).then(
             function (response) {
@@ -236,7 +235,7 @@ app.controller('emails', function ($scope, $http, $timeout) {
                 if (response.data.done) {
                     site.hideModal('#deleteEmailModal');
                     $scope.list.forEach((mail, i) => {
-                        if (mail.id == email.id) {
+                        if (mail.guid == email.guid) {
                             $scope.list.splice(i, 1);
                         }
                     });

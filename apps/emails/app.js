@@ -126,11 +126,11 @@ module.exports = function init(site) {
         let doc = req.body;
         doc._updated = site.security.getUserFinger({ $req: req, $res: res });
 
-        if (doc.id) {
+        if (doc.guid) {
             $emails.edit(
                 {
                     where: {
-                        id: doc.id,
+                        guid: doc.guid,
                     },
                     set: doc,
                 },
@@ -197,14 +197,14 @@ module.exports = function init(site) {
             return;
         }
 
-        let id = req.body.id;
-        site.emailList = site.emailList.filter((e) => e.id != id);
+        let guid = req.body.guid;
+        site.emailList = site.emailList.filter((e) => e.guid != guid);
         response.done = true;
         res.json(response);
-        if (id) {
+        if (guid) {
             $emails.delete(
                 {
-                    id: id,
+                    guid: guid,
                 },
                 (err, result) => {},
             );
@@ -218,9 +218,9 @@ module.exports = function init(site) {
         let where = req.body;
         response.toEmail = where['to'];
         response.index = where['index'];
-        response.id = where['id'];
+        response.guid = where['guid'];
 
-        let doc = site.emailList.find((e) => e.id == response.id);
+        let doc = site.emailList.find((e) => e.guid == response.guid);
         if (doc) {
             response.list = [doc];
         } else if (response.toEmail) {
@@ -398,7 +398,7 @@ module.exports = function init(site) {
     });
 
     site.onGET({ name: '/viewEmail' }, (req, res) => {
-        let doc = site.emailList.find((e) => e.id == req.query.id);
+        let doc = site.emailList.find((e) => e.guid == req.query.guid);
         if (doc) {
             res.sendHTML(doc.html || doc.text);
             return;
@@ -406,7 +406,7 @@ module.exports = function init(site) {
         $emails.find(
             {
                 where: {
-                    id: req.query.id,
+                    guid: req.query.guid,
                 },
                 select: {
                     html: 1,

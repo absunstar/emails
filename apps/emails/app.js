@@ -7,10 +7,11 @@ module.exports = function init(site) {
     site.emailList = [];
     site.trustedBrowserIDs = '*test*|*vip*|*developer*';
     site.createDirSync(site.path.join(site.cwd, 'localStorage'));
-    site.vipEmailListPath = site.path.join(site.cwd, 'localStorage', 'vip-emails.json');
-    site.log('VIP Emails Path : ' + site.vipEmailListPath);
-    site.vipEmailList = site.fromJSON(site.readFileSync(site.vipEmailListPath)) || [];
+    site.vipEmailListPath = site.path.join(site.cwd, 'localStorage', 'vip-email-list.json');
 
+    site.log('VIP Emails Path : ' + site.vipEmailListPath);
+    site.vipEmailList = site.fromJSON(site.readFileSync(site.vipEmailListPath) , []);
+    site.log(site.vipEmailList);
     $emailsVIP.findAll({ limit: 100000 }, (err, docs, count) => {
         if (!err && docs) {
             console.log('VIP Emails Count : ' + count);

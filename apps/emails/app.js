@@ -10,7 +10,7 @@ module.exports = function init(site) {
     site.vipEmailListPath = site.path.join(site.cwd, 'localStorage', 'vip-email-list.json');
 
     site.log('VIP Emails Path : ' + site.vipEmailListPath);
-    site.vipEmailList = site.fromJSON(site.readFileSync(site.vipEmailListPath) , []);
+    site.vipEmailList = site.fromJSON(site.readFileSync(site.vipEmailListPath), []);
     site.log(site.vipEmailList);
     $emailsVIP.findAll({ limit: 100000 }, (err, docs, count) => {
         if (!err && docs) {
@@ -283,29 +283,44 @@ module.exports = function init(site) {
     site.onPOST('/api/emails/all', (req, res) => {
         let response = { done: false, list: [] };
 
+        response.list = site.emailList.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder, index: e.index }));
+
         let user_where = req.data.where || {};
 
         let where = {};
 
         if (user_where['from']) {
             where['from'] = site.getRegExp(user_where['from']);
+            response.list = response.list.filter((e) => e.from.contains(user_where['from']));
         }
 
         if (user_where['to']) {
             where['to'] = site.getRegExp(user_where['to']);
+            response.list = response.list.filter((e) => e.to.contains(user_where['to']));
         }
 
         if (user_where['subject']) {
             where['subject'] = site.getRegExp(user_where['subject']);
+            response.list = response.list.filter((e) => e.subject.contains(user_where['subject']));
         }
 
         if (user_where['html']) {
             where['html'] = site.getRegExp(user_where['html']);
+            response.list = response.list.filter((e) => e.html.contains(user_where['html']));
         }
         if (user_where['text']) {
             where['text'] = site.getRegExp(user_where['text']);
+            response.list = response.list.filter((e) => e.text.contains(user_where['text']));
         }
         if (user_where['search']) {
+            response.list = response.list.filter(
+                (e) =>
+                    e.from.contains(user_where['search']) ||
+                    e.to.contains(user_where['search']) ||
+                    e.subject.contains(user_where['search']) ||
+                    e.html.contains(user_where['search']) ||
+                    e.text.contains(user_where['search']),
+            );
             where.$or = [
                 {
                     from: site.getRegExp(user_where['search']),
@@ -317,25 +332,22 @@ module.exports = function init(site) {
             ];
         }
 
-        if (user_where['to']) {
-            response.list = site.emailList.filter((e) => e.to.contains(user_where['to']));
-            if (response.list.length > 0) {
-                response.memory = true;
-                response.done = true;
-                response.list.forEach((doc) => {
-                    doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
-                    if (doc.isVIP) {
-                        response.isVIP = true;
-                    }
-                    if (doc.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
-                        doc.isVIP = false;
-                    }
-                });
-                response.list = response.list.filter((d) => !d.isVIP);
+        if (response.list.length > 0) {
+            response.memory = true;
+            response.done = true;
+            response.list.forEach((doc) => {
+                doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
+                if (doc.isVIP) {
+                    response.isVIP = true;
+                }
+                if (doc.isVIP && req.browserID && req.browserID.like(site.trustedBrowserIDs)) {
+                    doc.isVIP = false;
+                }
+            });
+            response.list = response.list.filter((d) => !d.isVIP);
 
-                res.json(response);
-                return;
-            }
+            res.json(response);
+            return;
         }
 
         if (response.list.length === 0) {
@@ -417,7 +429,7 @@ module.exports = function init(site) {
                 if (!err && doc) {
                     res.sendHTML(doc.html || doc.text);
                 } else {
-                    res.sendTEXT('<h1> Email Not Exists</h1>');
+                    res.sendHTML('<h1> Email Not Exists</h1>');
                 }
             },
             true,

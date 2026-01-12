@@ -282,11 +282,7 @@ app.controller('emails', function ($scope, $http, $timeout) {
             if ($scope.emailSearch.to.indexOf('@') === -1) {
                 $scope.emailSearch.to = $scope.emailSearch.to + '@' + document.location.hostname.replace('emails.', '');
             }
-
-            if ($scope.emailSearch.to.split('@')[0].length < $scope.minEmailLength) {
-                alert('Email Length Must be ' + $scope.minEmailLength + ' letter or more ...');
-                return;
-            }
+            
         }
 
         if ($scope.emailSearch.from) {

@@ -335,6 +335,7 @@ module.exports = function init(site) {
         if (response.list.length > 0) {
             response.memory = true;
             response.done = true;
+            response.count = site.emailList.length;
             response.list.forEach((doc) => {
                 doc.isVIP = site.vipEmailList.some((v) => doc.to.contains(v.email));
                 if (doc.isVIP) {

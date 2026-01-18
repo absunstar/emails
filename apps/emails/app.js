@@ -5,6 +5,13 @@ module.exports = function init(site) {
     const $emailsVIP = site.connectCollection('emailsVIP');
 
     site.emailList = [];
+    setInterval(
+        () => {
+            site.emailList = site.emailList.slice(-500);
+        },
+        1000 * 60 * 60,
+    );
+
     site.trustedBrowserIDs = '*test*|*vip*|*developer*';
     site.createDirSync(site.path.join(site.cwd, 'localStorage'));
     site.vipEmailListPath = site.path.join(site.cwd, 'localStorage', 'vip-email-list.json');

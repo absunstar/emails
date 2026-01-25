@@ -288,44 +288,48 @@ module.exports = function init(site) {
     });
 
     site.onPOST('/api/emails/all', (req, res) => {
-        let response = { done: false, list: [] };
-
-        response.list = site.emailList.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder, index: e.index }));
-
-        let user_where = req.data.where || {};
-
-        let where = {};
-
-        if (user_where['from']) {
-            where['from'] = site.getRegExp(user_where['from']);
-            response.list = response.list.filter((e) => e.from?.contains(user_where['from']));
-        }
+        let response = { done: true, list: [] };
 
         if (user_where['to']) {
             where['to'] = site.getRegExp(user_where['to']);
-            response.list = response.list.filter((e) => e.to?.contains(user_where['to']));
-        }
+            response.list = site.emailList.filter((e) => e.to?.contains(user_where['to']));
+        } else {
+            response.list = site.emailList.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder, index: e.index }));
 
-        if (user_where['subject']) {
-            where['subject'] = site.getRegExp(user_where['subject']);
-            response.list = response.list.filter((e) => e.subject?.contains(user_where['subject']));
-        }
+            let user_where = req.data.where || {};
 
-        if (user_where['search']) {
-            response.list = response.list.filter((e) => e.from?.contains(user_where['search']) || e.to?.contains(user_where['search']) || e.subject?.contains(user_where['search']));
-            where.$or = [
-                {
-                    from: site.getRegExp(user_where['search']),
-                },
-                { to: site.getRegExp(user_where['search']) },
-                { subject: site.getRegExp(user_where['search']) },
-                { html: site.getRegExp(user_where['search']) },
-                { text: site.getRegExp(user_where['search']) },
-            ];
+            let where = {};
+
+            if (user_where['from']) {
+                where['from'] = site.getRegExp(user_where['from']);
+                response.list = response.list.filter((e) => e.from?.contains(user_where['from']));
+            }
+
+            if (user_where['to']) {
+                where['to'] = site.getRegExp(user_where['to']);
+                response.list = response.list.filter((e) => e.to?.contains(user_where['to']));
+            }
+
+            if (user_where['subject']) {
+                where['subject'] = site.getRegExp(user_where['subject']);
+                response.list = response.list.filter((e) => e.subject?.contains(user_where['subject']));
+            }
+
+            if (user_where['search']) {
+                response.list = response.list.filter((e) => e.from?.contains(user_where['search']) || e.to?.contains(user_where['search']) || e.subject?.contains(user_where['search']));
+                where.$or = [
+                    {
+                        from: site.getRegExp(user_where['search']),
+                    },
+                    { to: site.getRegExp(user_where['search']) },
+                    { subject: site.getRegExp(user_where['search']) },
+                    { html: site.getRegExp(user_where['search']) },
+                    { text: site.getRegExp(user_where['search']) },
+                ];
+            }
         }
 
         if (response.list.length > 0) {
-            response.list = response.list.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder, index: e.index }));
             response.memory = true;
             response.done = true;
             response.count = site.emailList.length;

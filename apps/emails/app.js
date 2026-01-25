@@ -290,15 +290,15 @@ module.exports = function init(site) {
     site.onPOST('/api/emails/all', (req, res) => {
         let response = { done: true, list: [] };
 
+        let user_where = req.data.where || {};
+
+        let where = {};
+
         if (user_where['to']) {
             where['to'] = site.getRegExp(user_where['to']);
             response.list = site.emailList.filter((e) => e.to?.contains(user_where['to']));
         } else {
             response.list = site.emailList.map((e) => ({ id: e.id, guid: e.guid, from: e.from, to: e.to, subject: e.subject, date: e.date, folder: e.folder, index: e.index }));
-
-            let user_where = req.data.where || {};
-
-            let where = {};
 
             if (user_where['from']) {
                 where['from'] = site.getRegExp(user_where['from']);

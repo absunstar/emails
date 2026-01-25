@@ -226,8 +226,15 @@ module.exports = function init(site) {
         response.toEmail = where['to'];
         response.index = where['index'];
         response.guid = where['guid'];
+        response.id = where['id'];
 
-        let doc = site.emailList.find((e) => e.guid == response.guid);
+        let doc = null;
+        if (response.guid) {
+            doc = site.emailList.find((e) => e.guid == response.guid);
+        } else if (response.id) {
+            doc = site.emailList.find((e) => e.id == response.id);
+        }
+
         if (doc) {
             response.list = [doc];
         } else if (response.toEmail) {

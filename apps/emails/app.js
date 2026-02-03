@@ -415,7 +415,7 @@ module.exports = function init(site) {
     });
 
     site.onGET({ name: '/viewEmail' }, (req, res) => {
-        let doc = site.emailList.find((e) => e.guid == req.query.guid);
+        let doc = site.emailList.find((e) => e.guid.like(req.query.guid));
         if (doc) {
             res.sendHTML(doc.html || doc.text);
             return;

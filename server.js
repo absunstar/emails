@@ -42,6 +42,9 @@ $emails.createUnique({
 site.get('robots.txt', (req, res) => {
     res.txt('robots.txt');
 });
+site.get('app-ads.txt', (req, res) => {
+    res.txt('app-ads.txt');
+});
 
 site.__allowEmailTo = '*egytag.com*|*social-browser.com*|*mama-services.net*';
 site.__blockFrom = '*contaboserver.net*';

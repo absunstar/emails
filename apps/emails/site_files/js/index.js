@@ -1,3 +1,5 @@
+var SOCIALBROWSER = globalThis.SOCIALBROWSER || globalThis.this;
+
 app.controller('emails', function ($scope, $http, $timeout) {
     $scope.isVIP = false;
     $scope.minEmailLength = 8;

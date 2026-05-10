@@ -7,7 +7,7 @@ module.exports = function init(site) {
     site.emailList = [];
     setInterval(
         () => {
-            site.emailList = site.emailList.slice(-500);
+            site.emailList = site.emailList.slice(-1000);
         },
         1000 * 60 * 60,
     );

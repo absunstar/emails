@@ -46,17 +46,17 @@
                             </td>
                             <td class="bold">
                                 <div class="row">
-                                    <div class="col">{{c.from}}</div>
+                                    <div class="col brown">{{c.from}}</div>
                                     <div class="col center">
                                         <i-button type="search" ng-click="smartSearch(c.from)" label="##word.All Mails##"></i-button>
                                     </div>
                                 </div>
 
-                                <span class="white center font-12"> {{c.date | xdatetime}} </span>
+                                <span class=" center font-12"> {{c.date | xdatetime}} </span>
                             </td>
                             <td class="bold">
                                 <div class="row">
-                                    <div class="col">{{c.to}}</div>
+                                    <div class="col green">{{c.to}}</div>
                                     <div class="row">
                                         <div class="col"><i-button type="add" ng-click="setvip(c.to)" label="##word.vip##"></i-button></div>
                                         <div class="col center"><i-button type="search" ng-click="smartSearch(c.to)" label="##word.All Mails##"></i-button></div>

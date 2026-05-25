@@ -2,69 +2,272 @@
 <html lang="##session.language.id##" dir="##session.language.dir##" class="##session.language.id##" ng-app="myApp">
     <head x-import="head.html">
         <style>
-            ins {
-                background: var(--color1);
+            body {
+                margin-top: 72px;
+                margin-bottom: 0;
+                font-family: Inter, 'Segoe UI', Arial, sans-serif;
+            }
+            .temp-mail-page {
+                max-width: 1180px;
+                margin: 0 auto;
+                padding: 42px 18px 64px;
+                color: #e8eef8;
+            }
+            .hero-grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 24px;
+                align-items: stretch;
+            }
+            .hero-copy {
+                padding: 24px 0 4px;
+            }
+            .eyebrow {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 14px;
+                padding: 6px 12px;
+                border: 1px solid rgba(95, 178, 255, 0.36);
+                border-radius: 999px;
+                color: #8fc9ff;
+                background: rgba(23, 49, 86, 0.45);
+                font-size: 13px;
+                font-weight: 700;
+                letter-spacing: 0;
+            }
+            .temp-mail-page h1 {
+                margin: 0 0 14px;
+                text-align: left;
+                color: #ffffff;
+                font-family: Tahoma, Verdana, Arial, sans-serif !important;
+                font-size: clamp(34px, 5vw, 58px);
+                font-weight: 900;
+                line-height: 1.04;
+                text-shadow: none;
+            }
+            .temp-mail-page h2,
+            .temp-mail-page h3,
+            .temp-mail-page p,
+            .temp-mail-page li,
+            .eyebrow,
+            .trust-pill,
+            legend,
+            input,
+            i-button button {
+                font-family: Tahoma, Verdana, Arial, sans-serif !important;
+            }
+            .hero-copy p {
+                max-width: 680px;
+                margin: 0 0 22px;
+                color: #b7c4d8;
+                font-size: 18px;
+            }
+            .trust-row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin-top: 18px;
+            }
+            .trust-pill {
+                padding: 9px 12px;
+                border: 1px solid rgba(255, 255, 255, 0.11);
+                border-radius: 999px;
+                background: rgba(255, 255, 255, 0.055);
+                color: #d8e5f7;
+                font-size: 13px;
+                font-weight: 700;
+            }
+            .mail-tool {
+                width: 100%;
+                border: 1px solid rgba(126, 173, 255, 0.2);
+                border-radius: 18px;
+                background: linear-gradient(180deg, rgba(18, 27, 46, 0.96), rgba(9, 14, 25, 0.98));
+                box-shadow:
+                    0 24px 80px rgba(0, 0, 0, 0.38),
+                    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+                padding: 22px;
+            }
+            .mail-tool-grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 16px;
+                align-items: start;
+            }
+            .mail-tool-grid fieldset {
+                width: 100%;
+            }
+            .app-badge {
+                margin-bottom: 18px;
+            }
+            .play-btn img {
+                width: 190px;
+                max-width: 100%;
+                transition: transform 0.2s ease;
+            }
+            .play-btn img:hover {
+                transform: translateY(-2px);
             }
             fieldset {
-                margin: 15px !important;
-                padding: 10px;
-                margin-bottom: 30px !important;
-                border-radius: 10px;
+                margin: 0 0 18px !important;
+                padding: 18px;
+                border: 1px solid rgba(126, 173, 255, 0.2);
+                border-radius: 16px;
+                background: rgba(255, 255, 255, 0.045);
             }
-            .message {
-                transition: all 0.2s ease;
+            .mail-tool fieldset > .row:first-child {
+                display: grid;
+                grid-template-columns: 200px minmax(0, 1fr) 120px;
+                gap: 12px;
+                align-items: start;
             }
-            .message:hover {
-                transform: scale(1.05);
+            .mail-tool fieldset > .row:first-child > * {
+                width: 100% !important;
+                float: none !important;
             }
-            input {
-                background-color: var(--color2) !important;
-                color: #607d8b !important;
-                font-size: 1.5rem !important;
-                line-height: 1.8 !important;
-                font-weight: bold !important;
-                text-align: center !important;
-                height: 100% !important;
+            legend {
+                float: none;
+                width: auto;
+                margin: 0 0 10px;
+                padding: 0 6px;
+                background: transparent;
+                color: #8fc9ff;
+                font-size: 14px;
+                font-weight: 800;
             }
-            input:focus {
-                border-color: var(--theme-color) !important;
+            #email input {
+                border: 1px solid rgba(143, 201, 255, 0.34) !important;
+                border-radius: 12px !important;
+                background: rgba(2, 6, 23, 0.78) !important;
+                color: #3f9dff !important;
+                box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02) !important;
+                font-size: 32px !important;
+                text-align: center;
             }
-            .btn {
-                transition: all 0.2s ease;
+            #emailinput:focus {
+                border-color: #38bdf8 !important;
+                box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14) !important;
+            }
+            .btn,
+            i-button button {
+                border: 1px solid rgba(143, 201, 255, 0.26) !important;
+                border-radius: 14px !important;
+                background: linear-gradient(135deg, #2563eb, #0ea5e9) !important;
+                color: #ffffff !important;
+                font-weight: 800 !important;
+                box-shadow: 0 12px 30px rgba(14, 165, 233, 0.22);
+                transition:
+                    transform 0.2s ease,
+                    box-shadow 0.2s ease;
             }
             .btn:hover,
-            .btn:focus {
-                background-color: var(--color1);
-                border-color: var(--color5);
-                color: var(--color5);
+            .btn:focus,
+            i-button button:hover,
+            i-button button:focus {
+                transform: translateY(-2px);
+                box-shadow: 0 16px 36px rgba(14, 165, 233, 0.3);
             }
-            .reset-btn button {
-                font-size: 2rem;
-                line-height: 1.8;
-                max-height: fit-content;
-                background: var(--color);
-                color: var(--color5);
-            }
-            button .spinner-border-sm {
-                --bs-spinner-width: 2rem;
-                --bs-spinner-height: 2rem;
-                --bs-spinner-border-width: 0.2em;
+            .reset-btn button,
+            .copy-btn button,
+            .search-btn button {
+                min-height: 58px;
+                min-width: 170px;
+                font-size: 0.92rem;
+                line-height: 1.4;
+                white-space: nowrap;
             }
             .copy-btn button {
-                max-height: fit-content;
-                background: var(--color1);
-                color: var(--color5);
-                font-size: 2rem;
+                min-width: 90px;
             }
             .search-btn button {
-                font-size: 2rem;
-                max-height: fit-content;
-                background: var(--color1);
-                color: var(--color5);
-                line-height: 1.8;
-                margin-bottom: 50px !important;
+                min-width: 220px;
             }
-            @media screen and (max-width: 768px /*mobile*/) {
+            .table {
+                margin-top: 50px;
+                overflow: hidden;
+                border-radius: 14px;
+                color: #dce8f8 !important;
+                background: rgba(2, 6, 23, 0.56) !important;
+            }
+            .table th {
+                color: #8fc9ff;
+                background: rgba(37, 99, 235, 0.16);
+            }
+            .table td,
+            .table th {
+                border-color: rgba(255, 255, 255, 0.08);
+            }
+            .seo-section {
+                margin-top: 34px;
+                padding: 30px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 18px;
+                background: rgba(8, 13, 25, 0.78);
+                box-shadow: 0 18px 70px rgba(0, 0, 0, 0.28);
+            }
+            .section-kicker {
+                color: #10b981;
+                font-weight: 900;
+                text-transform: uppercase;
+                font-size: 12px;
+            }
+            .seo-section h2 {
+                margin: 8px 0 12px;
+                color: #ffffff;
+                font-size: 28px;
+                font-weight: 900;
+            }
+            .seo-section h3 {
+                margin: 22px 0 8px;
+                color: #8fc9ff;
+                font-size: 20px;
+                font-weight: 900;
+            }
+            .seo-section p,
+            .seo-section li {
+                color: #b7c4d8;
+                font-size: 16px;
+            }
+            .feature-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 14px;
+                margin: 24px 0;
+            }
+            .feature-card {
+                min-height: 150px;
+                padding: 18px;
+                border: 1px solid rgba(143, 201, 255, 0.16);
+                border-radius: 16px;
+                background: rgba(255, 255, 255, 0.045);
+            }
+            .feature-card h3 {
+                margin-top: 0;
+            }
+            @media screen and (max-width: 900px) {
+                .hero-grid,
+                .mail-tool-grid,
+                .feature-grid {
+                    grid-template-columns: 1fr;
+                }
+                .temp-mail-page h1 {
+                    font-size: 40px;
+                }
+            }
+            @media screen and (max-width: 768px) {
+                body {
+                    margin-top: 96px;
+                }
+                .temp-mail-page {
+                    padding: 24px 12px 42px;
+                }
+                .mail-tool,
+                .seo-section {
+                    padding: 18px;
+                }
+                .mail-tool fieldset > .row:first-child {
+                    grid-template-columns: 1fr;
+                }
                 input {
                     font-size: 1rem !important;
                 }
@@ -73,62 +276,46 @@
                     width: 100%;
                 }
             }
-            .container {
-                background: rgba(255, 255, 255, 0.05);
-                padding: 40px;
-                border-radius: 20px;
-                backdrop-filter: blur(10px);
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+
+            .empty-animate {
+                animation: inputEmptyPulse 1s infinite !important;
+                transition: all 0.2s ease !important;
             }
 
-            .play-btn img {
-                width: 220px;
-                transition: transform 0.2s ease;
-            }
+            @keyframes inputEmptyPulse {
+                0% {
+                    transform: scale(1);
+                }
 
-            .play-btn img:hover {
-                transform: scale(1.05);
+                100% {
+                     transform: scale(.8);
+                }
             }
         </style>
-        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3372007384613151" crossorigin="anonymous"></script>
     </head>
 
     <body>
         <nav x-import="navbar/index.html" class="sitebar" ng-controller="navbar"></nav>
 
-        <div id="main-layout" class="container loaded">
-            <h1>##word.VIP Temp Mail##</h1>
-            <div class="row">
-                <div class="col2 side1" x-features="os.desktop && !url./vip">
-                    <div class="google">
-                        <ins
-                            class="adsbygoogle"
-                            style="display: block"
-                            data-ad-client="ca-pub-3372007384613151"
-                            data-ad-slot="3239326915"
-                            data-ad-format="auto"
-                            data-full-width-responsive="true"
-                        ></ins>
-                        <script>
-                            (adsbygoogle = window.adsbygoogle || []).push({});
-                        </script>
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="row">
-                        <div class="col" ng-controller="emails">
-                            <div x-import="emails/view_modal.html"></div>
+        <main id="main-layout" class="temp-mail-page loaded">
+            <section class="hero-grid">
+                <div class="hero-copy">
+                    <span class="eyebrow">Free privacy tool by Social Browser</span>
 
-                            <div class="container center">
-                                <a class="play-btn" href="https://play.google.com/store/apps/details?id=com.egytag.mails" target="_blank">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Get it on Google Play" />
-                                </a>
-                            </div>
+                    <div class="mail-tool" ng-controller="emails">
+                        <div x-import="emails/view_modal.html"></div>
 
+                        <div class="app-badge center">
+                            <a class="play-btn" href="https://play.google.com/store/apps/details?id=com.egytag.mails" target="_blank" rel="noopener">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Get Social Temp Mail on Google Play" />
+                            </a>
+                        </div>
+
+                        <div class="mail-tool-grid">
                             <fieldset>
                                 <div class="row">
                                     <i-button loading="{{newEmailBusy}}" class="col4 reset-btn" type="reset" ng-click="generateEmail()" label="##word.New Email##"></i-button>
-                                    <i-control class="col" ng-model="emailSearch.to" label="##word. If You Have ( Temp Mail ) ? Write it here or Click New Email##" type="text"></i-control>
+                                    <i-control id="email" class="col" ng-model="emailSearch.to" label="##word.Temp Mail Address##" type="text"></i-control>
                                     <i-button class="col2 copy-btn" type="copy" ng-click="copy()"></i-button>
                                 </div>
                             </fieldset>
@@ -160,162 +347,58 @@
                             </fieldset>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="information">
-                            <h2>Social Temp Mail: Enhancing Privacy in the Social Media Age</h2>
-                            <p>
-                                In today's digital age, privacy is a growing concern for social media users. With the increasing number of websites and services requiring email addresses for
-                                registration, many individuals are turning to temporary email services, also known as Temp Mail, to protect their personal information. Social Temp Mail offers a
-                                convenient solution for maintaining privacy while interacting on social media platforms. This article explores what Social Temp Mail is, how it works, its benefits, and
-                                how it can be used effectively.
-                            </p>
-                            <h2>What is Social Temp Mail?</h2>
-                            <div>
-                                <ins
-                                    class="adsbygoogle"
-                                    style="display: block"
-                                    data-ad-client="ca-pub-3372007384613151"
-                                    data-ad-slot="2472938527"
-                                    data-ad-format="auto"
-                                    data-full-width-responsive="true"
-                                ></ins>
-                                <script>
-                                    (adsbygoogle = window.adsbygoogle || []).push({});
-                                </script>
-                            </div>
-                            <p>
-                                Social Temp Mail is a temporary email service designed specifically for use with social media platforms. It provides users with disposable email addresses that can be
-                                used for a short period, typically ranging from a few minutes to a few hours. These email addresses allow users to sign up for social media accounts, verify profiles,
-                                and interact with websites without revealing their primary email address.
-                            </p>
-                            <h2>How Social Temp Mail Works</h2>
-                            <p>Using Social Temp Mail involves a few simple steps:</p>
-                            <ol>
-                                <li>
-                                    <strong>Generate a Temporary Email Address:</strong> Visit a Social Temp Mail website or use a mobile app to generate a temporary email address. This process
-                                    usually requires no registration and can be completed with a single click.
-                                </li>
-                                <li>
-                                    <strong>Use the Temporary Email Address:</strong> Use the generated email address to register for social media accounts, participate in online communities, or sign
-                                    up for newsletters. The temporary email address functions like a regular email address for receiving messages.
-                                </li>
-                                <li>
-                                    <strong>Access Emails:</strong> Check the inbox on the Social Temp Mail website or app to view any incoming emails. You can read, reply to, and delete emails as
-                                    needed.
-                                </li>
-                                <li>
-                                    <strong>Expiration:</strong> The temporary email address will automatically expire after a predetermined period, and all associated emails will be permanently
-                                    deleted. This ensures that your information is not stored indefinitely.
-                                </li>
-                            </ol>
-                            <h2>Benefits of Using Social Temp Mail</h2>
-                            <p>Social Temp Mail offers several advantages for social media users:</p>
-                            <ul>
-                                <li>
-                                    <strong>Enhanced Privacy:</strong> By using a temporary email address, you can protect your primary email from being exposed to potential spam, phishing attempts,
-                                    and unwanted marketing messages.
-                                </li>
-                                <li>
-                                    <strong>Avoiding Spam:</strong> Social Temp Mail helps keep your primary inbox clean by filtering out promotional emails and spam that often accompany social media
-                                    sign-ups.
-                                </li>
-                                <li>
-                                    <strong>Anonymity:</strong> Temporary email addresses allow you to interact with social media platforms and online communities without revealing your true identity.
-                                    This can be particularly useful for maintaining anonymity in forums and discussion boards.
-                                </li>
-                                <li>
-                                    <strong>Reduced Risk of Data Breaches:</strong> Using Social Temp Mail reduces the risk of your personal email being compromised in data breaches, as the temporary
-                                    address is not linked to your sensitive information.
-                                </li>
-                                <li>
-                                    <strong>Convenience:</strong> Social Temp Mail services are quick and easy to use, requiring no registration or personal information. This makes them convenient for
-                                    temporary needs.
-                                </li>
-                            </ul>
-                            <h2>Common Use Cases for Social Temp Mail</h2>
-                            <p>There are several scenarios where Social Temp Mail can be particularly useful:</p>
-                            <ul>
-                                <li>
-                                    <strong>Creating Multiple Social Media Accounts:</strong> Whether you need multiple accounts for managing different aspects of your online presence or for testing
-                                    purposes, Social Temp Mail can help you create and verify these accounts without cluttering your primary inbox.
-                                </li>
-                                <li>
-                                    <strong>Signing Up for Newsletters and Promotions:</strong> If you want to access exclusive content, promotions, or newsletters without receiving follow-up
-                                    marketing emails, Social Temp Mail provides a temporary solution.
-                                </li>
-                                <li>
-                                    <strong>Participating in Online Communities:</strong> Use Social Temp Mail to join forums, discussion boards, and online communities while maintaining your privacy
-                                    and anonymity.
-                                </li>
-                                <li>
-                                    <strong>Free Trials and Temporary Services:</strong> When signing up for free trials or temporary services, Social Temp Mail allows you to test the service without
-                                    committing your primary email address to potential spam.
-                                </li>
-                            </ul>
-                            <h2>Limitations of Social Temp Mail</h2>
-                            <p>While Social Temp Mail offers many benefits, there are some limitations to consider:</p>
-                            <ul>
-                                <li>
-                                    <strong>Limited Time:</strong> Temporary email addresses have a short lifespan and are automatically deleted after a certain period. This means you may not be able
-                                    to access emails after the address expires.
-                                </li>
-                                <li>
-                                    <strong>No Reply Guarantee:</strong> Some websites or services may recognize and block temporary email addresses, preventing you from completing the registration or
-                                    verification process.
-                                </li>
-                                <li>
-                                    <strong>Lack of Security:</strong> Since Social Temp Mail services are publicly accessible, the emails received on these addresses may not be private or secure.
-                                    Sensitive information should not be sent or received via Social Temp Mail.
-                                </li>
-                            </ul>
-                            <h2>Popular Social Temp Mail Services</h2>
-                            <p>Here are some popular Social Temp Mail services that you can use:</p>
-                            <ul>
-                                <li><strong>TempMail:</strong> A widely used Temp Mail service that provides disposable email addresses with a simple and user-friendly interface.</li>
-                                <li><strong>Guerrilla Mail:</strong> Offers temporary email addresses with additional features like email attachments and the ability to reply to emails.</li>
-                                <li><strong>10 Minute Mail:</strong> Provides email addresses that last for 10 minutes, with the option to extend the time if needed.</li>
-                                <li><strong>Mailinator:</strong> A public Temp Mail service that allows you to choose your email address and access a shared inbox.</li>
-                            </ul>
-                            <h2>Best Practices for Using Social Temp Mail</h2>
-                            <p>To maximize the benefits of Social Temp Mail, consider the following best practices:</p>
-                            <ul>
-                                <li>
-                                    <strong>Use for Temporary Needs:</strong> Reserve Social Temp Mail for temporary or one-time interactions. For long-term use, rely on your primary email address or
-                                    create a secondary email account.
-                                </li>
-                                <li><strong>Avoid Sensitive Information:</strong> Do not use Social Temp Mail for sending or receiving sensitive information, as the emails are not secure.</li>
-                                <li>
-                                    <strong>Regularly Clear Temporary Addresses:</strong> Keep track of the temporary email addresses you generate and ensure they are cleared after use to maintain
-                                    privacy.
-                                </li>
-                                <li><strong>Check Expiration Times:</strong> Be aware of the expiration times for temporary email addresses to avoid losing access to important messages.</li>
-                            </ul>
-                            <h2>What Should You Know</h2>
-                            <p>
-                                Social Temp Mail is a valuable tool for enhancing privacy and managing your online presence. By providing temporary, disposable email addresses, it allows you to
-                                interact with social media platforms and online communities without compromising your personal information. Understanding the benefits and limitations of Social Temp
-                                Mail can help you use it effectively and protect your privacy in the digital age.
-                            </p>
-                        </div>
+                    <h1>Free Temp Mail for private signups and secure testing</h1>
+                    <p>Create a disposable email address instantly, receive verification messages, and keep your personal inbox away from spam, tracking, and one-time registration noise.</p>
+                    <div class="trust-row">
+                        <span class="trust-pill">No signup required</span>
+                        <span class="trust-pill">Fast inbox checks</span>
+                        <span class="trust-pill">Disposable email addresses</span>
+                        <span class="trust-pill">Built for browser workflows</span>
                     </div>
                 </div>
-                <div class="col2 side2" x-features="os.desktop && !url./vip">
-                    <div class="google">
-                        <ins
-                            class="adsbygoogle"
-                            style="display: block"
-                            data-ad-client="ca-pub-3372007384613151"
-                            data-ad-slot="7537664573"
-                            data-ad-format="auto"
-                            data-full-width-responsive="true"
-                        ></ins>
-                        <script>
-                            (adsbygoogle = window.adsbygoogle || []).push({});
-                        </script>
-                    </div>
+            </section>
+
+            <section class="seo-section">
+                <span class="section-kicker">Private disposable email</span>
+                <h2>Use Social Temp Mail when you need a fast, temporary inbox</h2>
+                <p>
+                    Social Temp Mail gives you a free temporary email address for account verification, app testing, newsletter previews, online communities, and other short-term workflows. It is made
+                    for users who want a clean primary inbox and a simple way to receive one-time messages without sharing a personal email address.
+                </p>
+
+                <div class="feature-grid">
+                    <article class="feature-card">
+                        <h3>Protect your inbox</h3>
+                        <p>Use a disposable email address for signups that may send marketing messages, spam, or unwanted follow-up emails.</p>
+                    </article>
+                    <article class="feature-card">
+                        <h3>Verify accounts faster</h3>
+                        <p>Generate a temp mail address, paste it into the service you are testing, then check the inbox for verification codes or login links.</p>
+                    </article>
+                    <article class="feature-card">
+                        <h3>Work with Social Browser</h3>
+                        <p>Pair temporary email with isolated browser profiles, proxy-friendly sessions, and safer multi-account workflows.</p>
+                    </article>
                 </div>
-            </div>
-        </div>
+
+                <h3>What is temp mail?</h3>
+                <p>
+                    Temp mail, also called temporary email or disposable email, is an inbox you use for a limited task instead of exposing your main address. It helps reduce inbox clutter and lowers
+                    the chance that your personal email is added to lists you did not choose.
+                </p>
+
+                <h3>Best uses for a temporary email address</h3>
+                <ul>
+                    <li>Testing websites, apps, forms, and sign-up flows.</li>
+                    <li>Receiving confirmation messages for short-term accounts.</li>
+                    <li>Keeping promotions and trial emails outside your main inbox.</li>
+                    <li>Managing privacy-focused browsing and research sessions.</li>
+                </ul>
+
+                <h3>Privacy note</h3>
+                <p>Temporary email is useful for low-risk, short-term messages. Do not use disposable inboxes for banking, private documents, password recovery, or sensitive personal data.</p>
+            </section>
+        </main>
 
         <div x-import="scripts.html"></div>
         <script x-import="emails/index.js"></script>

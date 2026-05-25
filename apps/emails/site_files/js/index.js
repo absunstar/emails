@@ -284,7 +284,6 @@ app.controller('emails', function ($scope, $http, $timeout) {
             if ($scope.emailSearch.to.indexOf('@') === -1) {
                 $scope.emailSearch.to = $scope.emailSearch.to + '@' + document.location.hostname.replace('emails.', '');
             }
-            
         }
 
         if ($scope.emailSearch.from) {
@@ -398,6 +397,10 @@ app.controller('emails', function ($scope, $http, $timeout) {
         if ($scope.newEmailBusy) return;
         $scope.newEmailBusy = true;
         $scope.emailSearch.to = '';
+        let input = document.querySelector('input');
+        if (input) {
+            input.classList.add('empty-animate');
+        }
         let host = document.location.hostname;
         $timeout(() => {
             $scope.newEmailBusy = false;
@@ -407,6 +410,9 @@ app.controller('emails', function ($scope, $http, $timeout) {
             }
             host = host.join('.');
             $scope.emailSearch.to = makeid() + '@' + host;
+            if (input) {
+                input.classList.remove('empty-animate');
+            }
         }, 1000 * 2);
     };
 

@@ -87,10 +87,10 @@ const server = new SMTPServer({
     },
     onRcptTo(address, session, callback) {
         console.log(' ... Mail To ... ' + address.address);
-        if (!address.address.like(site.__allowEmailTo)) {
-            console.log('Block to Address : ' + address.address);
-            return callback(new Error('not allowed email to : ' + address.address));
-        }
+        // if (!address.address.like(site.__allowEmailTo)) {
+        //     console.log('Block to Address : ' + address.address);
+        //     return callback(new Error('not allowed email to : ' + address.address));
+        // }
         return callback(); // Accept the address
     },
     onData(stream, session, callback) {

@@ -195,7 +195,27 @@ module.exports = function init(site) {
         }
         site.writeFileSync(site.vipEmailListPath, site.toJSON(site.vipEmailList));
     });
+    site.onPOST('/api/emails/set-normal', (req, res) => {
+        let response = {};
+        response.done = true;
 
+        let doc = req.body;
+
+        let index = site.vipEmailList.findIndex((v) => v.email === doc.email);
+        if (index !== -1) {
+            site.vipEmailList.splice(index , 1);
+            $emailsVIP.delete(doc, (err, result) => {
+                if (!err) {
+                    response.done = true;
+                    response.doc = result;
+                } else {
+                    response.error = err.message;
+                }
+                res.json(response);
+            });
+        } 
+        site.writeFileSync(site.vipEmailListPath, site.toJSON(site.vipEmailList));
+    });
     site.onPOST('/api/emails/delete', (req, res) => {
         let response = { done: false };
 

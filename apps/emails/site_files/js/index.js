@@ -80,7 +80,7 @@ app.controller('emails', function ($scope, $http, $timeout) {
         );
     };
 
-    $scope.setvip = function (email) {
+    $scope.setAsVipEmails = function (email) {
         $scope.busy = true;
         if (email == '*') {
             SOCIALBROWSER.var.session_list.forEach((session) => {
@@ -103,7 +103,65 @@ app.controller('emails', function ($scope, $http, $timeout) {
                         function (response) {
                             $scope.busy = false;
                             if (response.data.done) {
-                                alert('VIP Set');
+                                alert('Set Email As VIP' + newEmail);
+                            } else {
+                                $scope.error = '##word.error##';
+                            }
+                        },
+                        function (err) {
+                            console.log(err);
+                        },
+                    );
+                }
+            });
+        } else {
+            $http({
+                method: 'POST',
+                url: '/api/emails/set-vip',
+                data: {
+                    email: email,
+                    vip: true,
+                },
+            }).then(
+                function (response) {
+                    $scope.busy = false;
+                    if (response.data.done) {
+                        alert('VIP Set');
+                    } else {
+                        $scope.error = '##word.error##';
+                    }
+                },
+                function (err) {
+                    console.log(err);
+                },
+            );
+        }
+    };
+
+       $scope.setAsNormalEmails = function (email) {
+        $scope.busy = true;
+        if (email == '*') {
+            SOCIALBROWSER.var.session_list.forEach((session) => {
+                let domain = '';
+                if (document.location.hostname.like('*egytag*')) {
+                    domain = 'egytag.com';
+                } else if (document.location.hostname.like('*social-browser*')) {
+                    domain = 'social-browser.com';
+                }
+                if (domain) {
+                    let newEmail = session.display.split('@')[0] + '@' + domain;
+                    $http({
+                        method: 'POST',
+                        url: '/api/emails/set-normal',
+                        data: {
+                            email: newEmail,
+                            vip: true,
+                        },
+                    }).then(
+                        function (response) {
+                            $scope.busy = false;
+                            if (response.data.done) {
+                                alert('Set Email As Normal : ' + newEmail);
                             } else {
                                 $scope.error = '##word.error##';
                             }

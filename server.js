@@ -108,7 +108,8 @@ const server = new SMTPServer({
                     message.date = new Date(parsed.date);
                     message.text = parsed.text || '';
                     message.html = parsed.html || '';
-                    message.guid = parsed.messageId || site.md5(message.date + message.subject + message.from + message.to);
+                    message.messageId = parsed.messageId 
+                    message.guid = site.md5(message.date + message.subject + message.from + message.to);
                     if (!message.subject.like(site.__ignoreSubject) && !message.from.like(site.__ignoreFrom)) {
                         $emails.add(message, (err, docs) => {
                             if (err) {

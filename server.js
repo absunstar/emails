@@ -49,7 +49,7 @@ site.get('app-ads.txt', (req, res) => {
 site.__allowEmailTo = '*egytag.com*|*social-browser.com*|*mama-services.net*';
 site.__blockFrom = '*contaboserver.net*';
 site.__ignoreFrom =
-    '*suggestions*|*posts-recap*|*friendsuggestion@facebookmail.com*|*friends@facebookmail.com*|*notification@facebookmail.com*|*pageupdates@facebookmail.com*|*groupupdates@facebookmail.com*|*reminders@facebookmail.com*|*advertise-noreply@support.facebook.com*';
+    '*friendupdates@facebookmail.com*|*suggestions*|*posts-recap*|*friendsuggestion@facebookmail.com*|*friends@facebookmail.com*|*notification@facebookmail.com*|*pageupdates@facebookmail.com*|*groupupdates@facebookmail.com*|*reminders@facebookmail.com*|*advertise-noreply@support.facebook.com*';
 site.__ignoreSubject = '*just went live on Kick!*';
 
 const server = new SMTPServer({

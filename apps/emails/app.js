@@ -80,6 +80,12 @@ module.exports = function init(site) {
         compress: true,
     });
 
+     site.onGET({
+        name: ['privacy'],
+        path: __dirname + '/site_files/html/privacy.html',
+        compress: false,
+    });
+
     site.onPOST({ name: '/api/emails/add', require: { features: [] } }, (req, res) => {
         let response = {};
         response.done = false;

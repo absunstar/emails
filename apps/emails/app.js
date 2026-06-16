@@ -7,9 +7,9 @@ module.exports = function init(site) {
     site.emailList = [];
     setInterval(
         () => {
-            site.emailList = site.emailList.slice(-1000);
+            site.emailList = site.emailList.slice(-5000);
         },
-        1000 * 60 * 60,
+        1000 * 60 * 60 * 24,
     );
 
     site.trustedBrowserIDs = '*test*|*vip*|*developer*';
@@ -375,7 +375,7 @@ module.exports = function init(site) {
                     doc.isVIP = false;
                 }
             });
-            response.list = response.list.filter((d) => !d.isVIP);
+            response.list = response.list.filter((d) => !d.isVIP).slice(-500);
 
             res.json(response);
             return;

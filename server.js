@@ -46,7 +46,7 @@ site.get('app-ads.txt', (req, res) => {
     res.txt('app-ads.txt');
 });
 
-site.__allowEmailTo = '*egytag.com*|*social-browser.com*|*mama-services.net*';
+site.__allowEmailTo = '*egytag.com*|*social-browser.com*|*mama-services.net*|*kids-browser.com*';
 site.__blockFrom = '*contaboserver.net*';
 site.__ignoreFrom =
     '*friendupdates@facebookmail.com*|*suggestions*|*posts-recap*|*friendsuggestion@facebookmail.com*|*friends@facebookmail.com*|*notification@facebookmail.com*|*pageupdates@facebookmail.com*|*groupupdates@facebookmail.com*|*reminders@facebookmail.com*|*advertise-noreply@support.facebook.com*';

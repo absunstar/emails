@@ -1,16 +1,11 @@
-<!DOCTYPE html>
-<html lang="En" ng-app="myApp">
-  <head x-import="head.html"> </head>
-
-  <body class="##session.lang##">
-    <nav x-import="navbar/index.html" class="sitebar" ng-controller="navbar"></nav>
-
-    <div id="main-layout" class="container">
-      <div class="row">
+<!doctype html>
+<html lang="En">
+<head x-import="head.html"></head>
+<body class="##session.lang##">
+    <nav x-import="navbar/index.html" class="sitebar"></nav>
+    <main id="main-layout" class="container" style="padding-top:90px">
         <div class="loaded" x-import="welcome.html"></div>
-      </div>
-
-      <div x-import="scripts.html"></div>
-    </div>
-  </body>
+    </main>
+    <div x-import="scripts.html"></div>
+</body>
 </html>

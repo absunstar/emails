@@ -1,90 +1,354 @@
-<!DOCTYPE html>
-<html lang="##session.language.id##" dir="##session.language.dir##" class="##session.language.id##" ng-app="myApp">
-    <head x-import="head.html"> </head>
-
-    <body>
-        <nav x-import="navbar/index.html" class="sitebar" ng-controller="navbar"></nav>
-
-        <div id="main-layout" class="container" x-permission="login">
-            <div class="row">
-                <div class="col" ng-controller="emails">
-                    <div x-import="emails/add_modal.html"></div>
-                    <div x-import="emails/delete_modal.html"></div>
-                    <div x-import="emails/view_modal.html"></div>
-                    <div x-import="emails/search.html"></div>
-
-                    <div class="top-actions">
-                        <i-button type="add" ng-click="newEmail()" label="##word.emails_new##"></i-button>
-                        <i-button type="search" onclick="site.showModal('#SearchModal')" label="##word.search_all##"></i-button>
-                        <i-button type="add" ng-click="setAsVipEmails('*')" label="##word.Make All Profiles VIP##"></i-button>
-                        <i-button type="remove" ng-click="setAsNormalEmails('*')" label="##word.Make All Profiles Normal##"></i-button>
-
-                        <div class="col">
-                            <h2 class="center">Emails Count : {{count}}</h2>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col8"><i-control ng-model="searchText" label="Search"></i-control></div>
-                        <div class="col">
-                            <i-button type="search" ng-click="smartSearch()" label="##word.Smart Search##"></i-button>
-                        </div>
-                        <div class="col">
-                            <i-button type="search" ng-click="loadAll()" label="##word.ALL Mails##"></i-button>
-                        </div>
-                    </div>
-
-                    <table class="table hover loaded" id="t1">
-                        <tr>
-                            <th>Index</th>
-                            <th>##word.emails_from##</th>
-                            <th>##word.emails_to##</th>
-                            <th>##word.emails_subject##</th>
-                            <th>##word.emails_actions## <i-button type="delete" ng-click="deleteAll()" label="##word.emails_delete_all##"></i-button></th>
-                        </tr>
-                        <tr ng-repeat="c in list | filter:searchText">
-                            <td>
-                                <p class="bold white center">{{$index + 1}}</p>
-                            </td>
-                            <td class="bold">
-                                <div class="row">
-                                    <div class="col brown">{{c.from}}</div>
-                                    <div class="col center">
-                                        <i-button type="search" ng-click="smartSearch(c.from)" label="##word.All Mails##"></i-button>
-                                    </div>
-                                </div>
-
-                                <span class=" center font-12"> {{c.date | xdatetime}} </span>
-                            </td>
-                            <td class="bold">
-                                <div class="row">
-                                    <div class="col green">{{c.to}}</div>
-                                    <div class="row">
-                                        <div class="col"><i-button type="add" ng-click="setAsVipEmails(c.to)" label="##word.vip##"></i-button></div>
-                                        <div class="col"><i-button type="add" ng-click="setAsNormalEmails(c.to)" label="##word.normal##"></i-button></div>
-                                        <div class="col center"><i-button type="search" ng-click="smartSearch(c.to)" label="##word.All Mails##"></i-button></div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="bold">
-                                <div class="row">
-                                    <div class="col">
-                                        <p>{{c.subject}}</p>
-                                        <p class="orange">Folder : {{c.folder}}</p>
-                                    </div>
-                                    <div class="col center"><i-button type="view" ng-click="details(c)" label="##word.View##"></i-button></div>
-                                </div>
-                            </td>
-                            <td class="center">
-                                <i-button x-features="login" type="delete" ng-click="delete(c)" label="##word.emails_delete##"></i-button>
-                            </td>
-                        </tr>
-                    </table>
+<!doctype html>
+<html lang="##session.language.id##" dir="##session.language.dir##" class="##session.language.id##">
+<head x-import="head.html"></head>
+<body class="mail-admin-body">
+    <nav x-import="navbar/index.html" class="sitebar"></nav>
+    <main class="mail-admin-shell" data-email-admin-app="true">
+        <header class="mail-admin-hero">
+            <div class="mail-admin-title-wrap">
+                <span class="mail-admin-title-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><path d="m5 7 7 5 7-5"></path><path d="M8 3v4M16 3v4"></path></svg>
+                </span>
+                <div>
+                    <div class="mail-admin-kicker">SOCIAL TEMP MAIL</div>
+                    <h1>Mail Admin Console</h1>
+                    <p>Search, inspect, organize, reply, send, download and manage every stored message from one workspace.</p>
                 </div>
             </div>
+            <div class="mail-admin-hero-actions">
+                <span class="mail-admin-access-badge"><span class="mail-admin-live-dot"></span> Full admin access</span>
+                <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="open-policy">
+                    <svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6l8-3Z"></path><path d="M9 12l2 2 4-5"></path></svg>
+                    <span>Security &amp; Policies</span>
+                </button>
+                <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="refresh">
+                    <svg class="ui-icon" viewBox="0 0 24 24"><path d="M20 6v6h-6"></path><path d="M19 12a7 7 0 1 0-2 5"></path></svg>
+                    <span>Refresh</span>
+                </button>
+                <button class="sb-btn mail-admin-primary" type="button" data-admin-action="compose">
+                    <svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><path d="m5 7 7 5 7-5"></path><path d="M18 3v6M15 6h6"></path></svg>
+                    <span>Send Mail</span>
+                </button>
+            </div>
+        </header>
+
+        <section class="mail-admin-stats" aria-label="Email statistics">
+            <button type="button" class="mail-admin-stat is-active" data-admin-quick-filter="all">
+                <span class="mail-admin-stat-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span>
+                <span><small>Total messages</small><strong data-admin-stat="total">0</strong></span>
+            </button>
+            <button type="button" class="mail-admin-stat" data-admin-quick-filter="unread">
+                <span class="mail-admin-stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5l3 2"></path></svg></span>
+                <span><small>Unread</small><strong data-admin-stat="unread">0</strong></span>
+            </button>
+            <button type="button" class="mail-admin-stat" data-admin-quick-filter="favorite">
+                <span class="mail-admin-stat-icon"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"></path></svg></span>
+                <span><small>Favorites</small><strong data-admin-stat="favorite">0</strong></span>
+            </button>
+            <button type="button" class="mail-admin-stat" data-admin-quick-filter="attachments">
+                <span class="mail-admin-stat-icon"><svg viewBox="0 0 24 24"><path d="m8 12 5.5-5.5a3 3 0 1 1 4.2 4.2L10 18.4a5 5 0 1 1-7.1-7.1l8.2-8.2"></path></svg></span>
+                <span><small>With attachments</small><strong data-admin-stat="attachments">0</strong></span>
+            </button>
+            <button type="button" class="mail-admin-stat" data-admin-quick-filter="failed">
+                <span class="mail-admin-stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 17h.01"></path></svg></span>
+                <span><small>Failed sends</small><strong data-admin-stat="failed">0</strong></span>
+            </button>
+        </section>
+
+        <section class="mail-admin-workspace">
+            <aside class="mail-admin-sidebar">
+                <div class="mail-admin-panel-head">
+                    <div><small>ORGANIZE</small><h2>Folders</h2></div>
+                    <div class="mail-admin-panel-actions">
+                        <button class="mail-admin-icon-btn" type="button" data-admin-action="new-folder" title="Create folder" aria-label="Create folder">
+                            <svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v10H3z"></path><path d="M12 11v5M9.5 13.5h5"></path></svg>
+                        </button>
+                        <button class="mail-admin-icon-btn" type="button" data-admin-action="refresh-folders" title="Refresh folders" aria-label="Refresh folders">
+                            <svg viewBox="0 0 24 24"><path d="M20 6v6h-6"></path><path d="M19 12a7 7 0 1 0-2 5"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <nav class="mail-admin-folders" data-admin-folders></nav>
+                <div class="mail-admin-new-folder" data-admin-new-folder hidden>
+                    <input type="text" data-admin-new-folder-name maxlength="60" placeholder="Folder name" autocomplete="off">
+                    <button type="button" data-admin-action="create-folder">Create</button>
+                    <button type="button" data-admin-action="cancel-folder" aria-label="Cancel folder creation">×</button>
+                </div>
+                <div class="mail-admin-sidebar-divider"></div>
+                <div class="mail-admin-panel-head compact"><div><small>QUICK VIEWS</small><h2>Filters</h2></div></div>
+                <div class="mail-admin-quick-list">
+                    <button type="button" data-admin-quick-filter="favorite"><span>★</span><span>Favorites</span><strong data-admin-side-count="favorite">0</strong></button>
+                    <button type="button" data-admin-quick-filter="unread"><span>●</span><span>Unread</span><strong data-admin-side-count="unread">0</strong></button>
+                    <button type="button" data-admin-quick-filter="attachments"><span>↗</span><span>Attachments</span><strong data-admin-side-count="attachments">0</strong></button>
+                    <button type="button" data-admin-quick-filter="failed"><span>!</span><span>Failed sends</span><strong data-admin-side-count="failed">0</strong></button>
+                </div>
+                <div class="mail-admin-sidebar-divider"></div>
+                <div class="mail-admin-storage-card">
+                    <div class="mail-admin-storage-head"><span>Storage</span><strong data-admin-storage-text>0 / 10,000</strong></div>
+                    <div class="mail-admin-storage-track"><span data-admin-storage-bar></span></div>
+                    <small>JSON message storage. Automatic cleanup preserves protected mail first.</small>
+                </div>
+            </aside>
+
+            <section class="mail-admin-main">
+                <div class="mail-admin-searchbar">
+                    <label class="mail-admin-searchbox">
+                        <svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"></circle><path d="m15 15 5 5"></path></svg>
+                        <input type="search" data-admin-filter="query" placeholder="Search sender, recipient, subject or message content..." autocomplete="off">
+                    </label>
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="toggle-filters" aria-expanded="false">
+                        <svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>
+                        <span>Filters</span>
+                        <span class="mail-admin-filter-count" data-admin-filter-count hidden>0</span>
+                    </button>
+                    <select class="sb-select mail-admin-page-size" data-admin-page-size aria-label="Messages per page">
+                        <option value="50">50 / page</option>
+                        <option value="100">100 / page</option>
+                        <option value="250">250 / page</option>
+                    </select>
+                </div>
+
+                <div class="mail-admin-filters" data-admin-filter-panel hidden>
+                    <div class="sb-field"><label>From</label><input class="sb-input" data-admin-filter="from" type="text" placeholder="sender@example.com"></div>
+                    <div class="sb-field"><label>To</label><input class="sb-input" data-admin-filter="to" type="text" placeholder="recipient@example.com"></div>
+                    <div class="sb-field"><label>Subject</label><input class="sb-input" data-admin-filter="subject" type="text" placeholder="Subject contains..."></div>
+                    <div class="sb-field"><label>Folder</label><select class="sb-select" data-admin-filter="folder"><option value="all">All folders</option></select></div>
+                    <div class="sb-field"><label>Read state</label><select class="sb-select" data-admin-filter="read"><option value="all">All</option><option value="unread">Unread</option><option value="read">Read</option></select></div>
+                    <div class="sb-field"><label>Status</label><select class="sb-select" data-admin-filter="status"><option value="all">All statuses</option><option value="received">Received</option><option value="sent">Sent</option><option value="sending">Sending</option><option value="failed">Failed</option></select></div>
+                    <div class="sb-field"><label>From date</label><input class="sb-input" data-admin-filter="after" type="date"></div>
+                    <div class="sb-field"><label>To date</label><input class="sb-input" data-admin-filter="before" type="date"></div>
+                    <label class="mail-admin-check"><input type="checkbox" data-admin-filter="favorite"><span>Favorites only</span></label>
+                    <label class="mail-admin-check"><input type="checkbox" data-admin-filter="hasAttachments"><span>Has attachments</span></label>
+                    <div class="mail-admin-filter-actions"><button class="sb-btn sb-btn-ghost" type="button" data-admin-action="clear-filters">Clear filters</button><button class="sb-btn" type="button" data-admin-action="apply-filters">Apply filters</button></div>
+                </div>
+
+                <div class="mail-admin-viewbar">
+                    <div class="mail-admin-viewbar-left">
+                        <button class="mail-admin-tool-btn" type="button" data-admin-action="toggle-auto-refresh" aria-pressed="false">
+                            <svg viewBox="0 0 24 24"><path d="M20 6v6h-6"></path><path d="M19 12a7 7 0 1 0-2 5"></path></svg>
+                            <span data-admin-auto-refresh-label>Auto refresh: Off</span>
+                        </button>
+                        <span class="mail-admin-auto-status" data-admin-auto-status>Manual refresh</span>
+                    </div>
+                    <div class="mail-admin-viewbar-right">
+                        <button class="mail-admin-tool-btn" type="button" data-admin-action="reset-filters" data-admin-reset-filters hidden>
+                            <svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"></path></svg>
+                            <span>Reset filters</span>
+                        </button>
+                        <div class="mail-admin-columns-wrap">
+                            <button class="mail-admin-tool-btn" type="button" data-admin-action="toggle-columns" aria-expanded="false">
+                                <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM10 5v14M16 5v14"></path></svg>
+                                <span>Columns</span>
+                            </button>
+                            <div class="mail-admin-columns-panel" data-admin-columns-panel hidden>
+                                <strong>Visible columns</strong>
+                                <label><input type="checkbox" data-admin-column-toggle="from" checked><span>From</span></label>
+                                <label><input type="checkbox" data-admin-column-toggle="to" checked><span>To</span></label>
+                                <label><input type="checkbox" data-admin-column-toggle="subject" checked><span>Subject</span></label>
+                                <label><input type="checkbox" data-admin-column-toggle="folder" checked><span>Folder</span></label>
+                                <label><input type="checkbox" data-admin-column-toggle="date" checked><span>Date</span></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mail-admin-bulkbar" data-admin-bulkbar hidden>
+                    <div><strong data-admin-selected-count>0</strong><span> selected</span></div>
+                    <button type="button" data-admin-action="bulk-read" class="mail-admin-bulk-action">Mark read</button>
+                    <button type="button" data-admin-action="bulk-unread" class="mail-admin-bulk-action">Mark unread</button>
+                    <button type="button" data-admin-action="bulk-favorite" class="mail-admin-bulk-action">★ Favorite</button>
+                    <button type="button" data-admin-action="bulk-unfavorite" class="mail-admin-bulk-action">☆ Unfavorite</button>
+                    <label class="mail-admin-folder-input"><span>Move to</span><input type="text" data-admin-bulk-folder placeholder="Folder name"></label>
+                    <button type="button" data-admin-action="bulk-move" class="mail-admin-bulk-action">Move</button>
+                    <button type="button" data-admin-action="bulk-delete" class="mail-admin-bulk-action danger">Delete</button>
+                    <button type="button" data-admin-action="clear-selection" class="mail-admin-bulk-close" aria-label="Clear selection">×</button>
+                </div>
+
+                <div class="mail-admin-list-head">
+                    <div><h2>Messages</h2><p>Showing <span data-admin-result-range>0</span> of <span data-admin-result-count>0</span> matching messages</p></div>
+                    <div class="mail-admin-list-meta"><span data-admin-last-refresh>Not loaded yet</span></div>
+                </div>
+
+                <div class="mail-admin-table-wrap">
+                    <table class="mail-admin-table">
+                        <thead>
+                            <tr>
+                                <th class="select-col"><input type="checkbox" data-admin-select-all aria-label="Select all visible messages"></th>
+                                <th class="star-col">Fav</th>
+                                <th data-admin-col="from"><button type="button" class="mail-admin-sort" data-admin-sort="from"><span>From</span><span data-admin-sort-indicator="from"></span></button></th>
+                                <th data-admin-col="to"><button type="button" class="mail-admin-sort" data-admin-sort="to"><span>To</span><span data-admin-sort-indicator="to"></span></button></th>
+                                <th data-admin-col="subject"><button type="button" class="mail-admin-sort" data-admin-sort="subject"><span>Subject</span><span data-admin-sort-indicator="subject"></span></button></th>
+                                <th data-admin-col="folder"><button type="button" class="mail-admin-sort" data-admin-sort="folder"><span>Folder</span><span data-admin-sort-indicator="folder"></span></button></th>
+                                <th data-admin-col="date"><button type="button" class="mail-admin-sort" data-admin-sort="date"><span>Date</span><span data-admin-sort-indicator="date"></span></button></th>
+                                <th class="action-col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody data-admin-list></tbody>
+                    </table>
+                    <div class="mail-admin-empty" data-admin-empty hidden>
+                        <span><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span>
+                        <h3>No messages match these filters</h3>
+                        <p>Try clearing filters or searching for a different sender, recipient or subject.</p>
+                        <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="clear-filters">Clear filters</button>
+                    </div>
+                </div>
+
+                <footer class="mail-admin-pagination" data-admin-pagination hidden>
+                    <button type="button" class="sb-btn sb-btn-ghost" data-admin-action="prev-page">Previous</button>
+                    <span>Page <strong data-admin-page-number>1</strong> of <strong data-admin-page-total>1</strong></span>
+                    <button type="button" class="sb-btn sb-btn-ghost" data-admin-action="next-page">Next</button>
+                </footer>
+            </section>
+        </section>
+    </main>
+
+    <div id="adminMessageModal" class="modal" hidden>
+        <div class="modal-content mail-admin-message-modal">
+            <div class="modal-header mail-admin-message-header">
+                <div><small data-admin-message-folder>MESSAGE</small><h2 data-admin-message-subject>Message</h2></div>
+                <button class="sb-modal-close" type="button" data-modal-close="#adminMessageModal">×</button>
+            </div>
+            <div class="modal-body mail-admin-message-body">
+                <div class="mail-admin-message-meta">
+                    <div><small>From</small><strong data-admin-message-from>—</strong></div>
+                    <div><small>To</small><strong data-admin-message-to>—</strong></div>
+                    <div><small>Date</small><strong data-admin-message-date>—</strong></div>
+                    <div><small>Status</small><strong data-admin-message-status>—</strong></div>
+                </div>
+                <div class="mail-admin-message-actions">
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="message-favorite">☆ Favorite</button>
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="message-read">Mark unread</button>
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="message-images">Show images</button>
+                    <a class="sb-btn sb-btn-ghost" data-admin-message-eml href="#" download>Download EML</a>
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="message-reply">Reply</button>
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="message-forward">Forward</button>
+                    <button class="sb-btn sb-btn-danger" type="button" data-admin-action="message-delete">Delete</button>
+                </div>
+                <div class="mail-admin-privacy-strip" data-admin-privacy-strip></div>
+                <div class="mail-admin-folder-edit">
+                    <label><span>Folder</span><input class="sb-input" type="text" data-admin-message-folder-input></label>
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="message-save-folder">Move message</button>
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="message-vip">Set mailbox VIP</button>
+                </div>
+                <iframe class="sb-email-frame mail-admin-email-frame" data-admin-message-frame sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+                <section class="mail-admin-attachments" data-admin-attachments hidden><div class="mail-admin-section-title"><h3>Attachments</h3><span data-admin-attachment-count></span></div><div data-admin-attachment-list></div></section>
+                <section class="mail-admin-compose-inline" data-admin-reply-panel hidden>
+                    <div class="mail-admin-section-title"><h3>Reply</h3><button type="button" data-admin-action="close-inline-compose">×</button></div>
+                    <div class="sb-form-grid"><div class="sb-field"><label>From</label><input class="sb-input" data-admin-reply-from type="email"></div><div class="sb-field wide"><label>Message</label><textarea class="sb-textarea" data-admin-reply-text></textarea></div></div>
+                    <div class="mail-admin-inline-actions"><button class="sb-btn" type="button" data-admin-action="send-reply">Send reply</button></div>
+                </section>
+                <section class="mail-admin-compose-inline" data-admin-forward-panel hidden>
+                    <div class="mail-admin-section-title"><h3>Forward</h3><button type="button" data-admin-action="close-inline-compose">×</button></div>
+                    <div class="sb-form-grid"><div class="sb-field"><label>From</label><input class="sb-input" data-admin-forward-from type="email"></div><div class="sb-field"><label>To</label><input class="sb-input" data-admin-forward-to type="email"></div><div class="sb-field wide"><label>Note</label><textarea class="sb-textarea" data-admin-forward-text></textarea></div></div>
+                    <div class="mail-admin-inline-actions"><button class="sb-btn" type="button" data-admin-action="send-forward">Forward message</button></div>
+                </section>
+            </div>
         </div>
+    </div>
 
-        <div x-import="scripts.html"></div>
+    <div id="adminComposeModal" class="modal" hidden>
+        <div class="modal-content mail-admin-compose-modal">
+            <div class="modal-header"><div><small class="mail-admin-kicker">ADMIN COMPOSER</small><h2>Send Mail</h2></div><button class="sb-modal-close" type="button" data-modal-close="#adminComposeModal">×</button></div>
+            <div class="modal-body">
+                <form data-admin-compose-form class="sb-form-grid">
+                    <div class="sb-field"><label>From</label><input class="sb-input" name="from" type="email" required></div>
+                    <div class="sb-field"><label>To</label><input class="sb-input" name="to" type="text" required></div>
+                    <div class="sb-field"><label>Cc</label><input class="sb-input" name="cc" type="text"></div>
+                    <div class="sb-field"><label>Reply-To</label><input class="sb-input" name="replyTo" type="email"></div>
+                    <div class="sb-field wide"><label>Subject</label><input class="sb-input" name="subject" type="text"></div>
+                    <div class="sb-field wide"><label>Text message</label><textarea class="sb-textarea" name="text"></textarea></div>
+                    <div class="sb-field wide"><label>HTML message</label><textarea class="sb-textarea" name="html"></textarea></div>
+                </form>
+            </div>
+            <div class="modal-footer"><button class="sb-btn sb-btn-ghost" type="button" data-modal-close="#adminComposeModal">Cancel</button><button class="sb-btn" type="button" data-admin-action="send-mail">Send Mail</button></div>
+        </div>
+    </div>
 
-        <script x-import="emails/index.js"></script>
-    </body>
+
+    <div id="adminPolicyModal" class="modal" hidden>
+        <div class="modal-content mail-admin-policy-modal">
+            <div class="modal-header mail-admin-policy-header">
+                <div><small class="mail-admin-kicker">SERVER PROTECTION</small><h2>Security &amp; Policies</h2><p>Control who can connect, send or receive mail and tune abuse limits without editing server code.</p></div>
+                <button class="sb-modal-close" type="button" data-modal-close="#adminPolicyModal">×</button>
+            </div>
+            <div class="mail-policy-toolbar">
+                <div class="mail-policy-master">
+                    <label class="mail-policy-switch"><input type="checkbox" data-policy-master><span></span></label>
+                    <div><strong>Policy engine</strong><small>Turn all allow/block rules on or off. Rate limits have their own switches.</small></div>
+                </div>
+                <div class="mail-policy-toolbar-actions">
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="policy-export">Export</button>
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="policy-import">Import</button>
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="policy-reset">Reset defaults</button>
+                    <button class="sb-btn" type="button" data-admin-action="policy-save">Save changes</button>
+                    <input type="file" accept="application/json,.json" data-policy-import-file hidden>
+                </div>
+            </div>
+            <div class="mail-policy-tabs" role="tablist">
+                <button type="button" class="is-active" data-admin-action="policy-tab" data-policy-tab="rules">Rules</button>
+                <button type="button" data-admin-action="policy-tab" data-policy-tab="limits">Limits</button>
+                <button type="button" data-admin-action="policy-tab" data-policy-tab="activity">Activity</button>
+            </div>
+            <div class="modal-body mail-admin-policy-body">
+                <section data-policy-pane="rules">
+                    <div class="mail-policy-intro">
+                        <div><h3>Allow &amp; block rules</h3><p>Block rules win first. An enabled Allow list with entries becomes a whitelist for that field.</p></div>
+                        <div class="mail-policy-rule-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input type="search" data-policy-search placeholder="Find a rule list..."></div>
+                    </div>
+                    <div class="mail-policy-groups" data-policy-list-groups></div>
+                    <div class="mail-policy-note"><strong>Pattern examples</strong><span><code>user@example.com</code> exact email</span><span><code>*@example.com</code> wildcard</span><span><code>example.com</code> domain</span><span><code>203.0.113.*</code> IP wildcard</span><span><code>10.0.0.0/8</code> IPv4 CIDR</span></div>
+                </section>
+                <section data-policy-pane="limits" hidden>
+                    <div class="mail-policy-intro"><div><h3>Rate limits &amp; size limits</h3><p>These are intentionally lightweight safeguards against one client exhausting the public server.</p></div></div>
+                    <div class="mail-policy-limit-sections">
+                        <article class="mail-policy-limit-card">
+                            <header><div><h4>SMTP protection</h4><p>Connections and incoming message size.</p></div><label class="mail-policy-switch"><input type="checkbox" data-policy-limit="limits.smtp.enabled" data-policy-kind="boolean"><span></span></label></header>
+                            <div class="mail-policy-limit-grid">
+                                <label><span>Connections / minute / IP</span><input type="number" min="1" data-policy-limit="limits.smtp.connectionsPerMinute"></label>
+                                <label><span>Concurrent connections / IP</span><input type="number" min="1" data-policy-limit="limits.smtp.concurrentPerIp"></label>
+                                <label><span>Max message size (MB)</span><input type="number" min="1" step="1" data-policy-limit="limits.smtp.maxMessageBytes" data-policy-unit="mb"></label>
+                                <label><span>Max attachment size (MB)</span><input type="number" min="1" step="1" data-policy-limit="limits.smtp.maxAttachmentBytes" data-policy-unit="mb"></label>
+                                <label><span>Max attachments / message</span><input type="number" min="0" data-policy-limit="limits.smtp.maxAttachments"></label>
+                            </div>
+                        </article>
+                        <article class="mail-policy-limit-card">
+                            <header><div><h4>HTTP &amp; API protection</h4><p>Public API, inbox polling, admin and expensive searches.</p></div><label class="mail-policy-switch"><input type="checkbox" data-policy-limit="limits.http.enabled" data-policy-kind="boolean"><span></span></label></header>
+                            <div class="mail-policy-limit-grid">
+                                <label><span>API requests / minute / IP</span><input type="number" min="1" data-policy-limit="limits.http.apiPerMinute"></label>
+                                <label><span>Inbox polls / minute / IP</span><input type="number" min="1" data-policy-limit="limits.http.inboxPollPerMinute"></label>
+                                <label><span>Admin requests / minute</span><input type="number" min="1" data-policy-limit="limits.http.adminPerMinute"></label>
+                                <label><span>Expensive searches / minute</span><input type="number" min="1" data-policy-limit="limits.http.expensivePerMinute"></label>
+                                <label><span>Max request body (KB)</span><input type="number" min="16" step="16" data-policy-limit="limits.http.maxBodyBytes" data-policy-unit="kb"></label>
+                            </div>
+                        </article>
+                        <article class="mail-policy-limit-card">
+                            <header><div><h4>Outgoing mail</h4><p>Limits Send, Reply and Forward operations.</p></div><label class="mail-policy-switch"><input type="checkbox" data-policy-limit="limits.outbound.enabled" data-policy-kind="boolean"><span></span></label></header>
+                            <div class="mail-policy-limit-grid">
+                                <label><span>Social Browser sends / hour</span><input type="number" min="1" data-policy-limit="limits.outbound.perHour"></label>
+                                <label><span>Admin sends / hour</span><input type="number" min="1" data-policy-limit="limits.outbound.adminPerHour"></label>
+                                <label><span>Legacy / API sends / hour</span><input type="number" min="1" data-policy-limit="limits.outbound.apiPerHour"></label>
+                            </div>
+                        </article>
+                    </div>
+                    <div class="mail-policy-note"><strong>IP detection</strong><span>By default the direct connection IP is used. If your reverse proxy is trusted, set <code>EMAIL_TRUST_PROXY=true</code> so IP rules use the first X-Forwarded-For value.</span></div>
+                </section>
+                <section data-policy-pane="activity" hidden>
+                    <div class="mail-policy-intro"><div><h3>Protection activity</h3><p>Runtime counters reset when the Node process restarts. Policy rules remain saved in JSON.</p></div><button class="sb-btn sb-btn-ghost" type="button" data-admin-action="policy-refresh">Refresh activity</button></div>
+                    <div class="mail-policy-metrics" data-policy-metrics></div>
+                    <div class="mail-policy-test">
+                        <div><h4>Test a rule</h4><p>Check how the current saved policy treats a sender, recipient, IP or subject.</p></div>
+                        <select data-policy-test-type><option value="from">From email</option><option value="to">To email</option><option value="ip">IP address</option><option value="subject">Subject</option></select>
+                        <input type="text" data-policy-test-value placeholder="Enter a value to test">
+                        <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="policy-test">Test</button>
+                        <div class="mail-policy-test-result" data-policy-test-result hidden></div>
+                    </div>
+                    <div class="mail-policy-events"><div class="mail-policy-events-head"><h4>Recent protection events</h4><span>Last 40 runtime events</span></div><div data-policy-events></div></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div x-import="scripts.html"></div>
+    <script x-import="emails/admin.js"></script>
+</body>
 </html>

@@ -1,17 +1,7 @@
-<div id="viewEmailModal" class="modal fixed">
-  <div class="modal-content">
-    <div class="modal-header">
-      <span class="close">&times;</span>
-      <h2>##word.View Email Message ##</h2>
+<div id="viewEmailModal" class="modal" hidden>
+    <div class="modal-content mail-view-modal">
+        <div class="modal-header"><h2>##word.View Email Message ##</h2><button class="sb-modal-close" type="button" data-modal-close="#viewEmailModal">×</button></div>
+        <div class="modal-body"><div x-import="emails/view.html"></div><div class="sb-status" data-view-error></div></div>
+        <div class="modal-footer"><button class="sb-btn sb-btn-ghost" type="button" data-modal-close="#viewEmailModal"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg><span>##word.Close Email##</span></button></div>
     </div>
-
-    <div class="modal-body">
-      <div x-import="emails/view.html"></div>
-      <p class="error">{{error}}</p>
-
-      <div class="modal-footer center">
-        <i-button type="close" onclick="site.hideModal('#viewEmailModal')" label="##word.Close Email##"></i-button>
-      </div>
-    </div>
-  </div>
 </div>

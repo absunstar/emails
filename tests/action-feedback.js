@@ -1,0 +1,22 @@
+const fs = require('fs');
+const path = require('path');
+const root = path.join(__dirname, '..');
+const appJs = fs.readFileSync(path.join(root, 'site_files/js/app.js'), 'utf8');
+const emailJs = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/index.js'), 'utf8');
+const freeHtml = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/free.html'), 'utf8');
+const viewHtml = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/view.html'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'site_files/css/zero-ui.css'), 'utf8');
+function assert(value, message) { if (!value) throw new Error(message); }
+assert(appJs.includes('SBUI.toast = function'), 'Global toast helper is missing');
+assert(css.includes('.sb-toast-host') && css.includes('.sb-toast-success') && css.includes('.sb-toast-error'), 'Toast styles are missing');
+assert(emailJs.includes('copyWithFeedback'), 'Copy action feedback helper is missing');
+assert(!emailJs.includes('alert('), 'Frontend email actions must not use blocking alert dialogs');
+assert(emailJs.includes("'New email created'"), 'New email success feedback is missing');
+assert(emailJs.includes("'Inbox refreshed'"), 'Inbox refresh feedback is missing');
+assert(emailJs.includes("'New mail arrived'"), 'Live new-mail feedback is missing');
+assert(freeHtml.includes('mail-new-email-btn') && freeHtml.includes('Generate address'), 'New Email button redesign is missing');
+assert(freeHtml.includes('mail-copy-btn') && freeHtml.includes('data-action="copy-email"'), 'Copy button icon treatment is missing');
+assert(freeHtml.includes('inbox-refresh-btn'), 'Inbox action button redesign is missing');
+assert(viewHtml.includes('data-action="copy-verification-code"') && viewHtml.includes('ui-icon'), 'Verification copy icon is missing');
+assert(viewHtml.includes('data-action="download-eml"') && viewHtml.includes('data-action="show-reply"') && viewHtml.includes('data-action="show-forward"'), 'Message action buttons are incomplete');
+console.log('Action icons and user feedback checks passed');

@@ -1,20 +1,11 @@
-<h2 class="brand">
-  <div >
-    <div class="inline title" help-id="brand_title">
-      <a href="/"> ##word.brand_title## <span> ##word.brand_tag##</span> </a>
+<header class="sb-navbar">
+    <a class="sb-brand" href="/">##word.brand_title## <span>##word.brand_tag##</span></a>
+    <div class="sb-navbar-actions">
+        <button id="btn_login" class="sb-btn sb-btn-ghost" data-browser-signin type="button">Sign in with Social Browser</button>
+        <button class="sb-btn sb-btn-ghost" data-browser-account type="button" hidden>Social Browser</button>
     </div>
-
-    <div class="info">
-      <a x-features="login" href="#" onclick="event.stopPropagation(); $('.user-menu').toggle()"> <img src="##user.profile.image_url##" onerror="this.src='/images/user.png'" alt="" /> </a>
-      <a x-features="browser.social" x-permission="!login" id="btn_login" ng-click="login()"> ##word.VIP Login## </a>
+    <div class="user-menu" data-browser-user-menu hidden>
+        <div class="userPrint" data-browser-user-name>Social Browser</div>
+        <div class="userPrint" data-browser-user-id></div>
     </div>
-
-    <div class="user-menu">
-      <div class="center profile">
-        <img class="center" src="##user.profile.image_url##" onerror="this.src='/images/user.png'" alt="" /> <br />
-        <h5 class="grayDark userPrint center">##user.email##</h5>
-        <div class="link" ng-click="logout()">##word.security_logout##</div>
-      </div>
-    </div>
-  </div>
-</h2>
+</header>

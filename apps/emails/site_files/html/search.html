@@ -1,26 +1,21 @@
-<div id="SearchModal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <span class="close">&times;</span>
-      <h2>##word.emails_search## <i class="fa fa-search"></i></h2>
-    </div>
-    <div class="modal-body">
-      <div class="row border">
-        <i-control class="col5" ng-model="emailSearch.from" label="##word.emails_from##" type="text"></i-control>
-        <i-control class="col5" ng-model="emailSearch.to" label="##word.emails_to##" type="text"></i-control>
-        <i-control class="col2" ng-model="emailSearch.limit" type="number" label="##word.emails_limit##"></i-control>
-        <div class="row">
-          <i-control ng-model="emailSearch.subject" label="##word.emails_subject##"></i-control>
+<div id="SearchModal" class="modal" hidden>
+    <div class="modal-content">
+        <div class="modal-header"><h2>##word.emails_search##</h2><button class="sb-modal-close" type="button" data-modal-close="#SearchModal">×</button></div>
+        <div class="modal-body">
+            <form data-search-form class="sb-form-grid">
+                <div class="sb-field"><label>##word.emails_from##</label><input class="sb-input" name="from" /></div>
+                <div class="sb-field"><label>##word.emails_to##</label><input class="sb-input" name="to" /></div>
+                <div class="sb-field"><label>##word.emails_limit##</label><input class="sb-input" name="limit" type="number" min="1" max="5000" value="500" /></div>
+                <div class="sb-field"><label>##word.emails_subject##</label><input class="sb-input" name="subject" /></div>
+                <div class="sb-field wide"><label>Message contains</label><input class="sb-input" name="text" /></div>
+            </form>
+            <div class="sb-status" data-search-error></div>
         </div>
-     
-      </div>
-      <h2 class="error">{{error}}</h2>
-      <div class="modal-footer center">
-        <i-button type="search" ng-click="searchAll()" label="##word.search##"></i-button>
-        <i-button type="delete" ng-click="deleteAllEmails()" label="##word.Delete All Messages##"></i-button>
-        <i-button type="clear" ng-click="emailSearch = {limit : 200}" label="##word.clear##"></i-button>
-        <i-button type="close" onclick="site.hideModal('#SearchModal')" label="##word.close##"></i-button>
-      </div>
+        <div class="modal-footer">
+            <button class="sb-btn sb-btn-ghost" type="button" data-action="clear-search"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m6 7 1 13h10l1-13"></path></svg><span>##word.clear##</span></button>
+            <button class="sb-btn sb-btn-danger" type="button" data-action="delete-matching"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m6 7 1 13h10l1-13"></path></svg><span>##word.Delete All Messages##</span></button>
+            <button class="sb-btn" type="button" data-action="run-search"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"></circle><path d="m15 15 5 5"></path></svg><span>##word.search##</span></button>
+            <button class="sb-btn sb-btn-ghost" type="button" data-modal-close="#SearchModal"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg><span>##word.close##</span></button>
+        </div>
     </div>
-  </div>
 </div>

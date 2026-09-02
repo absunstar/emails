@@ -1,0 +1,393 @@
+'use strict';
+
+const { normalizeAddressList } = require('./core/email-service');
+const { normalizeHostname } = require('./core/domain');
+const { analyzeEmailHtml } = require('./core/message-tools');
+
+function createEmailMcpService(options) {
+    options = options || {};
+    const emailService = options.emailService;
+    const abusePolicy = options.abusePolicy || null;
+    if (!emailService) throw new Error('Shared email service is required');
+
+    function requestedDomain(args) {
+        const domain = normalizeHostname(args && args.domain);
+        return domain || '';
+    }
+
+    function readContext(args) {
+        const domain = requestedDomain(args);
+        return {
+            isAdmin: true,
+            allowVip: true,
+            ...(domain ? { domain } : {}),
+            source: 'mcp-manager',
+            maxLimit: 5000,
+        };
+    }
+
+    function adminContext(args) {
+        return readContext(args);
+    }
+
+    function enforceOutboundRate(scope, mode) {
+        if (!abusePolicy || typeof abusePolicy.outboundHit !== 'function') return;
+        const key = 'mcp:' + String(scope?.ip || scope?.client || 'SOCIALBROWERMANAGER');
+        const hit = abusePolicy.outboundHit(key, mode || 'admin');
+        if (!hit.allowed) throw new Error('MCP outgoing email rate limit reached. Try again later.');
+    }
+
+    function enforceAdminRate(scope, expensive) {
+        if (!abusePolicy || typeof abusePolicy.httpHit !== 'function') return;
+        const key = 'mcp:' + String(scope?.ip || scope?.client || 'SOCIALBROWERMANAGER');
+        const hit = abusePolicy.httpHit(expensive ? 'expensive' : 'admin', key);
+        if (!hit.allowed) throw new Error('MCP admin rate limit reached. Try again later.');
+    }
+
+    function policyRequired() {
+        if (!abusePolicy) throw new Error('Abuse policy service is not available');
+        return abusePolicy;
+    }
+
+    function policyListName(name) {
+        const policy = policyRequired();
+        const value = String(name || '').trim();
+        const config = policy.getConfig();
+        if (!value || !Object.prototype.hasOwnProperty.call(config.lists || {}, value)) {
+            throw new Error('Unknown policy list: ' + value);
+        }
+        return value;
+    }
+
+    function policyLimitPath(group, key) {
+        const policy = policyRequired();
+        const config = policy.getConfig();
+        const g = String(group || '').trim();
+        const k = String(key || '').trim();
+        if (!config.limits || !config.limits[g] || !Object.prototype.hasOwnProperty.call(config.limits[g], k)) {
+            throw new Error('Unknown policy limit: ' + g + '.' + k);
+        }
+        return { group: g, key: k };
+    }
+
+    function extractRemoteAssets(html) {
+        const source = String(html || '');
+        const images = [];
+        const links = [];
+        const imageRe = /<img\b[^>]*\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+        const linkRe = /<a\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+        let match;
+        while ((match = imageRe.exec(source))) {
+            const url = String(match[1] || match[2] || match[3] || '').trim();
+            if (/^https?:\/\//i.test(url) && !images.includes(url)) images.push(url);
+            if (images.length >= 200) break;
+        }
+        while ((match = linkRe.exec(source))) {
+            const url = String(match[1] || match[2] || match[3] || '').trim();
+            if (/^https?:\/\//i.test(url) && !links.includes(url)) links.push(url);
+            if (links.length >= 500) break;
+        }
+        return { images, links };
+    }
+
+    return {
+        store: emailService.store,
+
+        async capabilities(scope) {
+            enforceAdminRate(scope, false);
+            const policy = abusePolicy ? abusePolicy.getConfig() : null;
+            return {
+                manager: true,
+                scope: 'global-admin',
+                storage: 'json-files-only',
+                maxMessages: emailService.store.maxMessages,
+                customFolders: emailService.listAdminFolders(),
+                vipCount: emailService.listVip().length,
+                policyEnabled: !!policy?.enabled,
+                capabilities: [
+                    'global-search', 'advanced-filters', 'pagination', 'sorting', 'read', 'read-many', 'favorites', 'folders', 'bulk-update',
+                    'send', 'bulk-send', 'reply', 'forward', 'attachments', 'eml-export', 'remote-image-analysis', 'tracking-pixel-analysis',
+                    'vip-management', 'delete', 'bulk-delete', 'delete-matching', 'mailbox-statuses', 'statistics',
+                    'security-policy-read', 'security-policy-update', 'security-policy-rules', 'security-policy-limits', 'security-policy-test', 'security-activity',
+                ],
+            };
+        },
+
+        async search(args, scope) {
+            enforceAdminRate(scope, true);
+            args = args || {};
+            const requestedLimit = Math.max(1, Math.min(Number(args.limit || 50), 500));
+            const result = await emailService.search(Object.assign({}, args, {
+                includeBody: !!args.includeBody,
+                limit: requestedLimit,
+                offset: Math.max(0, Number(args.offset || 0)),
+            }), readContext(args));
+            return Object.assign({ domain: requestedDomain(args) || null }, result);
+        },
+
+        async read(guid, scope) {
+            enforceAdminRate(scope, false);
+            return emailService.read(guid, adminContext());
+        },
+
+        async readMany(guids, scope) {
+            enforceAdminRate(scope, false);
+            return emailService.readMany(guids, adminContext());
+        },
+
+        async mailboxStatuses(args, scope) {
+            enforceAdminRate(scope, true);
+            return emailService.mailboxStatuses(args.addresses || [], { allowVip: true, maxAddresses: 100 });
+        },
+
+        async stats(args, scope) {
+            enforceAdminRate(scope, true);
+            const result = await emailService.stats(readContext(args || {}));
+            return Object.assign({ domain: requestedDomain(args || {}) || null }, result);
+        },
+
+        async send(args, scope) {
+            enforceOutboundRate(scope, 'admin');
+            return emailService.send(args);
+        },
+
+        async sendBulk(args, scope) {
+            enforceOutboundRate(scope, 'admin');
+            return emailService.sendBulk(args);
+        },
+
+        async reply(args, scope) {
+            enforceOutboundRate(scope, 'admin');
+            return emailService.reply(args, adminContext());
+        },
+
+        async forward(args, scope) {
+            enforceOutboundRate(scope, 'admin');
+            return emailService.forward(args, adminContext());
+        },
+
+        async update(args, scope) {
+            enforceAdminRate(scope, false);
+            return emailService.update(args.guid, args.patch || {}, adminContext());
+        },
+
+        async updateBulk(args, scope) {
+            enforceAdminRate(scope, true);
+            const guids = Array.from(new Set((args.guids || []).map(String)));
+            const updated = [];
+            const notFound = [];
+            for (const guid of guids) {
+                const doc = await emailService.update(guid, args.patch || {}, adminContext());
+                if (doc) updated.push(guid);
+                else notFound.push(guid);
+            }
+            return { updatedCount: updated.length, updated, notFound };
+        },
+
+        async setRead(guids, read, scope) {
+            enforceAdminRate(scope, false);
+            return emailService.setRead(guids, read, adminContext());
+        },
+
+        async delete(guid, scope) {
+            enforceAdminRate(scope, false);
+            return emailService.delete(guid, adminContext());
+        },
+
+        async deleteMany(guids, scope) {
+            enforceAdminRate(scope, true);
+            return emailService.deleteMany(guids, adminContext());
+        },
+
+        async deleteMatching(args, scope) {
+            enforceAdminRate(scope, true);
+            return emailService.deleteMatching(args || {}, adminContext(args));
+        },
+
+        async attachmentRead(args, scope) {
+            enforceAdminRate(scope, true);
+            const result = await emailService.readAttachment(args.guid, args.attachmentId, adminContext());
+            const maxBytes = Math.max(1, Math.min(Number(args.maxBytes || 20 * 1024 * 1024), 25 * 1024 * 1024));
+            if (result.content.length > maxBytes) throw new Error('Attachment exceeds maxBytes. Size: ' + result.content.length);
+            return {
+                guid: args.guid,
+                attachment: result.meta,
+                size: result.content.length,
+                encoding: 'base64',
+                contentBase64: result.content.toString('base64'),
+            };
+        },
+
+        async emlExport(args, scope) {
+            enforceAdminRate(scope, true);
+            const result = await emailService.exportEml(args.guid, adminContext());
+            const maxBytes = Math.max(1, Math.min(Number(args.maxBytes || 25 * 1024 * 1024), 40 * 1024 * 1024));
+            if (result.content.length > maxBytes) throw new Error('EML exceeds maxBytes. Size: ' + result.content.length);
+            return {
+                guid: args.guid,
+                filename: String(result.message.subject || 'message').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120) + '.eml',
+                size: result.content.length,
+                encoding: 'base64',
+                contentBase64: result.content.toString('base64'),
+            };
+        },
+
+        async analyze(guid, scope) {
+            enforceAdminRate(scope, true);
+            const message = (await emailService.read(guid, adminContext())).message;
+            const summary = analyzeEmailHtml(message.html || '');
+            const assets = extractRemoteAssets(message.html || '');
+            return {
+                guid,
+                subject: message.subject,
+                remoteImages: summary.remoteImages,
+                trackingPixels: summary.trackingPixels,
+                externalLinks: summary.externalLinks,
+                imageUrls: assets.images,
+                linkUrls: assets.links,
+                attachments: message.attachments || [],
+            };
+        },
+
+        async vipList(scope) {
+            enforceAdminRate(scope, false);
+            return { count: emailService.listVip().length, entries: emailService.listVip() };
+        },
+
+        async vipSet(args, scope) {
+            enforceAdminRate(scope, false);
+            if (args.vip === false) return { vip: false, result: await emailService.removeVip(args.email) };
+            return { vip: true, result: await emailService.setVip({ email: args.email, vip: true, source: 'mcp-manager' }) };
+        },
+
+        async foldersList(scope) {
+            enforceAdminRate(scope, false);
+            return { folders: emailService.listAdminFolders() };
+        },
+
+        async folderCreate(name, scope) {
+            enforceAdminRate(scope, false);
+            return emailService.addAdminFolder(name);
+        },
+
+        async policyGet(scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            return { config: policy.getConfig(), defaults: policy.getDefaults(), status: policy.status(), path: policy.filePath };
+        },
+
+        async policyExport(scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            return { format: 'social-browser-email-policy-v1', exportedAt: new Date().toISOString(), config: policy.getConfig() };
+        },
+
+        async policyImport(config, scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            const result = policy.update(config || {});
+            await emailService.store.audit('mcp_policy_import', { updatedAt: result.updatedAt });
+            return { imported: true, config: result, status: policy.status() };
+        },
+
+        async policyUpdate(config, scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            const result = policy.update(config || {});
+            await emailService.store.audit('mcp_policy_update', { updatedAt: result.updatedAt });
+            return { config: result, status: policy.status() };
+        },
+
+        async policyReset(scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            const result = policy.reset();
+            await emailService.store.audit('mcp_policy_reset', { updatedAt: result.updatedAt });
+            return { config: result, status: policy.status() };
+        },
+
+        async policyStatus(scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            return policy.status();
+        },
+
+        async policyTest(args, scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            const type = String(args.type || '').toLowerCase();
+            const value = String(args.value || '');
+            let result;
+            if (type === 'ip') result = policy.checkIp(value);
+            else if (type === 'to') result = policy.checkAddress('to', value);
+            else if (type === 'subject') result = policy.checkSubject(value);
+            else if (type === 'ignore') result = policy.shouldIgnore(args.from || value, args.subject || '');
+            else if (type === 'outbound') result = policy.checkOutbound(args.from || '', args.to || value);
+            else result = policy.checkAddress('from', value);
+            return { type: type || 'from', value, result };
+        },
+
+        async policyRuleAdd(args, scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            const name = policyListName(args.list);
+            const config = policy.getConfig();
+            const list = config.lists[name];
+            const value = String(args.value || '').trim();
+            if (!value) throw new Error('Rule value is required');
+            if (!list.values.some((item) => String(item).toLowerCase() === value.toLowerCase())) list.values.push(value);
+            if (args.enabled !== undefined) list.enabled = !!args.enabled;
+            const result = policy.update({ lists: { [name]: list } });
+            await emailService.store.audit('mcp_policy_rule_add', { list: name, value });
+            return { list: name, rule: result.lists[name], status: policy.status() };
+        },
+
+        async policyRuleRemove(args, scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            const name = policyListName(args.list);
+            const config = policy.getConfig();
+            const value = String(args.value || '').trim();
+            const before = config.lists[name].values.length;
+            config.lists[name].values = config.lists[name].values.filter((item) => String(item).toLowerCase() !== value.toLowerCase());
+            const result = policy.update({ lists: { [name]: config.lists[name] } });
+            await emailService.store.audit('mcp_policy_rule_remove', { list: name, value });
+            return { list: name, removed: before !== result.lists[name].values.length, rule: result.lists[name], status: policy.status() };
+        },
+
+        async policyListSetEnabled(args, scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            const name = policyListName(args.list);
+            const config = policy.getConfig();
+            config.lists[name].enabled = !!args.enabled;
+            const result = policy.update({ lists: { [name]: config.lists[name] } });
+            await emailService.store.audit('mcp_policy_list_toggle', { list: name, enabled: !!args.enabled });
+            return { list: name, rule: result.lists[name], status: policy.status() };
+        },
+
+        async policyLimitSet(args, scope) {
+            enforceAdminRate(scope, true);
+            const policy = policyRequired();
+            const target = policyLimitPath(args.group, args.key);
+            const config = policy.getConfig();
+            const current = config.limits[target.group][target.key];
+            let value = args.value;
+            if (typeof current === 'boolean') value = !!value;
+            else {
+                value = Number(value);
+                if (!Number.isFinite(value)) throw new Error('Limit value must be numeric');
+            }
+            const patch = { limits: { [target.group]: { [target.key]: value } } };
+            const result = policy.update(patch);
+            await emailService.store.audit('mcp_policy_limit_set', { group: target.group, key: target.key, value });
+            return { group: target.group, key: target.key, value: result.limits[target.group][target.key], status: policy.status() };
+        },
+
+        normalizeAddressList,
+    };
+}
+
+module.exports = {
+    createEmailMcpService,
+};

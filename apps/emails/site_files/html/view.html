@@ -1,17 +1,19 @@
-<div ng-hide="busy" class="row">
-  <div class="row padding margin border">
-    <div class="col2"><p class="bold">##word.From##</p></div>
-    <div class="col9"><p class="blue">{{currentEmail.from}}</p></div>
-  </div>
-  <div class="row padding margin border">
-    <div class="col2"><p class="bold">##word.To##</p></div>
-    <div class="col9"><p class="blue">{{currentEmail.to}}</p></div>
-  </div>
-  <div class="row padding margin border">
-    <div class="col2"><p class="bold">##word.Subject##</p></div>
-    <div class="col9 center"><p class="bold font-xx-large">{{currentEmail.subject}}</p></div>
-  </div>
-  <div class="row padding margin border">
-    <iframe id="div-message"></iframe>
-  </div>
+<div class="mail-view-tools" data-verification-tools hidden>
+    <div class="verification-card"><div><span class="verification-label">Verification code</span><strong data-verification-code></strong></div><button class="sb-btn sb-btn-small" type="button" data-action="copy-verification-code"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path></svg><span>Copy Code</span></button></div>
+    <div class="verification-links" data-verification-links></div>
 </div>
+<div class="mail-privacy-bar"><div><strong>Privacy Protection</strong><span data-privacy-summary>Remote content is blocked by default.</span></div><button class="sb-btn sb-btn-small sb-btn-ghost" type="button" data-action="load-remote-images" data-remote-state="blocked"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"></path><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m7 15 3-3 2 2 2-2 3 3"></path></svg><span data-button-label>Load Remote Images</span></button></div>
+<div class="sb-form-grid">
+    <div class="sb-field"><label>##word.From##</label><div class="sb-input" data-view-from></div></div>
+    <div class="sb-field"><label>##word.To##</label><div class="sb-input" data-view-to></div></div>
+    <div class="sb-field wide"><label>##word.Subject##</label><div class="sb-input" data-view-subject></div></div>
+    <div class="wide mail-attachments" data-attachments hidden><div class="mail-section-title">Attachments <span data-attachment-count></span></div><div data-attachment-list></div></div>
+    <div class="wide"><iframe id="div-message" class="sb-email-frame" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe></div>
+</div>
+<div class="mail-message-actions">
+    <button class="sb-btn sb-btn-small sb-btn-ghost" type="button" data-action="download-eml"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"></path><path d="M15 3v4h4"></path><path d="M12 10v7"></path><path d="m9 14 3 3 3-3"></path></svg><span>Download .EML</span></button>
+    <button class="sb-btn sb-btn-small" type="button" data-action="show-reply" data-browser-send-action hidden><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 17-5-5 5-5"></path><path d="M5 12h9a5 5 0 0 1 5 5v2"></path></svg><span>Reply</span></button>
+    <button class="sb-btn sb-btn-small" type="button" data-action="show-forward" data-browser-send-action hidden><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 7 5 5-5 5"></path><path d="M19 12h-9a5 5 0 0 0-5 5v2"></path></svg><span>Forward</span></button>
+</div>
+<div class="mail-compose-inline" data-reply-panel hidden><div class="sb-field"><label>Reply from</label><input class="sb-input" data-reply-from readonly /></div><div class="sb-field"><label>Message</label><textarea class="sb-input" data-reply-text rows="4"></textarea></div><div class="sb-actions"><button class="sb-btn" type="button" data-action="send-reply"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 17-5-5 5-5"></path><path d="M5 12h9a5 5 0 0 1 5 5v2"></path></svg><span data-button-label>Send Reply</span></button><button class="sb-btn sb-btn-ghost" type="button" data-action="cancel-compose">Cancel</button></div></div>
+<div class="mail-compose-inline" data-forward-panel hidden><div class="sb-form-grid"><div class="sb-field"><label>Forward from</label><input class="sb-input" data-forward-from readonly /></div><div class="sb-field"><label>Forward to</label><input class="sb-input" data-forward-to inputmode="email" /></div><div class="sb-field wide"><label>Optional note</label><textarea class="sb-input" data-forward-text rows="3"></textarea></div></div><div class="sb-actions"><button class="sb-btn" type="button" data-action="send-forward"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 7 5 5-5 5"></path><path d="M19 12h-9a5 5 0 0 0-5 5v2"></path></svg><span data-button-label>Forward Message</span></button><button class="sb-btn sb-btn-ghost" type="button" data-action="cancel-compose">Cancel</button></div></div>

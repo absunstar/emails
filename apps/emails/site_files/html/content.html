@@ -1,12 +1,6 @@
-<div class="row">
-  <form class="form">
-    <div class="row">
-      <i-control ng-model="email.from" label="##word.From##" v="r"></i-control>
-      <i-control ng-model="email.to" label="##word.To##" v="r"></i-control>
-    </div>
-    <div class="row">
-      <i-control ng-model="email.subject" label="##word.Subject##" v="r"></i-control>
-      <i-content ng-model="email.html" label="##word.HTML Message##"></i-content>
-    </div>
-  </form>
+<div class="sb-form-grid">
+    <div class="sb-field"><label>##word.From##</label><input class="sb-input" name="from" type="email" required /></div>
+    <div class="sb-field"><label>##word.To##</label><input class="sb-input" name="to" type="text" required /></div>
+    <div class="sb-field wide"><label>##word.Subject##</label><input class="sb-input" name="subject" required /></div>
+    <div class="sb-field wide"><label>##word.HTML Message##</label><textarea class="sb-textarea" name="html"></textarea></div>
 </div>

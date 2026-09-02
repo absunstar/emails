@@ -4,10 +4,30 @@ const { normalizeAddressList } = require('./core/email-service');
 const { normalizeHostname } = require('./core/domain');
 const { analyzeEmailHtml } = require('./core/message-tools');
 
+async function runWithConcurrency(items, concurrency, worker) {
+    const results = new Array(items.length);
+    let next = 0;
+    async function runner() {
+        while (true) {
+            const index = next++;
+            if (index >= items.length) return;
+            try {
+                results[index] = { ok: true, value: await worker(items[index], index) };
+            } catch (error) {
+                results[index] = { ok: false, error: error?.message || String(error) };
+            }
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(Math.max(1, concurrency), items.length || 1) }, () => runner()));
+    return results;
+}
+
 function createEmailMcpService(options) {
     options = options || {};
     const emailService = options.emailService;
     const abusePolicy = options.abusePolicy || null;
+    const scheduler = options.scheduler || null;
+    const deliverability = options.deliverability || null;
     if (!emailService) throw new Error('Shared email service is required');
 
     function requestedDomain(args) {
@@ -32,9 +52,13 @@ function createEmailMcpService(options) {
 
     function enforceOutboundRate(scope, mode) {
         if (!abusePolicy || typeof abusePolicy.outboundHit !== 'function') return;
-        const key = 'mcp:' + String(scope?.ip || scope?.client || 'SOCIALBROWERMANAGER');
-        const hit = abusePolicy.outboundHit(key, mode || 'admin');
-        if (!hit.allowed) throw new Error('MCP outgoing email rate limit reached. Try again later.');
+        const key = 'mcp:SOCIALBROWERMANAGER';
+        const hit = abusePolicy.outboundHit(key, mode || 'mcp');
+        if (!hit.allowed) {
+            const error = new Error('MCP outgoing email rate limit reached. Try again later.');
+            error.retryAfterMs = Number(hit.retryAfterMs || 0);
+            throw error;
+        }
     }
 
     function enforceAdminRate(scope, expensive) {
@@ -47,6 +71,16 @@ function createEmailMcpService(options) {
     function policyRequired() {
         if (!abusePolicy) throw new Error('Abuse policy service is not available');
         return abusePolicy;
+    }
+
+    function schedulerRequired() {
+        if (!scheduler) throw new Error('Email scheduler service is not available');
+        return scheduler;
+    }
+
+    function deliverabilityRequired() {
+        if (!deliverability) throw new Error('Email deliverability service is not available');
+        return deliverability;
     }
 
     function policyListName(name) {
@@ -109,6 +143,9 @@ function createEmailMcpService(options) {
                     'send', 'bulk-send', 'reply', 'forward', 'attachments', 'eml-export', 'remote-image-analysis', 'tracking-pixel-analysis',
                     'vip-management', 'delete', 'bulk-delete', 'delete-matching', 'mailbox-statuses', 'statistics',
                     'security-policy-read', 'security-policy-update', 'security-policy-rules', 'security-policy-limits', 'security-policy-test', 'security-activity',
+                    'scheduled-send', 'scheduled-bulk-send', 'schedule-list', 'schedule-update', 'schedule-cancel', 'schedule-send-now', 'schedule-retry',
+                    'deliverability-status', 'deliverability-preflight', 'deliverability-config', 'per-domain-throttling', 'provider-throttling', 'warmup-ramp',
+                    'bounce-suppression', 'unsubscribe-suppression', 'complaint-suppression', 'delivery-circuit-breaker',
                 ],
             };
         },
@@ -147,23 +184,127 @@ function createEmailMcpService(options) {
         },
 
         async send(args, scope) {
-            enforceOutboundRate(scope, 'admin');
+            enforceOutboundRate(scope, 'mcp');
             return emailService.send(args);
         },
 
         async sendBulk(args, scope) {
-            enforceOutboundRate(scope, 'admin');
-            return emailService.sendBulk(args);
+            const items = Array.isArray(args.messages) ? args.messages : [];
+            const configuredMax = Number(abusePolicy?.getConfig?.()?.limits?.outbound?.bulkMaxMessages || 100);
+            if (!items.length) throw new Error('messages are required');
+            if (items.length > configuredMax) throw new Error('Bulk send is limited to ' + configuredMax + ' messages per request');
+            const concurrency = Math.max(1, Math.min(Number(args.concurrency || 3), 10));
+            const results = await runWithConcurrency(items, concurrency, async (message) => {
+                enforceOutboundRate(scope, 'mcp');
+                return emailService.send(message);
+            });
+            const sent = results.filter((item) => item.ok).length;
+            const failed = results.length - sent;
+            await emailService.store.audit('mcp_email_send_bulk', { requested: items.length, sent, failed, concurrency });
+            return { requested: items.length, sent, failed, results };
         },
 
         async reply(args, scope) {
-            enforceOutboundRate(scope, 'admin');
+            enforceOutboundRate(scope, 'mcp');
             return emailService.reply(args, adminContext());
         },
 
         async forward(args, scope) {
-            enforceOutboundRate(scope, 'admin');
+            enforceOutboundRate(scope, 'mcp');
             return emailService.forward(args, adminContext());
+        },
+
+        async schedule(args, scope) {
+            enforceAdminRate(scope, false);
+            return schedulerRequired().schedule(args, scope);
+        },
+
+        async scheduleBulk(args, scope) {
+            enforceAdminRate(scope, true);
+            return schedulerRequired().scheduleBulk(args, scope);
+        },
+
+        async schedulesList(args, scope) {
+            enforceAdminRate(scope, false);
+            return schedulerRequired().list(args || {});
+        },
+
+        async scheduleGet(args, scope) {
+            enforceAdminRate(scope, false);
+            return schedulerRequired().get(args.id, args.includeBody !== false);
+        },
+
+        async scheduleUpdate(args, scope) {
+            enforceAdminRate(scope, false);
+            return schedulerRequired().update(args.id, args);
+        },
+
+        async scheduleCancel(args, scope) {
+            enforceAdminRate(scope, false);
+            return schedulerRequired().cancel(args.id);
+        },
+
+        async scheduleSendNow(args, scope) {
+            enforceAdminRate(scope, false);
+            return schedulerRequired().sendNow(args.id);
+        },
+
+        async scheduleRetry(args, scope) {
+            enforceAdminRate(scope, false);
+            return schedulerRequired().retry(args.id, args || {});
+        },
+
+        async schedulerStatus(scope) {
+            enforceAdminRate(scope, false);
+            return schedulerRequired().status();
+        },
+
+        async deliverabilityStatus(scope) {
+            enforceAdminRate(scope, false);
+            return deliverabilityRequired().status();
+        },
+
+        async deliverabilityPreflight(args, scope) {
+            enforceAdminRate(scope, false);
+            return deliverabilityRequired().preflightReport(args.from || '', args.to || args.recipients || []);
+        },
+
+        async deliverabilityConfigGet(scope) {
+            enforceAdminRate(scope, false);
+            return { config: deliverabilityRequired().getConfig() };
+        },
+
+        async deliverabilityConfigUpdate(args, scope) {
+            enforceAdminRate(scope, true);
+            const result = deliverabilityRequired().updateConfig(args.config || {});
+            await emailService.store.audit('mcp_deliverability_config_update', { updatedAt: result.updatedAt });
+            return { updated: true, config: result };
+        },
+
+        async suppressionsList(args, scope) {
+            enforceAdminRate(scope, true);
+            return deliverabilityRequired().listSuppressions(args || {});
+        },
+
+        async suppressionAdd(args, scope) {
+            enforceAdminRate(scope, false);
+            const item = deliverabilityRequired().addSuppression(args.email, args.type, args.reason || '', 'mcp-manager');
+            await emailService.store.audit('mcp_email_suppression_add', { email: item.email, type: item.type });
+            return { added: true, item };
+        },
+
+        async suppressionRemove(args, scope) {
+            enforceAdminRate(scope, false);
+            const result = deliverabilityRequired().removeSuppression(args.email);
+            await emailService.store.audit('mcp_email_suppression_remove', { email: result.email, removed: result.removed });
+            return result;
+        },
+
+        async deliveryFeedbackReport(args, scope) {
+            enforceAdminRate(scope, false);
+            const result = deliverabilityRequired().reportFeedback(args || {});
+            await emailService.store.audit('mcp_delivery_feedback', { email: result.email, type: result.type, suppressed: result.suppressed });
+            return result;
         },
 
         async update(args, scope) {

@@ -8,6 +8,7 @@ const { getClientContext } = require('./core/client-context');
 const { createBrowserAuth } = require('./core/browser-auth');
 const { analyzeEmailHtml, sanitizeEmailHtml, qrSvg } = require('./core/message-tools');
 const { createEmailAbusePolicy } = require('./core/abuse-policy');
+const { createEmailDeliverabilityEngine } = require('./core/deliverability-engine');
 
 module.exports = function init(site) {
     const sendmail = require('sendmail')();
@@ -36,6 +37,10 @@ module.exports = function init(site) {
         },
     });
     site.emailAbusePolicy = policy;
+    site.emailDeliverability = site.emailDeliverability || createEmailDeliverabilityEngine({
+        baseDir: process.env.EMAIL_DELIVERABILITY_DIR || path.join(site.cwd, 'localStorage', 'email-deliverability'),
+        logger: (message) => site.log(message),
+    });
     const service = site.emailService || createEmailService({
         sendmail,
         dataDir: path.join(site.cwd, 'localStorage', 'email-files'),
@@ -43,6 +48,7 @@ module.exports = function init(site) {
         maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 10000),
         logger: (message) => site.log(message),
         abusePolicy: policy,
+        deliverability: site.emailDeliverability,
     });
     site.emailService = service;
     site.emailStore = service.store;

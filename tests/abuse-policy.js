@@ -12,6 +12,13 @@ const { createEmailService } = require('../apps/emails/core/email-service');
     const filePath = path.join(dir, 'policy.json');
     const policy = createEmailAbusePolicy({ filePath });
 
+    const safeDefaults = policy.getConfig().limits.outbound;
+    assert.strictEqual(safeDefaults.perHour, 60, 'Social Browser safe send default must be 60/hour');
+    assert.strictEqual(safeDefaults.adminPerHour, 500, 'Admin safe send default must be 500/hour');
+    assert.strictEqual(safeDefaults.apiPerHour, 120, 'Legacy/API safe send default must be 120/hour');
+    assert.strictEqual(safeDefaults.mcpPerHour, 500, 'MCP safe send default must be 500/hour');
+    assert.strictEqual(safeDefaults.bulkMaxMessages, 100, 'MCP bulk safe default must be 100 messages/request');
+
     assert.strictEqual(policy.checkAddress('from', 'bot@contaboserver.net').allowed, false, 'legacy default blocked sender must remain blocked');
     assert.strictEqual(ipMatches('10.5.4.3', '10.0.0.0/8'), true, 'IPv4 CIDR must match');
     assert.strictEqual(ipMatches('203.0.113.9', '203.0.113.*'), true, 'IP wildcard must match');
@@ -51,6 +58,12 @@ const { createEmailService } = require('../apps/emails/core/email-service');
     assert.strictEqual(policy.outboundHit('browser-1', false).allowed, true);
     assert.strictEqual(policy.outboundHit('browser-1', false).allowed, true);
     assert.strictEqual(policy.outboundHit('browser-1', false).allowed, false, 'outbound rate must reject excess sends');
+    const mcpConfig = policy.getConfig();
+    mcpConfig.limits.outbound.mcpPerHour = 2;
+    policy.update(mcpConfig);
+    assert.strictEqual(policy.outboundHit('mcp-global', 'mcp').allowed, true);
+    assert.strictEqual(policy.outboundHit('mcp-global', 'mcp').allowed, true);
+    assert.strictEqual(policy.outboundHit('mcp-global', 'mcp').allowed, false, 'MCP rate must count each actual send');
 
     const reloaded = createEmailAbusePolicy({ filePath });
     assert.deepStrictEqual(reloaded.getConfig().lists.blockIPs.values, ['198.51.100.7', '10.0.0.0/8'], 'policy lists must persist to JSON');
@@ -86,6 +99,8 @@ const { createEmailService } = require('../apps/emails/core/email-service');
     assert(app.includes("postBuckets(name)"), 'HTTP API rate-limit wrapper is missing');
     assert(adminHtml.includes('Security &amp; Policies'), 'admin Security & Policies UI is missing');
     assert(adminHtml.includes('data-policy-list-groups'), 'admin policy-list manager is missing');
+    assert(adminHtml.includes('limits.outbound.mcpPerHour'), 'Admin MCP outbound limit control is missing');
+    assert(adminHtml.includes('limits.outbound.bulkMaxMessages'), 'Admin MCP bulk limit control is missing');
     assert(adminJs.includes("name: 'blockIPs'"), 'IP policy list UI is missing');
     assert(adminJs.includes("name: 'blockOutboundDomains'"), 'outbound-domain policy UI is missing');
     assert(store.includes("hash(id) + '.bin'"), 'attachment paths must remain hash-based');

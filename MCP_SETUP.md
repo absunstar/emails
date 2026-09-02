@@ -36,7 +36,7 @@ VIP mail is available to the MCP manager. Manual delete operations use administr
 
 ## Capabilities and tools
 
-The build exposes 34 tools.
+The build exposes 43 tools.
 
 ### Discovery, search and reading
 
@@ -51,6 +51,15 @@ The build exposes 34 tools.
 
 - `email_send`
 - `email_send_bulk`
+- `email_schedule` — schedule one real message for a future date/time.
+- `email_schedule_bulk` — schedule multiple messages with optional spacing between deliveries.
+- `email_schedules_list` — list scheduled/sent/failed/cancelled jobs.
+- `email_schedule_get` — read one schedule including its stored message.
+- `email_schedule_update` — edit the message or planned send time before delivery.
+- `email_schedule_cancel` — cancel a pending job.
+- `email_schedule_send_now` — execute a pending/failed job immediately.
+- `email_schedule_retry` — reactivate a failed/cancelled job.
+- `email_scheduler_status` — scheduler counts and next queued message.
 - `email_reply`
 - `email_forward`
 - `email_update` — read/favorite/folder/status plus administrator body/subject editing.
@@ -58,6 +67,23 @@ The build exposes 34 tools.
 - `email_set_read`
 
 All outgoing actions pass through the same outbound policy checks and abuse limits as the product.
+
+
+### Persistent scheduled sending
+
+Scheduled jobs are stored as one JSON file per job under:
+
+```text
+localStorage/email-schedules/tasks/
+```
+
+They survive Node/server restarts. The scheduler stores both the original requested time and normalized UTC time. Prefer an explicit ISO-8601 offset:
+
+```text
+2026-09-03T14:30:00+03:00
+```
+
+Alternatively provide `date`, `time`, and `timezoneOffset` separately. The optional `timezone` value is a human-readable label; the numeric offset determines the actual send instant. When the job executes, outbound allow/block rules and the MCP hourly send limit are enforced. If the limit is temporarily exhausted, the job is deferred instead of being discarded. SMTP failures use bounded retries and persisted backoff. If the process stops while a job is actively sending, that job is recovered as `failed` with an unknown-delivery warning so it is not automatically duplicated.
 
 ### Attachments, EML and privacy inspection
 
@@ -106,6 +132,8 @@ These manipulate the same `localStorage/email-abuse-policy.json` used by `/admin
 localStorage/
   vip-email-list.json
   email-abuse-policy.json
+  email-schedules/
+    tasks/*.json
   email-files/
     meta.json
     messages/00..ff/*.json
@@ -307,3 +335,47 @@ location /mcp/ {
 ```
 
 For browser-based MCP clients, CORS preflight is supported. `EMAIL_MCP_CORS_ORIGIN` may be used to replace the default wildcard origin with a specific trusted origin.
+
+## Scheduling examples
+
+Schedule one message for 2:30 PM Cairo offset time:
+
+```json
+{
+  "name": "email_schedule",
+  "arguments": {
+    "from": "sender@social-browser.com",
+    "to": "user@example.com",
+    "subject": "Scheduled message",
+    "text": "Hello from Social Browser Email Manager",
+    "sendAt": "2026-09-03T14:30:00+03:00",
+    "timezone": "Africa/Cairo"
+  }
+}
+```
+
+The same instant can be supplied as separate date/time fields:
+
+```json
+{
+  "name": "email_schedule",
+  "arguments": {
+    "from": "sender@social-browser.com",
+    "to": "user@example.com",
+    "subject": "Scheduled message",
+    "text": "Hello",
+    "date": "2026-09-03",
+    "time": "14:30",
+    "timezoneOffset": "+03:00",
+    "timezone": "Africa/Cairo"
+  }
+}
+```
+
+The returned job includes `sendAt`, `sendAtUtc`, `timezone`, `status`, retry state, and the persistent schedule ID. Use `email_schedule_update`, `email_schedule_cancel`, or `email_schedule_send_now` with that ID.
+
+## Scheduling and deliverability
+
+The MCP currently exposes 51 tools. For natural-language future sending requests, agents should select `email_schedule` and convert the requested time to an explicit ISO-8601 `sendAt` value with a timezone offset. `email_send` is for immediate delivery only.
+
+All real outbound sends are additionally protected by the persistent Deliverability Engine documented in `DELIVERABILITY_ENGINE.md`. Before a large or repeated campaign, clients can call `email_deliverability_status` and `email_deliverability_preflight`. Suppressed recipients, domain/provider pacing, warm-up limits and open circuit breakers cannot be bypassed by normal send tools.

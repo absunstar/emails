@@ -137,6 +137,7 @@ function createEmailService(options) {
     const logger = typeof options.logger === 'function' ? options.logger : () => {};
     const sendmail = options.sendmail;
     const abusePolicy = options.abusePolicy || null;
+    const deliverability = options.deliverability || null;
     if (typeof sendmail !== 'function') throw new Error('sendmail function is required');
 
     let store;
@@ -216,6 +217,18 @@ function createEmailService(options) {
                 if (!decision.allowed) throw new Error(decision.reason || 'Outbound message blocked by server policy');
             }
         }
+        const allRecipients = recipients.concat(ccRecipients);
+        if (deliverability && typeof deliverability.preflight === 'function') {
+            const decision = deliverability.preflight(fromAddresses[0], allRecipients);
+            if (!decision.allowed) {
+                const error = new Error(decision.reason || 'Outbound message paused by deliverability policy');
+                error.code = decision.code || 'DELIVERABILITY_BLOCKED';
+                error.retryAfterMs = Number(decision.retryAfterMs || 0);
+                error.permanent = decision.permanent === true;
+                error.deliverability = decision;
+                throw error;
+            }
+        }
 
         const doc = {
             guid: makeGuid('sent'),
@@ -250,6 +263,7 @@ function createEmailService(options) {
             doc.status = 'sent';
             doc.transportReply = typeof reply === 'string' ? reply : '';
             await store.saveMessage(doc);
+            if (deliverability && typeof deliverability.recordSuccess === 'function') deliverability.recordSuccess(allRecipients);
             await store.audit(auditAction || 'email_send', { guid: doc.guid, from: doc.from, to: doc.to, subject: doc.subject, success: true });
             return { sent: true, guid: doc.guid, from: doc.from, to: doc.to, subject: doc.subject, date: doc.date };
         } catch (error) {
@@ -257,6 +271,7 @@ function createEmailService(options) {
             doc.status = 'failed';
             doc.error = error?.message || String(error);
             await store.saveMessage(doc);
+            if (deliverability && typeof deliverability.recordFailure === 'function') deliverability.recordFailure(allRecipients, error);
             await store.audit(auditAction || 'email_send', { guid: doc.guid, from: doc.from, to: doc.to, subject: doc.subject, success: false, error: doc.error });
             throw error;
         }
@@ -297,6 +312,9 @@ function createEmailService(options) {
                 attachments,
             };
             const saved = await store.saveMessage(doc);
+            if (deliverability && typeof deliverability.ingestFeedback === 'function') {
+                try { deliverability.ingestFeedback(message); } catch (error) { logger('Deliverability feedback detection failed: ' + (error?.message || error)); }
+            }
             if (saved.cleanup?.deleted?.length) {
                 await store.audit('automatic_cleanup', {
                     reason: 'message-count-exceeded',

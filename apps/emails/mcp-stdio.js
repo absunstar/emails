@@ -9,12 +9,18 @@ function sendmail(message, callback) {
 }
 const { createEmailService } = require('./core/email-service');
 const { createEmailAbusePolicy } = require('./core/abuse-policy');
+const { createEmailScheduler } = require('./core/email-scheduler');
+const { createEmailDeliverabilityEngine } = require('./core/deliverability-engine');
 const { createEmailMcpService } = require('./mcp-service');
 const { dispatchRpc, MODERN_PROTOCOL, SERVER_INFO } = require('./mcp-server');
 
 const cwd = process.cwd();
 const policy = createEmailAbusePolicy({
     filePath: process.env.EMAIL_POLICY_FILE || path.join(cwd, 'localStorage', 'email-abuse-policy.json'),
+});
+const deliverability = createEmailDeliverabilityEngine({
+    baseDir: process.env.EMAIL_DELIVERABILITY_DIR || path.join(cwd, 'localStorage', 'email-deliverability'),
+    logger: () => {},
 });
 const emailService = createEmailService({
     sendmail,
@@ -23,8 +29,16 @@ const emailService = createEmailService({
     maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 10000),
     logger: () => {},
     abusePolicy: policy,
+    deliverability,
 });
-const service = createEmailMcpService({ emailService, abusePolicy: policy });
+const scheduler = createEmailScheduler({
+    emailService,
+    abusePolicy: policy,
+    baseDir: process.env.EMAIL_SCHEDULE_DIR || path.join(cwd, 'localStorage', 'email-schedules'),
+    logger: () => {},
+    intervalMs: Number(process.env.EMAIL_SCHEDULE_TICK_MS || 5000),
+}).start();
+const service = createEmailMcpService({ emailService, abusePolicy: policy, scheduler, deliverability });
 const session = {
     id: 'stdio',
     createdAt: Date.now(),

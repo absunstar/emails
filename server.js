@@ -8,6 +8,8 @@ const sendmail = require('sendmail')();
 const { createEmailService } = require('./apps/emails/core/email-service');
 const { createEmailAbusePolicy } = require('./apps/emails/core/abuse-policy');
 const { createEmailMcpService } = require('./apps/emails/mcp-service');
+const { createEmailScheduler } = require('./apps/emails/core/email-scheduler');
+const { createEmailDeliverabilityEngine } = require('./apps/emails/core/deliverability-engine');
 const { startEmailMcpServer } = require('./apps/emails/mcp-server');
 
 const site = require('../isite')({
@@ -53,6 +55,11 @@ site.emailAbusePolicy = createEmailAbusePolicy({
     },
 });
 
+site.emailDeliverability = createEmailDeliverabilityEngine({
+    baseDir: process.env.EMAIL_DELIVERABILITY_DIR || path.join(site.cwd, 'localStorage', 'email-deliverability'),
+    logger: (message) => site.log(message),
+});
+
 site.emailService = createEmailService({
     sendmail,
     dataDir: process.env.EMAIL_DATA_DIR || path.join(site.cwd, 'localStorage', 'email-files'),
@@ -60,6 +67,7 @@ site.emailService = createEmailService({
     maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 10000),
     logger: (message) => site.log(message),
     abusePolicy: site.emailAbusePolicy,
+    deliverability: site.emailDeliverability,
 });
 site.emailStore = site.emailService.store;
 
@@ -235,9 +243,18 @@ smtpServer.on('error', (err) => console.error('SMTP Error %s', err.message));
 smtpServer.listen(Number(process.env.EMAIL_SMTP_PORT || 25), process.env.EMAIL_SMTP_HOST || undefined);
 
 const mcpSecret = 'SOCIALBROWERMANAGER';
+site.emailScheduler = site.emailScheduler || createEmailScheduler({
+    emailService: site.emailService,
+    abusePolicy: site.emailAbusePolicy,
+    baseDir: process.env.EMAIL_SCHEDULE_DIR || path.join(site.cwd, 'localStorage', 'email-schedules'),
+    logger: (message) => site.log(message),
+    intervalMs: Number(process.env.EMAIL_SCHEDULE_TICK_MS || 5000),
+}).start();
 const mcpService = createEmailMcpService({
     emailService: site.emailService,
     abusePolicy: site.emailAbusePolicy,
+    scheduler: site.emailScheduler,
+    deliverability: site.emailDeliverability,
 });
 site.emailMcpServer = startEmailMcpServer({
     service: mcpService,

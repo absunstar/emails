@@ -14,6 +14,15 @@ async function main() {
         async stats(args) { calls.push(['stats', args]); return { total: 1, unread: 1, favorite: 0 }; },
         async send(args) { calls.push(['send', args]); return { sent: true, guid: 'g2' }; },
         async sendBulk(args) { calls.push(['sendBulk', args]); return { requested: args.messages.length, sent: args.messages.length, failed: 0 }; },
+        async schedule(args) { calls.push(['schedule', args]); return { id: 'schedule_1', status: 'scheduled', sendAtUtc: args.sendAt || '2026-09-03T10:00:00.000Z' }; },
+        async scheduleBulk(args) { calls.push(['scheduleBulk', args]); return { scheduled: args.messages.length, tasks: args.messages.map((_, i) => ({ id: 'schedule_' + (i + 1), status: 'scheduled' })) }; },
+        async schedulesList(args) { calls.push(['schedulesList', args]); return { count: 1, total: 1, tasks: [{ id: 'schedule_1', status: 'scheduled' }] }; },
+        async scheduleGet(args) { calls.push(['scheduleGet', args]); return { id: args.id, status: 'scheduled', message: { subject: 'Scheduled' } }; },
+        async scheduleUpdate(args) { calls.push(['scheduleUpdate', args]); return { id: args.id, status: 'scheduled' }; },
+        async scheduleCancel(args) { calls.push(['scheduleCancel', args]); return { id: args.id, status: 'cancelled' }; },
+        async scheduleSendNow(args) { calls.push(['scheduleSendNow', args]); return { id: args.id, status: 'sent' }; },
+        async scheduleRetry(args) { calls.push(['scheduleRetry', args]); return { id: args.id, status: 'scheduled' }; },
+        async schedulerStatus() { calls.push(['schedulerStatus']); return { enabled: true, total: 1, counts: { scheduled: 1 } }; },
         async reply(args) { calls.push(['reply', args]); return { sent: true, guid: 'g3' }; },
         async forward(args) { calls.push(['forward', args]); return { sent: true, guid: 'g4' }; },
         async update(args) { calls.push(['update', args]); return { guid: args.guid, ...args.patch }; },
@@ -85,7 +94,7 @@ async function main() {
         assert.ok(TOOLS.length >= 34);
         for (const name of [
             'email_capabilities', 'email_search', 'email_forward', 'email_update_bulk', 'email_attachment_read', 'email_eml_export',
-            'email_analyze', 'email_vip_set', 'email_folder_create', 'email_policy_get', 'email_policy_export', 'email_policy_import', 'email_policy_rule_add', 'email_policy_limit_set',
+            'email_analyze', 'email_vip_set', 'email_folder_create', 'email_schedule', 'email_schedule_bulk', 'email_schedules_list', 'email_scheduler_status', 'email_policy_get', 'email_policy_export', 'email_policy_import', 'email_policy_rule_add', 'email_policy_limit_set',
         ]) assert.ok(list.json.result.tools.some((t) => t.name === name), 'missing tool ' + name);
 
         const call = await modernPost(4, 'tools/call', { name: 'email_search', arguments: { query: 'hello', favorite: true, sortBy: 'subject', sortDir: 'asc', limit: 5 } }, 'email_search');
@@ -101,20 +110,23 @@ async function main() {
         const limit = await modernPost(7, 'tools/call', { name: 'email_policy_limit_set', arguments: { group: 'smtp', key: 'connectionsPerMinute', value: 30 } }, 'email_policy_limit_set');
         assert.equal(limit.json.result.structuredContent.value, 30);
 
-        const resetDenied = await modernPost(8, 'tools/call', { name: 'email_policy_reset', arguments: { confirm: false } }, 'email_policy_reset');
+        const scheduled = await modernPost(8, 'tools/call', { name: 'email_schedule', arguments: { from: 'sender@example.com', to: 'user@example.net', subject: 'Later', text: 'hello', sendAt: new Date(Date.now() + 86400000).toISOString() } }, 'email_schedule');
+        assert.equal(scheduled.json.result.structuredContent.status, 'scheduled');
+
+        const resetDenied = await modernPost(9, 'tools/call', { name: 'email_policy_reset', arguments: { confirm: false } }, 'email_policy_reset');
         assert.equal(resetDenied.json.result.isError, true);
 
-        const reset = await modernPost(9, 'tools/call', { name: 'email_policy_reset', arguments: { confirm: true } }, 'email_policy_reset');
+        const reset = await modernPost(10, 'tools/call', { name: 'email_policy_reset', arguments: { confirm: true } }, 'email_policy_reset');
         assert.equal(reset.json.result.isError, undefined);
 
-        const badHeaders = await modernPost(10, 'tools/call', { name: 'email_search', arguments: {} }, 'email_read');
+        const badHeaders = await modernPost(11, 'tools/call', { name: 'email_search', arguments: {} }, 'email_read');
         assert.equal(badHeaders.response.status, 400);
         assert.equal(badHeaders.json.error.code, -32020);
 
         const health = await fetch(`http://127.0.0.1:${port}/health`);
         assert.equal(health.status, 200);
         const healthJson = await health.json();
-        assert.equal(healthJson.version, '4.0.0');
+        assert.equal(healthJson.version, require('../apps/emails/mcp-server').SERVER_INFO.version);
 
         console.log('MCP manager protocol and capability tests passed (' + TOOLS.length + ' tools)');
     } finally {

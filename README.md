@@ -50,7 +50,7 @@ http://127.0.0.1:60026/mcp/SOCIALBROWERMANAGER
 
 It starts automatically on `127.0.0.1:60026` by default. `EMAIL_MCP_HOST`, `EMAIL_MCP_PORT`, and optional `EMAIL_MCP_BEARER_TOKEN` remain configurable; `EMAIL_MCP_SECRET` is no longer required. Because the fixed path has full manager authority, keep the listener on localhost and use an additional trusted HTTPS/reverse-proxy security layer before remote production exposure.
 
-The MCP currently exposes 34 tools covering global/domain search, pagination/sorting, complete reads, mailbox status, stats, send/bulk send, reply, forward, favorites, folders, bulk updates, attachments, EML export, remote-image/tracking-pixel analysis, VIP management, deletion, and complete Security & Policies control including rules, limits, tests and live activity.
+The MCP currently exposes 43 tools covering global/domain search, pagination/sorting, complete reads, mailbox status, stats, send/bulk send, persistent scheduled sending, reply, forward, favorites, folders, bulk updates, attachments, EML export, remote-image/tracking-pixel analysis, VIP management, deletion, and complete Security & Policies control including rules, limits, tests and live activity.
 
 See `MCP_SETUP.md` for the complete tool inventory and deployment details.
 

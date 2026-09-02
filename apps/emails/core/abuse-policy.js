@@ -91,9 +91,11 @@ function defaultConfig(initial) {
             },
             outbound: {
                 enabled: true,
-                perHour: 20,
-                adminPerHour: 200,
+                perHour: 60,
+                adminPerHour: 500,
                 apiPerHour: 120,
+                mcpPerHour: 500,
+                bulkMaxMessages: 100,
             },
         },
         updatedAt: new Date().toISOString(),
@@ -206,10 +208,15 @@ function sanitizeConfig(input, fallback) {
     base.limits.http.expensivePerMinute = boundedNumber(http.expensivePerMinute, base.limits.http.expensivePerMinute, 1, 100000);
     base.limits.http.maxBodyBytes = boundedNumber(http.maxBodyBytes, base.limits.http.maxBodyBytes, 16 * 1024, 20 * 1024 * 1024);
     base.limits.outbound.enabled = booleanValue(outbound.enabled, base.limits.outbound.enabled);
-    base.limits.outbound.perHour = boundedNumber(outbound.perHour, base.limits.outbound.perHour, 1, 10000);
-    base.limits.outbound.adminPerHour = boundedNumber(outbound.adminPerHour, base.limits.outbound.adminPerHour, 1, 100000);
+    const legacyVersion = Number(source.version || 1);
+    const perHourInput = legacyVersion < 2 && Number(outbound.perHour) === 20 ? 60 : outbound.perHour;
+    const adminPerHourInput = legacyVersion < 2 && Number(outbound.adminPerHour) === 200 ? 500 : outbound.adminPerHour;
+    base.limits.outbound.perHour = boundedNumber(perHourInput, base.limits.outbound.perHour, 1, 10000);
+    base.limits.outbound.adminPerHour = boundedNumber(adminPerHourInput, base.limits.outbound.adminPerHour, 1, 100000);
     base.limits.outbound.apiPerHour = boundedNumber(outbound.apiPerHour, base.limits.outbound.apiPerHour, 1, 100000);
-    base.version = 1;
+    base.limits.outbound.mcpPerHour = boundedNumber(outbound.mcpPerHour, base.limits.outbound.mcpPerHour, 1, 100000);
+    base.limits.outbound.bulkMaxMessages = boundedNumber(outbound.bulkMaxMessages, base.limits.outbound.bulkMaxMessages, 1, 1000);
+    base.version = 2;
     base.updatedAt = new Date().toISOString();
     return base;
 }
@@ -415,8 +422,8 @@ class EmailAbusePolicy {
     outboundHit(key, mode) {
         const limits = this.config.limits.outbound;
         if (!limits.enabled) return { allowed: true };
-        const type = mode === 'admin' || mode === true ? 'admin' : (mode === 'api' ? 'api' : 'browser');
-        const limit = type === 'admin' ? limits.adminPerHour : (type === 'api' ? limits.apiPerHour : limits.perHour);
+        const type = mode === 'mcp' ? 'mcp' : (mode === 'admin' || mode === true ? 'admin' : (mode === 'api' ? 'api' : 'browser'));
+        const limit = type === 'mcp' ? limits.mcpPerHour : (type === 'admin' ? limits.adminPerHour : (type === 'api' ? limits.apiPerHour : limits.perHour));
         const rate = this.rateLimiter.hit('outbound-' + type, key || 'unknown', limit, 60 * 60 * 1000);
         if (!rate.allowed) {
             this.metrics.outboundRateLimited += 1;

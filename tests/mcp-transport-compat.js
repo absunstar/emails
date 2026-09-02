@@ -204,7 +204,7 @@ async function main() {
 
         const health = await fetch(base + '/health');
         const healthJson = await health.json();
-        assert.equal(healthJson.version, '4.0.0');
+        assert.equal(healthJson.version, require('../apps/emails/mcp-server').SERVER_INFO.version);
         assert.ok(healthJson.transports.includes('sse-legacy'));
         assert.ok(healthJson.transports.includes('streamable-http-stateless'));
         assert.ok(healthJson.methods.includes('DELETE'));

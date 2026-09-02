@@ -34,8 +34,11 @@ The same admin screen controls:
 - Admin requests per minute.
 - Expensive/global searches per minute.
 - Maximum HTTP request body size.
-- Social Browser Send/Reply/Forward operations per hour.
-- Admin Send/Reply/Forward operations per hour.
+- Social Browser Send/Reply/Forward operations per hour (safe default: 60).
+- Admin Send/Reply/Forward operations per hour (safe default: 500).
+- MCP actual sends per hour, including scheduled deliveries (safe default: 500).
+- Legacy/API sends per hour (safe default: 120).
+- Maximum messages in one bulk MCP request (safe default: 100).
 
 ## Attachment path safety
 
@@ -56,3 +59,8 @@ Authorized Admin API requests bypass the public IP allow/block policy so an admi
 ## Import / Export
 
 The Security & Policies screen can export the entire policy to JSON and import it on another installation. Imported settings are not applied until **Save changes** is clicked.
+
+
+## MCP bulk and scheduled-send accounting
+
+MCP bulk requests do not count as one send. Every actual message consumes one MCP outbound-rate slot. Scheduled jobs consume their slot when they execute, not when they are created. If a scheduled job reaches the hourly limit, it remains persisted and is deferred until the limiter allows another attempt.

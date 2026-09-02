@@ -29,8 +29,8 @@
 
 ## Server features
 
-- 34 email/admin/security tools
-- Native MCP resources and resource templates
+- 43 email/admin/security/scheduling tools
+- Native MCP resources and resource templates, including scheduled-email queue resources
 - Native MCP prompts
 - Argument completion
 - Text and binary resource contents

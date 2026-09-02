@@ -1,0 +1,102 @@
+'use strict';
+
+const path = require('path');
+const readline = require('readline');
+let sendmailImpl = null;
+function sendmail(message, callback) {
+    if (!sendmailImpl) sendmailImpl = require('sendmail')();
+    return sendmailImpl(message, callback);
+}
+const { createEmailService } = require('./core/email-service');
+const { createEmailAbusePolicy } = require('./core/abuse-policy');
+const { createEmailMcpService } = require('./mcp-service');
+const { dispatchRpc, MODERN_PROTOCOL, SERVER_INFO } = require('./mcp-server');
+
+const cwd = process.cwd();
+const policy = createEmailAbusePolicy({
+    filePath: process.env.EMAIL_POLICY_FILE || path.join(cwd, 'localStorage', 'email-abuse-policy.json'),
+});
+const emailService = createEmailService({
+    sendmail,
+    dataDir: process.env.EMAIL_DATA_DIR || path.join(cwd, 'localStorage', 'email-files'),
+    vipPath: process.env.EMAIL_VIP_FILE || path.join(cwd, 'localStorage', 'vip-email-list.json'),
+    maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 10000),
+    logger: () => {},
+    abusePolicy: policy,
+});
+const service = createEmailMcpService({ emailService, abusePolicy: policy });
+const session = {
+    id: 'stdio',
+    createdAt: Date.now(),
+    lastSeenAt: Date.now(),
+    protocolVersion: '',
+    clientInfo: {},
+    clientCapabilities: {},
+    logLevel: 'info',
+    resourceSubscriptions: new Set(),
+    streams: new Set(),
+};
+
+function write(value) {
+    process.stdout.write(JSON.stringify(value) + '\n');
+}
+
+function error(id, code, message) {
+    return { jsonrpc: '2.0', id: id ?? null, error: { code, message } };
+}
+
+function isModern(body) {
+    const version = body?.params?._meta?.['io.modelcontextprotocol/protocolVersion'];
+    return version === MODERN_PROTOCOL || body?.method === 'server/discover' || body?.method === 'subscriptions/listen';
+}
+
+async function handle(body) {
+    if (!body || Array.isArray(body) || body.jsonrpc !== '2.0' || typeof body.method !== 'string') {
+        write(error(body?.id, -32600, 'Invalid Request'));
+        return;
+    }
+    session.lastSeenAt = Date.now();
+    if (body.method === 'subscriptions/listen' && isModern(body)) {
+        const requested = body?.params?.notifications || {};
+        write({
+            jsonrpc: '2.0',
+            method: 'notifications/subscriptions/acknowledged',
+            params: {
+                notifications: {
+                    toolsListChanged: !!requested.toolsListChanged,
+                    promptsListChanged: !!requested.promptsListChanged,
+                    resourcesListChanged: !!requested.resourcesListChanged,
+                    resourceSubscriptions: Array.isArray(requested.resourceSubscriptions) ? requested.resourceSubscriptions.slice(0, 100) : [],
+                },
+                _meta: { 'io.modelcontextprotocol/subscriptionId': String(body.id) },
+            },
+        });
+        return;
+    }
+    try {
+        const result = await dispatchRpc(body, {
+            modern: isModern(body),
+            service,
+            scope: { ip: 'stdio', client: 'stdio-agent', sessionId: 'stdio' },
+            session,
+        });
+        if (result?.payload) write(result.payload);
+    } catch (err) {
+        write(error(body.id, -32603, err?.message || String(err)));
+    }
+}
+
+const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity, terminal: false });
+let queue = Promise.resolve();
+rl.on('line', (line) => {
+    const text = String(line || '').trim();
+    if (!text) return;
+    queue = queue.then(async () => {
+        let body;
+        try { body = JSON.parse(text); }
+        catch (_) { write(error(null, -32700, 'Parse error')); return; }
+        await handle(body);
+    });
+});
+rl.on('close', () => queue.finally(() => process.exit(0)));
+process.stderr.write(SERVER_INFO.name + ' MCP stdio ready\n');

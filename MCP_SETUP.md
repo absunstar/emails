@@ -151,3 +151,159 @@ node tests/mcp-smoke.js
 ```
 
 The MCP smoke test verifies the fixed manager path, modern/legacy handshakes, discovery, tool listing, advanced search, favorite/folder update, policy rule management, limit management, destructive confirmation and protocol headers.
+
+## Universal MCP transport compatibility
+
+This build supports multiple MCP transport generations on the same manager service.
+
+### Modern Streamable HTTP
+
+Use this URL for current remote MCP clients:
+
+```text
+https://emails.social-browser.com/mcp/SOCIALBROWERMANAGER
+```
+
+Supported modern revision:
+
+```text
+2026-07-28
+```
+
+The modern endpoint is stateless and supports `server/discover`, header-routed calls, JSON responses, SSE responses when requested, and `subscriptions/listen` SSE streams.
+
+### 2025-era Streamable HTTP
+
+The same URL also accepts initialize-handshake clients using:
+
+```text
+2025-11-25
+2025-06-18
+2025-03-26
+2024-11-05
+2024-10-07
+```
+
+An initialize response includes `Mcp-Session-Id`. The same endpoint then supports POST requests, the legacy long-lived GET stream, and DELETE session shutdown.
+
+### Legacy HTTP + SSE
+
+Older SSE-only clients can connect to:
+
+```text
+https://emails.social-browser.com/mcp/SOCIALBROWERMANAGER/sse
+```
+
+The server sends an `endpoint` SSE event pointing the client to the matching message POST endpoint:
+
+```text
+https://emails.social-browser.com/mcp/SOCIALBROWERMANAGER/message?sessionId=...
+```
+
+Do not manually construct the session id; use the endpoint event returned by the SSE connection.
+
+### STDIO
+
+Local/desktop MCP hosts that prefer STDIO can run:
+
+```bash
+npm run mcp:stdio
+```
+
+The STDIO process exposes the same email manager tools, resources and prompts over line-delimited JSON-RPC on stdin/stdout.
+
+### HTTP methods
+
+The HTTP MCP listener supports:
+
+```text
+POST     JSON-RPC calls and Streamable HTTP
+GET      legacy/stateful SSE stream
+DELETE   terminate a legacy MCP session
+OPTIONS  CORS/preflight capability discovery
+HEAD     endpoint availability probe
+```
+
+`PUT` and `PATCH` are not MCP transport methods and are intentionally not used.
+
+## MCP protocol methods
+
+The server handles the server-side core methods relevant to an email MCP server:
+
+```text
+initialize
+server/discover
+ping
+tools/list
+tools/call
+resources/list
+resources/templates/list
+resources/read
+resources/subscribe
+resources/unsubscribe
+prompts/list
+prompts/get
+completion/complete
+logging/setLevel
+subscriptions/listen
+notifications/initialized
+notifications/cancelled
+notifications/progress
+notifications/roots/list_changed
+```
+
+Unknown JSON-RPC notifications are safely accepted without creating a response, while unknown request methods return the standard `-32601 Method not found` response.
+
+The server does not advertise client-side capabilities such as sampling or roots as server capabilities. Those methods are requests a server may send to a capable client, not additional email-manager operations.
+
+## MCP resources
+
+Besides tools, compatible clients can use native MCP resources:
+
+```text
+email-manager://capabilities
+email-manager://stats
+email-manager://folders
+email-manager://vip
+email-manager://security-policy
+email-manager://security-status
+email-manager://message/{guid}
+email-manager://eml/{guid}
+email-manager://attachment/{guid}/{attachmentId}
+```
+
+Binary EML/attachment resources are returned using standard base64 `blob` resource contents.
+
+## MCP prompts and completion
+
+Native prompts are exposed for common agent workflows:
+
+```text
+summarize_recent_email
+review_unread_email
+draft_reply
+security_audit
+mailbox_cleanup_plan
+```
+
+`completion/complete` supplies common argument suggestions such as reply tone, day ranges and folder names.
+
+## SSE reverse-proxy requirements
+
+The same `/mcp/` Nginx location can serve Streamable HTTP and legacy SSE. Keep buffering disabled and allow long reads:
+
+```nginx
+location /mcp/ {
+    proxy_pass http://127.0.0.1:60026;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+}
+```
+
+For browser-based MCP clients, CORS preflight is supported. `EMAIL_MCP_CORS_ORIGIN` may be used to replace the default wildcard origin with a specific trusted origin.

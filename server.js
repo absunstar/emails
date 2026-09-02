@@ -246,7 +246,9 @@ site.emailMcpServer = startEmailMcpServer({
     host: process.env.EMAIL_MCP_HOST || '127.0.0.1',
     port: Number(process.env.EMAIL_MCP_PORT || 60026),
     onListen(info) {
-        site.log('Email MCP listening on http://' + info.host + ':' + info.port + info.path);
+        site.log('Email MCP Streamable HTTP: http://' + info.host + ':' + info.port + info.path);
+        site.log('Email MCP Legacy SSE: http://' + info.host + ':' + info.port + info.ssePath);
+        site.log('Email MCP STDIO: npm run mcp:stdio');
     },
 });
 

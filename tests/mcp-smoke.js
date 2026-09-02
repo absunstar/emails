@@ -114,7 +114,7 @@ async function main() {
         const health = await fetch(`http://127.0.0.1:${port}/health`);
         assert.equal(health.status, 200);
         const healthJson = await health.json();
-        assert.equal(healthJson.version, '3.0.0');
+        assert.equal(healthJson.version, '4.0.0');
 
         console.log('MCP manager protocol and capability tests passed (' + TOOLS.length + ' tools)');
     } finally {

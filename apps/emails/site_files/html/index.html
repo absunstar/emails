@@ -21,6 +21,22 @@
                     <svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6l8-3Z"></path><path d="M9 12l2 2 4-5"></path></svg>
                     <span>Security &amp; Policies</span>
                 </button>
+                <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="open-schedules">
+                    <svg class="ui-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5l3 2"></path></svg>
+                    <span>Schedules</span>
+                </button>
+                <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="open-deliverability">
+                    <svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 18h16"></path><path d="M6 15V9M10 15V5M14 15v-3M18 15V7"></path></svg>
+                    <span>Deliverability</span>
+                </button>
+                <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="open-operations">
+                    <svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 7h16v12H4z"></path><path d="M7 7V4h10v3M8 11h8M8 15h5"></path></svg>
+                    <span>Backup &amp; Storage</span>
+                </button>
+                <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="open-health">
+                    <svg class="ui-icon" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6"></path></svg>
+                    <span>Health</span>
+                </button>
                 <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="refresh">
                     <svg class="ui-icon" viewBox="0 0 24 24"><path d="M20 6v6h-6"></path><path d="M19 12a7 7 0 1 0-2 5"></path></svg>
                     <span>Refresh</span>
@@ -346,6 +362,169 @@
                     </div>
                     <div class="mail-policy-events"><div class="mail-policy-events-head"><h4>Recent protection events</h4><span>Last 40 runtime events</span></div><div data-policy-events></div></div>
                 </section>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="adminSchedulesModal" class="modal" hidden>
+        <div class="modal-content mail-admin-ops-modal">
+            <div class="modal-header">
+                <div><small class="mail-admin-kicker">PERSISTENT SCHEDULER</small><h2>Scheduled Emails</h2><p>Create, edit, retry, cancel or send scheduled messages now. Tasks survive server restarts.</p></div>
+                <button class="sb-modal-close" type="button" data-modal-close="#adminSchedulesModal">×</button>
+            </div>
+            <div class="mail-ops-toolbar">
+                <div class="mail-ops-metrics" data-schedule-metrics></div>
+                <div class="mail-ops-actions">
+                    <select class="sb-select" data-schedule-filter><option value="">All statuses</option><option value="scheduled">Scheduled</option><option value="sending">Sending</option><option value="sent">Sent</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option></select>
+                    <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="schedule-refresh">Refresh</button>
+                    <button class="sb-btn" type="button" data-admin-action="schedule-new">New schedule</button>
+                </div>
+            </div>
+            <div class="modal-body mail-admin-ops-body">
+                <section class="mail-schedule-editor" data-schedule-editor hidden>
+                    <div class="mail-ops-section-head"><div><h3 data-schedule-editor-title>New scheduled email</h3><p>Use an ISO date/time with an explicit UTC offset. The server stores the normalized UTC time.</p></div><button type="button" class="sb-btn sb-btn-ghost" data-admin-action="schedule-editor-close">Close</button></div>
+                    <form class="sb-form-grid" data-schedule-form>
+                        <input type="hidden" name="id">
+                        <div class="sb-field"><label>From</label><input class="sb-input" name="from" type="email" required></div>
+                        <div class="sb-field"><label>To</label><input class="sb-input" name="to" type="text" required></div>
+                        <div class="sb-field"><label>Cc</label><input class="sb-input" name="cc" type="text"></div>
+                        <div class="sb-field"><label>Send at</label><input class="sb-input" name="sendAt" type="text" placeholder="2026-09-03T15:00:00+03:00" required></div>
+                        <div class="sb-field wide"><label>Subject</label><input class="sb-input" name="subject" type="text"></div>
+                        <div class="sb-field wide"><label>Text message</label><textarea class="sb-textarea" name="text"></textarea></div>
+                        <div class="sb-field wide"><label>HTML message</label><textarea class="sb-textarea" name="html"></textarea></div>
+                        <div class="sb-field"><label>Max retries</label><input class="sb-input" name="maxRetries" type="number" min="0" max="10" value="3"></div>
+                        <div class="sb-field"><label>Retry delay seconds</label><input class="sb-input" name="retryDelaySeconds" type="number" min="30" value="300"></div>
+                    </form>
+                    <div class="mail-ops-inline-actions"><button class="sb-btn" type="button" data-admin-action="schedule-save">Save schedule</button><button class="sb-btn sb-btn-ghost" type="button" data-admin-action="schedule-editor-close">Cancel</button></div>
+                </section>
+                <div class="mail-ops-table-wrap">
+                    <table class="mail-ops-table">
+                        <thead><tr><th>Send time</th><th>From</th><th>To</th><th>Subject</th><th>Status</th><th>Attempts</th><th>Actions</th></tr></thead>
+                        <tbody data-schedule-list></tbody>
+                    </table>
+                    <div class="mail-ops-empty" data-schedule-empty hidden>No scheduled emails match this filter.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminDeliverabilityModal" class="modal" hidden>
+        <div class="modal-content mail-admin-ops-modal">
+            <div class="modal-header">
+                <div><small class="mail-admin-kicker">SENDER REPUTATION</small><h2>Deliverability Control</h2><p>Monitor provider pacing, warm-up, bounces, complaints, circuit breakers and suppression decisions.</p></div>
+                <button class="sb-modal-close" type="button" data-modal-close="#adminDeliverabilityModal">×</button>
+            </div>
+            <div class="mail-ops-tabs">
+                <button type="button" class="is-active" data-admin-action="deliverability-tab" data-deliverability-tab="overview">Overview</button>
+                <button type="button" data-admin-action="deliverability-tab" data-deliverability-tab="suppressions">Suppressions</button>
+                <button type="button" data-admin-action="deliverability-tab" data-deliverability-tab="settings">Settings</button>
+                <button type="button" data-admin-action="deliverability-tab" data-deliverability-tab="feedback">Feedback &amp; FBL</button>
+            </div>
+            <div class="modal-body mail-admin-ops-body">
+                <section data-deliverability-pane="overview">
+                    <div class="mail-ops-section-head"><div><h3>Provider health</h3><p>Internal conservative limits protect sender reputation. They are not provider-published quotas.</p></div><button class="sb-btn sb-btn-ghost" type="button" data-admin-action="deliverability-refresh">Refresh</button></div>
+                    <div class="mail-delivery-summary" data-deliverability-summary></div>
+                    <div class="mail-provider-grid" data-deliverability-providers></div>
+                    <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Domain</th><th>Provider</th><th>Health</th><th>Today</th><th>Hard bounce</th><th>Complaints</th><th>Failures</th><th>Circuit</th></tr></thead><tbody data-deliverability-domains></tbody></table></div>
+                </section>
+                <section data-deliverability-pane="suppressions" hidden>
+                    <div class="mail-ops-section-head"><div><h3>Suppression list</h3><p>Unsubscribes, complaints and hard bounces are prevented from receiving future outreach.</p></div></div>
+                    <div class="mail-suppression-toolbar">
+                        <input class="sb-input" type="search" data-suppression-search placeholder="Search email, domain, reason...">
+                        <select class="sb-select" data-suppression-type><option value="">All types</option><option value="unsubscribe">Unsubscribe</option><option value="complaint">Complaint</option><option value="hard_bounce">Hard bounce</option><option value="manual">Manual</option></select>
+                        <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="suppression-refresh">Search</button>
+                    </div>
+                    <div class="mail-suppression-add">
+                        <input class="sb-input" type="email" data-suppression-email placeholder="person@example.com">
+                        <select class="sb-select" data-suppression-add-type><option value="manual">Manual</option><option value="unsubscribe">Unsubscribe</option><option value="complaint">Complaint</option><option value="hard_bounce">Hard bounce</option></select>
+                        <input class="sb-input" type="text" data-suppression-reason placeholder="Reason">
+                        <button class="sb-btn" type="button" data-admin-action="suppression-add">Add</button>
+                    </div>
+                    <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Email</th><th>Domain</th><th>Type</th><th>Reason</th><th>Source</th><th>Date</th><th>Action</th></tr></thead><tbody data-suppression-list></tbody></table></div>
+                </section>
+                <section data-deliverability-pane="settings" hidden>
+                    <div class="mail-ops-section-head"><div><h3>Deliverability limits</h3><p>Changes apply immediately to Send, Bulk, Reply, Forward and Scheduler execution.</p></div><button class="sb-btn" type="button" data-admin-action="deliverability-save">Save settings</button></div>
+                    <div class="mail-delivery-settings" data-deliverability-settings></div>
+                </section>
+                <section data-deliverability-pane="feedback" hidden>
+                    <div class="mail-ops-section-head"><div><h3>Feedback loops &amp; one-click unsubscribe</h3><p>Inbound DSN and ARF reports are detected automatically. Provider webhooks can report normalized events when a feedback token is configured.</p></div></div>
+                    <div class="mail-feedback-status" data-feedback-status></div>
+                    <div class="mail-feedback-form">
+                        <input class="sb-input" type="email" data-feedback-email placeholder="recipient@example.com">
+                        <select class="sb-select" data-feedback-type><option value="complaint">Complaint</option><option value="hard_bounce">Hard bounce</option><option value="soft_bounce">Soft bounce</option><option value="unsubscribe">Unsubscribe</option><option value="delivered">Delivered</option></select>
+                        <input class="sb-input" type="text" data-feedback-reason placeholder="Optional reason">
+                        <button class="sb-btn" type="button" data-admin-action="feedback-report">Record feedback</button>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminOperationsModal" class="modal" hidden>
+        <div class="modal-content mail-admin-ops-modal">
+            <div class="modal-header">
+                <div><small class="mail-admin-kicker">BACKUP · DISASTER RECOVERY · DISK</small><h2>Backup &amp; Storage</h2><p>Verified persistent backups, restore previews, retention cleanup, disk quotas, emergency low-space handling and operational history.</p></div>
+                <button class="sb-modal-close" type="button" data-modal-close="#adminOperationsModal">×</button>
+            </div>
+            <div class="modal-body mail-admin-ops-body">
+                <div class="mail-ops-toolbar">
+                    <div class="mail-ops-metrics" data-operations-metrics></div>
+                    <div class="mail-ops-actions">
+                        <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="operations-refresh">Refresh</button>
+                        <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="operations-maintenance">Run maintenance</button>
+                        <button class="sb-btn" type="button" data-admin-action="backup-create">Create backup</button>
+                    </div>
+                </div>
+                <div class="mail-ops-section-head"><div><h3>Storage policy</h3><p>Automatic backup cadence, retention windows and low-space thresholds. Protected/VIP mail is preserved by retention cleanup.</p></div><button class="sb-btn" type="button" data-admin-action="operations-save">Save settings</button></div>
+                <div class="mail-delivery-settings">
+                    <article class="mail-delivery-settings-card"><h4>Backup &amp; retention</h4><div class="mail-delivery-settings-grid">
+                        <label><span>Automatic backups</span><input type="checkbox" data-operations-config="backup.enabled" data-operations-kind="boolean"></label>
+                        <label><span>Verify after backup</span><input type="checkbox" data-operations-config="backup.verifyAfterCreate" data-operations-kind="boolean"></label>
+                        <label><span>Backup every hours</span><input type="number" min="1" max="720" data-operations-config="backup.intervalHours"></label>
+                        <label><span>Keep latest backups</span><input type="number" min="1" max="365" data-operations-config="backup.keepLast"></label>
+                        <label><span>Backup max age days</span><input type="number" min="1" max="3650" data-operations-config="backup.maxAgeDays"></label>
+                        <label><span>Maintenance every minutes</span><input type="number" min="5" max="1440" data-operations-config="maintenance.intervalMinutes"></label>
+                        <label><span>Messages retention days</span><input type="number" min="1" max="3650" data-operations-config="retention.messagesDays"></label>
+                        <label><span>Audit retention days</span><input type="number" min="1" max="3650" data-operations-config="retention.auditDays"></label>
+                        <label><span>Tracking retention days</span><input type="number" min="1" max="3650" data-operations-config="retention.trackingDays"></label>
+                        <label><span>Completed schedules days</span><input type="number" min="1" max="3650" data-operations-config="retention.completedSchedulesDays"></label>
+                        <label><span>Cancelled schedules days</span><input type="number" min="1" max="3650" data-operations-config="retention.cancelledSchedulesDays"></label>
+                        <label><span>Emergency auto-cleanup</span><input type="checkbox" data-operations-config="emergency.autoCleanup" data-operations-kind="boolean"></label>
+                    </div></article>
+                    <article class="mail-delivery-settings-card"><h4>Disk thresholds</h4><div class="mail-delivery-settings-grid">
+                        <label><span>Managed quota GB</span><input type="number" min="0.1" step="0.1" data-operations-config="storage.maxBytes" data-operations-unit="gb"></label>
+                        <label><span>Warning %</span><input type="number" min="1" max="100" data-operations-config="storage.warningPercent"></label>
+                        <label><span>Critical %</span><input type="number" min="1" max="100" data-operations-config="storage.criticalPercent"></label>
+                        <label><span>Emergency %</span><input type="number" min="1" max="100" data-operations-config="storage.emergencyPercent"></label>
+                        <label><span>Hard stop %</span><input type="number" min="1" max="100" data-operations-config="storage.hardStopPercent"></label>
+                        <label><span>Minimum free disk GB</span><input type="number" min="0.05" step="0.05" data-operations-config="storage.minFreeBytes" data-operations-unit="gb"></label>
+                    </div></article>
+                </div>
+                <div class="mail-ops-section-head" style="margin-top:16px"><div><h3>Retention cleanup</h3><p>Preview exact candidates before deletion. Old protected/VIP messages are excluded.</p></div><button class="sb-btn sb-btn-ghost" type="button" data-admin-action="cleanup-preview">Preview cleanup</button></div>
+                <div data-operations-cleanup-preview class="mail-feedback-status"></div>
+                <div class="mail-ops-section-head"><div><h3>Backups</h3><p>Every snapshot contains a SHA-256 manifest. Validate before restore.</p></div></div>
+                <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Date</th><th>Reason</th><th>Files</th><th>Size</th><th>Actions</th></tr></thead><tbody data-operations-backups></tbody></table></div>
+                <div class="mail-ops-section-head" style="margin-top:16px"><div><h3>Storage history</h3><p>Recent maintenance samples make disk growth and quota pressure visible before it becomes an outage.</p></div></div>
+                <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Date</th><th>Status</th><th>Managed</th><th>Quota</th><th>Disk free</th><th>Messages</th><th>Backups</th></tr></thead><tbody data-operations-history></tbody></table></div>
+                <div class="mail-ops-section-head" style="margin-top:16px"><div><h3>Operational alerts</h3><p>Backup, restore, cleanup and disk-pressure events retained by the service. Set <code>EMAIL_OPS_ALERT_WEBHOOK</code> to forward alerts externally.</p></div></div>
+                <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Date</th><th>Level</th><th>Type</th><th>Message</th><th>Details</th></tr></thead><tbody data-operations-alerts></tbody></table></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminHealthModal" class="modal" hidden>
+        <div class="modal-content mail-admin-ops-modal">
+            <div class="modal-header">
+                <div><small class="mail-admin-kicker">PRODUCTION MONITORING</small><h2>Service Health</h2><p>Runtime state for HTTP, SMTP, MCP, Scheduler, memory, queues and recent errors.</p></div>
+                <button class="sb-modal-close" type="button" data-modal-close="#adminHealthModal">×</button>
+            </div>
+            <div class="modal-body mail-admin-ops-body">
+                <div class="mail-ops-section-head"><div><h3>Current status</h3><p data-health-updated>Not loaded yet.</p></div><button class="sb-btn sb-btn-ghost" type="button" data-admin-action="health-refresh">Refresh</button></div>
+                <div class="mail-health-components" data-health-components></div>
+                <div class="mail-health-metrics" data-health-metrics></div>
+                <div class="mail-ops-section-head"><div><h3>Recent runtime errors</h3><p>Most recent errors captured by the production monitor.</p></div></div>
+                <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Date</th><th>Component</th><th>Message</th><th>Details</th></tr></thead><tbody data-health-errors></tbody></table></div>
             </div>
         </div>
     </div>

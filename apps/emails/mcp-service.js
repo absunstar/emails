@@ -28,6 +28,7 @@ function createEmailMcpService(options) {
     const abusePolicy = options.abusePolicy || null;
     const scheduler = options.scheduler || null;
     const deliverability = options.deliverability || null;
+    const operationsManager = options.operationsManager || null;
     if (!emailService) throw new Error('Shared email service is required');
 
     function requestedDomain(args) {
@@ -81,6 +82,11 @@ function createEmailMcpService(options) {
     function deliverabilityRequired() {
         if (!deliverability) throw new Error('Email deliverability service is not available');
         return deliverability;
+    }
+
+    function operationsRequired() {
+        if (!operationsManager) throw new Error('Email backup and storage manager is not available');
+        return operationsManager;
     }
 
     function policyListName(name) {
@@ -146,6 +152,7 @@ function createEmailMcpService(options) {
                     'scheduled-send', 'scheduled-bulk-send', 'schedule-list', 'schedule-update', 'schedule-cancel', 'schedule-send-now', 'schedule-retry',
                     'deliverability-status', 'deliverability-preflight', 'deliverability-config', 'per-domain-throttling', 'provider-throttling', 'warmup-ramp',
                     'bounce-suppression', 'unsubscribe-suppression', 'complaint-suppression', 'delivery-circuit-breaker',
+                    'automatic-backup', 'backup-validation', 'disaster-recovery-preview', 'disaster-recovery-restore', 'disk-quota', 'retention-cleanup', 'emergency-low-space-mode', 'operational-alerts', 'storage-history',
                 ],
             };
         },
@@ -305,6 +312,78 @@ function createEmailMcpService(options) {
             const result = deliverabilityRequired().reportFeedback(args || {});
             await emailService.store.audit('mcp_delivery_feedback', { email: result.email, type: result.type, suppressed: result.suppressed });
             return result;
+        },
+
+        async operationsStatus(scope) {
+            enforceAdminRate(scope, false);
+            return operationsRequired().status();
+        },
+
+        async backupCreate(args, scope) {
+            enforceAdminRate(scope, true);
+            return operationsRequired().createBackup(args || {});
+        },
+
+        async backupsList(scope) {
+            enforceAdminRate(scope, false);
+            return operationsRequired().listBackups();
+        },
+
+        async backupValidate(args, scope) {
+            enforceAdminRate(scope, true);
+            return operationsRequired().validateBackup(args.id);
+        },
+
+        async restorePreview(args, scope) {
+            enforceAdminRate(scope, true);
+            return operationsRequired().restorePreview(args.id, args || {});
+        },
+
+        async restoreExecute(args, scope) {
+            enforceAdminRate(scope, true);
+            return operationsRequired().restore(args.id, args || {});
+        },
+
+        async storageReport(scope) {
+            enforceAdminRate(scope, true);
+            return operationsRequired().storageReport();
+        },
+
+        async storageConfigGet(scope) {
+            enforceAdminRate(scope, false);
+            return { config: operationsRequired().getConfig() };
+        },
+
+        async storageConfigUpdate(args, scope) {
+            enforceAdminRate(scope, true);
+            const config = operationsRequired().updateConfig(args.config || {});
+            await emailService.store.audit('mcp_storage_config_update', { updatedAt: new Date().toISOString() });
+            return { updated: true, config };
+        },
+
+        async cleanupPreview(args, scope) {
+            enforceAdminRate(scope, true);
+            return operationsRequired().cleanupPreview(args || {});
+        },
+
+        async cleanupExecute(args, scope) {
+            enforceAdminRate(scope, true);
+            return operationsRequired().cleanupExecute(args || {});
+        },
+
+        async maintenanceRun(args, scope) {
+            enforceAdminRate(scope, true);
+            return operationsRequired().runMaintenance(args || {});
+        },
+
+        async operationsAlerts(args, scope) {
+            enforceAdminRate(scope, false);
+            return operationsRequired().alerts(args || {});
+        },
+
+        async operationsHistory(args, scope) {
+            enforceAdminRate(scope, false);
+            return { history: operationsRequired().historyList(args?.limit || 144) };
         },
 
         async update(args, scope) {

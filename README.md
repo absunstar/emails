@@ -50,7 +50,7 @@ http://127.0.0.1:60026/mcp/SOCIALBROWERMANAGER
 
 It starts automatically on `127.0.0.1:60026` by default. `EMAIL_MCP_HOST`, `EMAIL_MCP_PORT`, and optional `EMAIL_MCP_BEARER_TOKEN` remain configurable; `EMAIL_MCP_SECRET` is no longer required. Because the fixed path has full manager authority, keep the listener on localhost and use an additional trusted HTTPS/reverse-proxy security layer before remote production exposure.
 
-The MCP currently exposes 43 tools covering global/domain search, pagination/sorting, complete reads, mailbox status, stats, send/bulk send, persistent scheduled sending, reply, forward, favorites, folders, bulk updates, attachments, EML export, remote-image/tracking-pixel analysis, VIP management, deletion, and complete Security & Policies control including rules, limits, tests and live activity.
+The MCP currently exposes 65 tools covering global/domain search, pagination/sorting, complete reads, mailbox status, stats, send/bulk send, persistent scheduled sending, reply, forward, favorites, folders, bulk updates, attachments, EML export, remote-image/tracking-pixel analysis, VIP management, deletion, Security & Policies, deliverability, and backup/disaster-recovery/storage operations.
 
 See `MCP_SETUP.md` for the complete tool inventory and deployment details.
 
@@ -88,3 +88,13 @@ The running server creates `localStorage/email-abuse-policy.json`. Authorized ad
 For reverse-proxy deployments that need real client IP rules, set `EMAIL_TRUST_PROXY=true` only when the proxy is trusted and direct client access cannot spoof `X-Forwarded-For`.
 
 Environment variables such as `EMAIL_BLOCK_FROM`, `EMAIL_ALLOW_TO`, `EMAIL_BLOCK_IPS` and related policy variables are treated as first-run defaults. After the policy JSON exists, the Admin policy file is the runtime source of truth.
+
+## Backup, disaster recovery and disk management
+
+The server now includes a persistent operations manager for verified automatic/manual snapshots, SHA-256 backup validation, restore previews, mandatory pre-restore safety backups, retention by age, disk quotas, emergency low-space cleanup, storage history and operational alerts. Admin controls are available under **Backup & Storage**, and the MCP exposes the same operational surface.
+
+Default snapshots are written under `localStorage/email-backups/`; use `EMAIL_BACKUP_DIR` to place them on another mounted volume. Optional `EMAIL_OPS_ALERT_WEBHOOK` forwards important backup/disk/restore alerts to an external monitoring endpoint. A storage `blocked` state makes `/ready` fail and can temporarily reject inbound SMTP rather than accepting mail that cannot be persisted safely.
+
+See `BACKUP_DISASTER_RECOVERY.md` for the exact backup contents, restore procedure, defaults, environment variables and disaster-recovery runbook.
+
+The separate Final Security Hardening project and real Gmail/Outlook/Yahoo/iCloud provider tests are not part of this release.

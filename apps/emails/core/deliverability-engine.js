@@ -358,10 +358,11 @@ class EmailDeliverabilityEngine {
         const type = String(args.type || '').trim().toLowerCase();
         const query = String(args.query || '').trim().toLowerCase();
         const limit = Math.max(1, Math.min(Number(args.limit || 100), 1000));
-        const items = [];
-        if (!fs.existsSync(this.suppressionsDir)) return { count: 0, items: [] };
+        const offset = Math.max(0, Number(args.offset || 0));
+        const all = [];
+        if (!fs.existsSync(this.suppressionsDir)) return { count: 0, total: 0, offset, limit, items: [] };
         const prefixes = fs.readdirSync(this.suppressionsDir);
-        outer: for (const prefix of prefixes) {
+        for (const prefix of prefixes) {
             const dir = path.join(this.suppressionsDir, prefix);
             let names = [];
             try { names = fs.readdirSync(dir); } catch (_) { continue; }
@@ -370,13 +371,13 @@ class EmailDeliverabilityEngine {
                 const item = readJson(path.join(dir, name), null);
                 if (!item || !item.email) continue;
                 if (type && item.type !== type) continue;
-                if (query && ![item.email, item.domain, item.type, item.reason].some((value) => String(value || '').toLowerCase().includes(query))) continue;
-                items.push(item);
-                if (items.length >= limit) break outer;
+                if (query && ![item.email, item.domain, item.type, item.reason, item.source].some((value) => String(value || '').toLowerCase().includes(query))) continue;
+                all.push(item);
             }
         }
-        items.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
-        return { count: items.length, items };
+        all.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+        const items = all.slice(offset, offset + limit);
+        return { count: items.length, total: all.length, offset, limit, items };
     }
 
     preflight(from, recipients) {
@@ -541,13 +542,23 @@ class EmailDeliverabilityEngine {
     ingestFeedback(message) {
         const from = String(message?.from || '').toLowerCase();
         const subject = String(message?.subject || '').toLowerCase();
-        if (!/(mailer-daemon|postmaster)/.test(from) && !/(delivery status notification|undeliver|returned mail|mail delivery failed|delivery failure)/.test(subject)) return { detected: false };
         const source = [message?.text || '', message?.html || ''].join('\n');
-        const match = source.match(/(?:Final-Recipient|Original-Recipient)\s*:\s*(?:rfc822\s*;\s*)?([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i);
-        if (!match) return { detected: false };
+        const recipientMatch = source.match(/(?:Final-Recipient|Original-Recipient|Original-Rcpt-To|Removal-Recipient|Recipient)\s*:\s*(?:rfc822\s*;\s*)?([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i);
+        const feedbackType = source.match(/Feedback-Type\s*:\s*([a-z-]+)/i);
+        const complaintLike = feedbackType && /^(?:abuse|fraud|virus|other)$/.test(String(feedbackType[1] || '').toLowerCase());
+        if (complaintLike && recipientMatch) {
+            return Object.assign({ detected: true }, this.reportFeedback({
+                email: recipientMatch[1],
+                type: 'complaint',
+                reason: 'Detected from inbound abuse feedback report',
+                source: 'inbound-arf',
+            }));
+        }
+        if (!/(mailer-daemon|postmaster)/.test(from) && !/(delivery status notification|undeliver|returned mail|mail delivery failed|delivery failure)/.test(subject)) return { detected: false };
+        if (!recipientMatch) return { detected: false };
         const status = source.match(/Status\s*:\s*([245]\.\d\.\d)/i);
         const type = status && status[1].startsWith('5.') ? 'hard_bounce' : (status && status[1].startsWith('4.') ? 'soft_bounce' : 'soft_bounce');
-        return Object.assign({ detected: true }, this.reportFeedback({ email: match[1], type, reason: 'Detected from inbound delivery-status notification', source: 'inbound-dsn' }));
+        return Object.assign({ detected: true }, this.reportFeedback({ email: recipientMatch[1], type, reason: 'Detected from inbound delivery-status notification', source: 'inbound-dsn' }));
     }
 
     preflightReport(from, recipients) {
@@ -572,11 +583,15 @@ class EmailDeliverabilityEngine {
         const warmupDailyLimit = this._warmupDailyLimit(now);
         const domains = Object.entries(this.state.domains || {}).map(([domain, counter]) => {
             this._resetCounter(counter, now);
-            return { domain, provider: this._providerForDomain(domain), hourAttempts: counter.hourAttempts, dayAttempts: counter.dayAttempts, sent: counter.sent, failed: counter.failed, hardBounces: counter.hardBounces, softBounces: counter.softBounces, complaints: counter.complaints, unsubscribes: counter.unsubscribes, circuitOpenUntil: counter.circuitOpenUntil, circuitReason: counter.circuitReason };
+            const attempts = Math.max(1, Number(counter.dayAttempts || 0));
+            const health = counter.circuitOpenUntil ? 'paused' : (counter.complaints / attempts * 100 >= this.config.circuitBreaker.complaintRatePercent * 0.7 || counter.hardBounces / attempts * 100 >= this.config.circuitBreaker.hardBounceRatePercent * 0.7 ? 'warning' : 'healthy');
+            return { domain, provider: this._providerForDomain(domain), health, hourAttempts: counter.hourAttempts, dayAttempts: counter.dayAttempts, sent: counter.sent, failed: counter.failed, hardBounces: counter.hardBounces, softBounces: counter.softBounces, complaints: counter.complaints, unsubscribes: counter.unsubscribes, hardBounceRatePercent: this._ratePercent(counter.hardBounces, counter.dayAttempts), complaintRatePercent: this._ratePercent(counter.complaints, counter.dayAttempts), failureRatePercent: this._ratePercent(counter.failed, counter.dayAttempts), circuitOpenUntil: counter.circuitOpenUntil, circuitReason: counter.circuitReason };
         }).sort((a, b) => b.dayAttempts - a.dayAttempts).slice(0, 100);
         const providers = Object.entries(this.state.providers || {}).map(([provider, counter]) => {
             this._resetCounter(counter, now);
-            return { provider, hourAttempts: counter.hourAttempts, dayAttempts: counter.dayAttempts, sent: counter.sent, failed: counter.failed, hardBounces: counter.hardBounces, softBounces: counter.softBounces, complaints: counter.complaints, unsubscribes: counter.unsubscribes, circuitOpenUntil: counter.circuitOpenUntil, circuitReason: counter.circuitReason };
+            const attempts = Math.max(1, Number(counter.dayAttempts || 0));
+            const health = counter.circuitOpenUntil ? 'paused' : (counter.complaints / attempts * 100 >= this.config.circuitBreaker.complaintRatePercent * 0.7 || counter.hardBounces / attempts * 100 >= this.config.circuitBreaker.hardBounceRatePercent * 0.7 ? 'warning' : 'healthy');
+            return { provider, health, hourAttempts: counter.hourAttempts, dayAttempts: counter.dayAttempts, sent: counter.sent, failed: counter.failed, hardBounces: counter.hardBounces, softBounces: counter.softBounces, complaints: counter.complaints, unsubscribes: counter.unsubscribes, hardBounceRatePercent: this._ratePercent(counter.hardBounces, counter.dayAttempts), complaintRatePercent: this._ratePercent(counter.complaints, counter.dayAttempts), failureRatePercent: this._ratePercent(counter.failed, counter.dayAttempts), circuitOpenUntil: counter.circuitOpenUntil, circuitReason: counter.circuitReason };
         }).sort((a, b) => b.dayAttempts - a.dayAttempts);
         this._saveState();
         return {

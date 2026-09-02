@@ -9,6 +9,9 @@ const { createBrowserAuth } = require('./core/browser-auth');
 const { analyzeEmailHtml, sanitizeEmailHtml, qrSvg } = require('./core/message-tools');
 const { createEmailAbusePolicy } = require('./core/abuse-policy');
 const { createEmailDeliverabilityEngine } = require('./core/deliverability-engine');
+const { createEmailRuntimeMonitor } = require('./core/runtime-monitor');
+const { createEmailBackupStorageManager } = require('./core/backup-storage-manager');
+const { createEmailUnsubscribeService } = require('./core/unsubscribe-service');
 
 module.exports = function init(site) {
     const sendmail = require('sendmail')();
@@ -41,6 +44,13 @@ module.exports = function init(site) {
         baseDir: process.env.EMAIL_DELIVERABILITY_DIR || path.join(site.cwd, 'localStorage', 'email-deliverability'),
         logger: (message) => site.log(message),
     });
+    site.emailRuntimeMonitor = site.emailRuntimeMonitor || createEmailRuntimeMonitor();
+    site.emailUnsubscribe = site.emailUnsubscribe || createEmailUnsubscribeService({
+        deliverability: site.emailDeliverability,
+        baseDir: process.env.EMAIL_UNSUBSCRIBE_DIR || path.join(site.cwd, 'localStorage', 'email-unsubscribe'),
+        publicOrigin: process.env.EMAIL_PUBLIC_ORIGIN || 'https://emails.social-browser.com',
+        monitor: site.emailRuntimeMonitor,
+    });
     const service = site.emailService || createEmailService({
         sendmail,
         dataDir: path.join(site.cwd, 'localStorage', 'email-files'),
@@ -49,9 +59,28 @@ module.exports = function init(site) {
         logger: (message) => site.log(message),
         abusePolicy: policy,
         deliverability: site.emailDeliverability,
+        unsubscribe: site.emailUnsubscribe,
+        monitor: site.emailRuntimeMonitor,
     });
     site.emailService = service;
     site.emailStore = service.store;
+    const scheduler = site.emailScheduler || null;
+    site.emailOperationsManager = site.emailOperationsManager || createEmailBackupStorageManager({
+        emailService: service,
+        monitor: site.emailRuntimeMonitor,
+        scheduler,
+        rootDir: path.join(site.cwd, 'localStorage'),
+        backupDir: process.env.EMAIL_BACKUP_DIR || path.join(site.cwd, 'localStorage', 'email-backups'),
+        controlDir: process.env.EMAIL_STORAGE_CONTROL_DIR || path.join(site.cwd, 'localStorage', 'email-storage'),
+        alertWebhook: process.env.EMAIL_OPS_ALERT_WEBHOOK || '',
+        logger: (message) => site.log(message),
+    });
+    if (scheduler) site.emailOperationsManager.setScheduler(scheduler);
+    if (!site.emailOperationsManager.timer) site.emailOperationsManager.start();
+    const operationsManager = site.emailOperationsManager;
+    const deliverability = site.emailDeliverability;
+    const runtimeMonitor = site.emailRuntimeMonitor;
+    const unsubscribe = site.emailUnsubscribe;
     site.trustedBrowserIDs = process.env.EMAIL_TRUSTED_BROWSER_IDS || '*test*|*vip*|*developer*';
     const browserAuth = site.emailBrowserAuth || createBrowserAuth(site);
     site.emailBrowserAuth = browserAuth;
@@ -236,6 +265,86 @@ module.exports = function init(site) {
         res.json(browserAuth.status(req));
     });
 
+
+    site.onGET({ name: '/health', overwrite: true }, (req, res) => {
+        const snapshot = runtimeMonitor.publicSnapshot();
+        if (!snapshot.ok) res.status(503);
+        res.json(snapshot);
+    });
+
+    site.onGET({ name: '/ready', overwrite: true }, (req, res) => {
+        const snapshot = runtimeMonitor.publicSnapshot();
+        if (!snapshot.ok) res.status(503);
+        res.json({ ready: snapshot.ok, status: snapshot.status, components: snapshot.components, timestamp: snapshot.timestamp });
+    });
+
+    site.onGET({ name: '/api/emails/unsubscribe', overwrite: true }, (req, res) => {
+        const token = String(req?.query?.token || '').trim();
+        const email = unsubscribe.verifyToken(token);
+        if (!email) {
+            res.status(400);
+            return res.sendHTML('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Invalid unsubscribe link</title></head><body style="font-family:Arial,sans-serif;max-width:640px;margin:60px auto;padding:20px"><h1>Invalid unsubscribe link</h1><p>This link is invalid or incomplete.</p><a href="/">Back to Social Temp Mail</a></body></html>');
+        }
+        const safeEmail = email.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const safeToken = token.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return res.sendHTML('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unsubscribe</title></head><body style="font-family:Arial,sans-serif;max-width:640px;margin:60px auto;padding:20px;color:#172033"><h1>Unsubscribe</h1><p>Stop future outreach email to <strong>' + safeEmail + '</strong>.</p><form method="post" action="/api/emails/unsubscribe?token=' + encodeURIComponent(safeToken) + '"><input type="hidden" name="List-Unsubscribe" value="One-Click"><button type="submit" style="padding:10px 16px;border:0;border-radius:8px;background:#0f766e;color:white;font-weight:700">Unsubscribe</button></form><p style="margin-top:24px"><a href="/">Back to Social Temp Mail</a></p></body></html>');
+    });
+
+    site.onGET({ name: '/api/emails/live', overwrite: true }, (req, res) => {
+        if (!guardHttp(req, res, ['inbox'])) return;
+        const domain = currentDomain(req);
+        const requested = String(req?.query?.addresses || '').split(',').map((item) => normalizeEmail(item)).filter(Boolean);
+        const addresses = Array.from(new Set(requested.filter((email) => addressBelongsToDomain(email, domain)))).slice(0, 100);
+        if (!addresses.length) {
+            res.status(400);
+            return res.json({ done: false, error: 'At least one valid mailbox address is required.' });
+        }
+        const raw = res?.res || res?.response || res;
+        if (!raw || typeof raw.write !== 'function') {
+            res.status(501);
+            return res.json({ done: false, error: 'Streaming response is unavailable on this runtime.' });
+        }
+        if (typeof raw.writeHead === 'function') raw.writeHead(200, {
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-cache, no-transform',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+        });
+        else {
+            if (typeof raw.setHeader === 'function') {
+                raw.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+                raw.setHeader('Cache-Control', 'no-cache, no-transform');
+                raw.setHeader('Connection', 'keep-alive');
+                raw.setHeader('X-Accel-Buffering', 'no');
+            }
+            raw.statusCode = 200;
+        }
+        const wanted = new Set(addresses);
+        runtimeMonitor.increment('sseConnections');
+        raw.write('event: ready\ndata: ' + JSON.stringify({ done: true, addresses, mode: 'sse' }) + '\n\n');
+        const unsubscribeEvent = service.subscribe((event) => {
+            if (!event || event.type !== 'incoming') return;
+            const matched = (event.recipients || []).filter((email) => wanted.has(String(email || '').toLowerCase()));
+            if (!matched.length) return;
+            runtimeMonitor.increment('sseEvents');
+            raw.write('event: mail\ndata: ' + JSON.stringify({ matched, message: event.message }) + '\n\n');
+        });
+        const keepalive = setInterval(() => {
+            try { raw.write(': keepalive\n\n'); } catch (_) {}
+        }, 20000);
+        if (typeof keepalive.unref === 'function') keepalive.unref();
+        const sourceReq = req?.req || req;
+        const cleanup = () => {
+            clearInterval(keepalive);
+            try { unsubscribeEvent(); } catch (_) {}
+        };
+        if (sourceReq && typeof sourceReq.once === 'function') {
+            sourceReq.once('close', cleanup);
+            sourceReq.once('aborted', cleanup);
+        }
+        if (raw && typeof raw.once === 'function') raw.once('close', cleanup);
+    });
+
     site.onGET({ name: 'admin', overwrite: true }, (req, res) => {
         if (!adminBrowser(req)) {
             res.status(403);
@@ -251,10 +360,71 @@ module.exports = function init(site) {
         compress: true,
     });
 
+    site.onGET({ name: 'temporary-email', path: __dirname + '/site_files/html/seo/temporary-email.html', parser: 'html css js', compress: true, overwrite: true });
+    site.onGET({ name: 'disposable-email', path: __dirname + '/site_files/html/seo/disposable-email.html', parser: 'html css js', compress: true, overwrite: true });
+    site.onGET({ name: 'verification-code-email', path: __dirname + '/site_files/html/seo/verification-code-email.html', parser: 'html css js', compress: true, overwrite: true });
+    site.onGET({ name: 'temp-email-for-testing', path: __dirname + '/site_files/html/seo/temp-email-for-testing.html', parser: 'html css js', compress: true, overwrite: true });
+    site.onGET({ name: 'multiple-temporary-inboxes', path: __dirname + '/site_files/html/seo/multiple-temporary-inboxes.html', parser: 'html css js', compress: true, overwrite: true });
+    site.onGET({ name: 'developer-temp-mail', path: __dirname + '/site_files/html/seo/developer-temp-mail.html', parser: 'html css js', compress: true, overwrite: true });
+
     site.onGET({
         name: ['privacy'],
         path: __dirname + '/site_files/html/privacy.html',
         compress: false,
+    });
+
+
+    onPost('/api/emails/unsubscribe', async (req, res) => {
+        const data = body(req);
+        const token = String(req?.query?.token || data.token || '').trim();
+        try {
+            const result = unsubscribe.unsubscribeToken(token, 'public-one-click');
+            await service.store.audit('email_unsubscribe', { email: result.email, source: 'public-one-click' });
+            const accept = String(req?.headers?.accept || '').toLowerCase();
+            if (accept.includes('text/html')) return res.sendHTML('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unsubscribed</title></head><body style="font-family:Arial,sans-serif;max-width:640px;margin:60px auto;padding:20px;color:#172033"><h1>You are unsubscribed</h1><p>This address has been added to the suppression list and will not receive future outreach email from this service.</p><a href="/">Back to Social Temp Mail</a></body></html>');
+            res.json({ done: true, unsubscribed: true, email: result.email });
+        } catch (error) {
+            res.status(400);
+            res.json({ done: false, error: error?.message || String(error) });
+        }
+    });
+
+    onPost('/api/emails/feedback', async (req, res) => {
+        const configuredToken = String(process.env.EMAIL_FEEDBACK_TOKEN || '').trim();
+        if (!configuredToken) {
+            res.status(503);
+            return res.json({ done: false, error: 'Feedback webhook is disabled until EMAIL_FEEDBACK_TOKEN is configured.' });
+        }
+        const data = body(req);
+        const supplied = String(req?.headers?.['x-email-feedback-token'] || data.token || req?.query?.token || '').trim();
+        if (supplied !== configuredToken) {
+            res.status(403);
+            return res.json({ done: false, error: 'Invalid feedback token.' });
+        }
+        const sourceEvents = Array.isArray(data.events) ? data.events : [data];
+        const results = [];
+        for (const source of sourceEvents.slice(0, 500)) {
+            const email = normalizeEmail(source.email || source.recipient || source.address || source.originalRecipient || '');
+            let type = String(source.type || source.event || source.feedbackType || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (type === 'bounce') type = String(source.status || '').startsWith('5') || source.hard === true ? 'hard_bounce' : 'soft_bounce';
+            if (['spam', 'abuse', 'complaint_received'].includes(type)) type = 'complaint';
+            if (['unsubscribed', 'opt_out', 'optout'].includes(type)) type = 'unsubscribe';
+            if (['delivery', 'delivered_message'].includes(type)) type = 'delivered';
+            try {
+                const result = deliverability.reportFeedback({
+                    email,
+                    type,
+                    reason: source.reason || source.description || '',
+                    source: source.source || source.provider || 'feedback-webhook',
+                });
+                results.push({ ok: true, result });
+                runtimeMonitor.increment('feedbackEvents');
+            } catch (error) {
+                results.push({ ok: false, email, type, error: error?.message || String(error) });
+            }
+        }
+        await service.store.audit('email_feedback_webhook', { received: sourceEvents.length, accepted: results.filter((item) => item.ok).length });
+        res.json({ done: true, received: sourceEvents.length, accepted: results.filter((item) => item.ok).length, results });
     });
 
     onPost('/api/emails/client-context', (req, res) => {
@@ -839,6 +1009,234 @@ module.exports = function init(site) {
         else if (type === 'ignore') result = policy.shouldIgnore(data.from || value, data.subject || '');
         else result = policy.checkAddress('from', value);
         res.json({ done: true, type: type || 'from', value, result });
+    });
+
+
+    onPost('/api/emails/admin/schedules/status', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
+        res.json({ done: true, status: scheduler.status() });
+    });
+
+    onPost('/api/emails/admin/schedules/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
+        try { res.json({ done: true, result: scheduler.list(body(req)) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/schedules/get', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
+        try { res.json({ done: true, task: scheduler.get(String(body(req).id || ''), true) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/schedules/create', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
+        try {
+            const task = await scheduler.schedule(body(req), { client: 'admin-dashboard' });
+            res.json({ done: true, task });
+        } catch (error) {
+            res.json({ done: false, error: error?.message || String(error) });
+        }
+    });
+
+    onPost('/api/emails/admin/schedules/update', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
+        const data = body(req);
+        try {
+            const task = await scheduler.update(String(data.id || ''), data);
+            res.json({ done: true, task });
+        } catch (error) {
+            res.json({ done: false, error: error?.message || String(error) });
+        }
+    });
+
+    onPost('/api/emails/admin/schedules/cancel', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
+        try { res.json({ done: true, task: await scheduler.cancel(String(body(req).id || '')) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/schedules/send-now', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
+        try { res.json({ done: true, task: await scheduler.sendNow(String(body(req).id || '')) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/schedules/retry', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
+        const data = body(req);
+        try { res.json({ done: true, task: await scheduler.retry(String(data.id || ''), data) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/deliverability/status', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        res.json({
+            done: true,
+            status: deliverability.status(),
+            config: deliverability.getConfig(),
+            feedbackWebhookEnabled: !!String(process.env.EMAIL_FEEDBACK_TOKEN || '').trim(),
+            feedbackEndpoint: '/api/emails/feedback',
+            inboundArfDetection: true,
+            inboundDsnDetection: true,
+            oneClickUnsubscribe: true,
+        });
+    });
+
+    onPost('/api/emails/admin/deliverability/config', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data = body(req);
+        try {
+            const config = data.config ? deliverability.updateConfig(data.config) : deliverability.getConfig();
+            if (data.config) await service.store.audit('admin_deliverability_config_update', { browser: browserRequestID(req) || '', updatedAt: config.updatedAt });
+            res.json({ done: true, config, status: deliverability.status() });
+        } catch (error) {
+            res.json({ done: false, error: error?.message || String(error) });
+        }
+    });
+
+    onPost('/api/emails/admin/deliverability/preflight', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data = body(req);
+        try { res.json({ done: true, result: deliverability.preflightReport(data.from || '', data.to || data.recipients || []) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/deliverability/suppressions/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, result: deliverability.listSuppressions(body(req)) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/deliverability/suppressions/add', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data = body(req);
+        try {
+            const item = deliverability.addSuppression(data.email, data.type || 'manual', data.reason || '', 'admin-dashboard');
+            await service.store.audit('admin_suppression_add', { email: item.email, type: item.type });
+            res.json({ done: true, item });
+        } catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/deliverability/suppressions/remove', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try {
+            const result = deliverability.removeSuppression(body(req).email);
+            await service.store.audit('admin_suppression_remove', result);
+            res.json({ done: true, result });
+        } catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/deliverability/feedback', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data = body(req);
+        try {
+            const result = deliverability.reportFeedback({ email: data.email, type: data.type, reason: data.reason || '', source: 'admin-dashboard' });
+            runtimeMonitor.increment('feedbackEvents');
+            await service.store.audit('admin_delivery_feedback', result);
+            res.json({ done: true, result, status: deliverability.status() });
+        } catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/health', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try {
+            const snapshot = await runtimeMonitor.snapshot({ scheduler, deliverability, service, policy, operationsManager });
+            res.json({ done: true, snapshot });
+        } catch (error) {
+            res.json({ done: false, error: error?.message || String(error) });
+        }
+    });
+
+    onPost('/api/emails/admin/operations/status', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, status: operationsManager.status() }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/config', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try {
+            const data = body(req);
+            const config = data.config ? operationsManager.updateConfig(data.config) : operationsManager.getConfig();
+            if (data.config) await service.store.audit('admin_storage_config_update', { browser: browserRequestID(req) || '', updatedAt: new Date().toISOString() });
+            res.json({ done: true, config, status: operationsManager.status() });
+        } catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/backup/create', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, result: await operationsManager.createBackup(body(req)) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/backups/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, result: operationsManager.listBackups() }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/backup/validate', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, result: await operationsManager.validateBackup(String(body(req).id || '')) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/restore/preview', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, result: await operationsManager.restorePreview(String(body(req).id || ''), body(req)) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/restore/execute', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data = body(req);
+        try { res.json({ done: true, result: await operationsManager.restore(String(data.id || ''), data) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/storage/report', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, report: operationsManager.storageReport() }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/cleanup/preview', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, result: operationsManager.cleanupPreview(body(req)) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/cleanup/execute', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, result: await operationsManager.cleanupExecute(body(req)) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/maintenance/run', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, result: await operationsManager.runMaintenance(body(req)) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/alerts', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, result: operationsManager.alerts(body(req)) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/operations/history', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { res.json({ done: true, history: operationsManager.historyList(body(req).limit || 144) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost({ name: '/generate-new-email' }, (req, res) => {

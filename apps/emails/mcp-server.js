@@ -11,7 +11,7 @@ const DEFAULT_MCP_SECRET = 'SOCIALBROWERMANAGER';
 const SERVER_INFO = {
     name: 'social-browser-email',
     title: 'Social Browser Email Manager',
-    version: '4.2.0',
+    version: '4.3.0',
 };
 
 const SERVER_INSTRUCTIONS = [
@@ -24,6 +24,7 @@ const SERVER_INSTRUCTIONS = [
     'Use email_send only when the user wants immediate delivery. If the user says later, tomorrow, tonight, after a duration, or names any future date/time, use email_schedule instead.',
     'For scheduling, convert the user requested time to one explicit ISO-8601 sendAt value with a numeric timezone offset or Z. Resolve relative times from reliable current-time context. If the intended timezone cannot be determined reliably, ask the user rather than guessing.',
     'Before large or repeated outbound campaigns, inspect email_deliverability_status or email_deliverability_preflight. Suppressions, warm-up limits, provider/domain pacing, and circuit breakers are safety controls and must not be bypassed.',
+    'Backup, restore, retention cleanup, and disk-management tools operate on persistent server data. Always run restore or cleanup preview first and use the returned confirmToken for execution. Restore creates a safety backup and requires a service restart afterward.',
 ].join(' ');
 
 const STRING = { type: 'string' };
@@ -163,6 +164,40 @@ const TOOLS = [
         reason: { type: 'string', maxLength: 1000 },
         source: { type: 'string', maxLength: 160 },
     }, ['email', 'type'], { readOnlyHint: false }),
+    tool('email_operations_status', 'Backup and storage status', 'Inspect backup health, disk quota, retention state, low-space mode, recent operational alerts, and storage history.', {}),
+    tool('email_backup_create', 'Create verified backup', 'Create a persistent server-side snapshot of messages, attachments, schedules, deliverability state, suppressions, VIP data, policies, and storage configuration. The backup is checksummed and can be validated before restore.', {
+        label: { type: 'string', maxLength: 160 },
+        reason: { type: 'string', maxLength: 160, default: 'mcp-manual' },
+    }, [], { readOnlyHint: false }),
+    tool('email_backups_list', 'List backups', 'List available persistent email backups with creation time, file count, and size.', {}),
+    tool('email_backup_validate', 'Validate backup', 'Verify every file in a backup against its SHA-256 manifest before disaster recovery.', { id: { type: 'string', minLength: 1 } }, ['id']),
+    tool('email_restore_preview', 'Preview disaster recovery restore', 'Validate a backup and preview how many files would be created, overwritten, or removed. This does not modify live data and returns a short-lived confirmToken required for restore.', { id: { type: 'string', minLength: 1 } }, ['id']),
+    tool('email_restore_execute', 'Execute disaster recovery restore', 'Restore managed email data from a validated backup. A fresh preview confirmToken and confirm=true are required. A safety backup is created first. The service must be restarted after restore.', {
+        id: { type: 'string', minLength: 1 },
+        confirmToken: { type: 'string', minLength: 8 },
+        confirm: { type: 'boolean' },
+    }, ['id', 'confirmToken', 'confirm'], { readOnlyHint: false, destructiveHint: true }),
+    tool('email_storage_report', 'Storage and disk report', 'Return managed storage bytes, server free disk space, quota level, category sizes, and per-mail-domain estimates.', {}),
+    tool('email_storage_config_get', 'Get backup and retention configuration', 'Read backup cadence, retention periods, quota thresholds, emergency cleanup settings, and maintenance interval.', {}),
+    tool('email_storage_config_update', 'Update backup and retention configuration', 'Update backup cadence, retention, quota, and low-space maintenance settings. This does not execute cleanup by itself.', { config: { type: 'object' } }, ['config'], { readOnlyHint: false }),
+    tool('email_storage_cleanup_preview', 'Preview retention cleanup', 'Dry-run storage cleanup. Protected/VIP messages are preserved. Returns candidate counts, estimated reclaimable bytes, and a confirmToken.', {
+        emergency: { type: 'boolean', default: false, description: 'Use the configured emergency retention windows for low-space recovery.' },
+    }),
+    tool('email_storage_cleanup_execute', 'Execute retention cleanup', 'Execute exactly the cleanup represented by a recent preview token. confirm=true is required.', {
+        confirmToken: { type: 'string', minLength: 8 },
+        confirm: { type: 'boolean' },
+    }, ['confirmToken', 'confirm'], { readOnlyHint: false, destructiveHint: true }),
+    tool('email_storage_maintenance_run', 'Run storage maintenance now', 'Run backup-due checks, backup pruning, disk assessment, and emergency cleanup when required.', {
+        forceCleanup: { type: 'boolean', default: false },
+        skipBackup: { type: 'boolean', default: false },
+    }, [], { readOnlyHint: false }),
+    tool('email_operations_alerts', 'Operational alerts', 'List recent backup, restore, disk-pressure, cleanup, and operations alerts.', {
+        level: { type: 'string', enum: ['warning', 'error'] },
+        limit: { type: 'integer', minimum: 1, maximum: 200, default: 100 },
+    }),
+    tool('email_operations_history', 'Storage history', 'Read recent persisted storage samples for quota and disk trend analysis.', {
+        limit: { type: 'integer', minimum: 1, maximum: 576, default: 144 },
+    }),
     tool('email_reply', 'Reply to email', 'Reply to a stored message by guid.', { guid: GUID, from: { type: 'string', minLength: 3 }, text: STRING, html: STRING }, ['guid', 'from'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }, { anyOf: [{ required: ['text'] }, { required: ['html'] }] }),
     tool('email_forward', 'Forward email', 'Forward a stored message to one or more recipients.', { guid: GUID, from: { type: 'string', minLength: 3 }, to: MESSAGE_SEND_PROPERTIES.to, text: STRING, html: STRING }, ['guid', 'from', 'to'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
     tool('email_update', 'Update email', 'Update message read, favorite, folder, status, subject, text, or HTML fields.', {
@@ -341,7 +376,7 @@ function validateScheduleRetryFields(args) {
 
 function validateToolArguments(name, raw) {
     const args = objectArgs(raw);
-    if (name === 'email_capabilities' || name === 'email_vip_list' || name === 'email_folders_list' || name === 'email_policy_get' || name === 'email_policy_export' || name === 'email_policy_status' || name === 'email_scheduler_status' || name === 'email_deliverability_status' || name === 'email_deliverability_config_get') return { ok: true, args: {} };
+    if (name === 'email_capabilities' || name === 'email_vip_list' || name === 'email_folders_list' || name === 'email_policy_get' || name === 'email_policy_export' || name === 'email_policy_status' || name === 'email_scheduler_status' || name === 'email_deliverability_status' || name === 'email_deliverability_config_get' || name === 'email_operations_status' || name === 'email_backups_list' || name === 'email_storage_report' || name === 'email_storage_config_get') return { ok: true, args: {} };
     if (name === 'email_search') {
         const checked = validateSearch(args, 500);
         if (!checked.ok) return checked;
@@ -422,6 +457,40 @@ function validateToolArguments(name, raw) {
         const type = String(args.type || '').trim().toLowerCase();
         if (!['delivered', 'hard_bounce', 'soft_bounce', 'complaint', 'unsubscribe'].includes(type)) return fail('invalid feedback type');
         return { ok: true, args: { email: args.email.trim(), type, reason: String(args.reason || '').slice(0, 1000), source: String(args.source || '').slice(0, 160) } };
+    }
+    if (name === 'email_backup_create') return { ok: true, args: { label: String(args.label || '').slice(0, 160), reason: String(args.reason || 'mcp-manual').slice(0, 160) } };
+    if (name === 'email_backup_validate' || name === 'email_restore_preview') {
+        if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
+        return { ok: true, args: { id: args.id.trim() } };
+    }
+    if (name === 'email_restore_execute') {
+        if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
+        if (typeof args.confirmToken !== 'string' || args.confirmToken.length < 8) return fail('confirmToken from email_restore_preview is required');
+        if (args.confirm !== true) return fail('confirm=true is required');
+        return { ok: true, args: { id: args.id.trim(), confirmToken: args.confirmToken, confirm: true } };
+    }
+    if (name === 'email_storage_config_update') {
+        if (!args.config || typeof args.config !== 'object' || Array.isArray(args.config)) return fail('config must be an object');
+        return { ok: true, args: { config: args.config } };
+    }
+    if (name === 'email_storage_cleanup_preview') return { ok: true, args: { emergency: args.emergency === true } };
+    if (name === 'email_storage_cleanup_execute') {
+        if (typeof args.confirmToken !== 'string' || args.confirmToken.length < 8) return fail('confirmToken from email_storage_cleanup_preview is required');
+        if (args.confirm !== true) return fail('confirm=true is required');
+        return { ok: true, args: { confirmToken: args.confirmToken, confirm: true } };
+    }
+    if (name === 'email_storage_maintenance_run') return { ok: true, args: { forceCleanup: args.forceCleanup === true, skipBackup: args.skipBackup === true } };
+    if (name === 'email_operations_alerts') {
+        const level = String(args.level || '').toLowerCase();
+        if (level && !['warning', 'error'].includes(level)) return fail('level must be warning or error');
+        const limit = args.limit === undefined ? 100 : Number(args.limit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 200) return fail('limit must be 1 to 200');
+        return { ok: true, args: { level, limit } };
+    }
+    if (name === 'email_operations_history') {
+        const limit = args.limit === undefined ? 144 : Number(args.limit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 576) return fail('limit must be 1 to 576');
+        return { ok: true, args: { limit } };
     }
     if (name === 'email_schedule') {
         const checked = validateSend(args);
@@ -887,6 +956,20 @@ async function executeTool(name, args, service, scope) {
     else if (name === 'email_stats') output = await service.stats(args, scope);
     else if (name === 'email_send') output = await service.send(args, scope);
     else if (name === 'email_send_bulk') output = await service.sendBulk(args, scope);
+    else if (name === 'email_operations_status') output = await service.operationsStatus(scope);
+    else if (name === 'email_backup_create') output = await service.backupCreate(args, scope);
+    else if (name === 'email_backups_list') output = await service.backupsList(scope);
+    else if (name === 'email_backup_validate') output = await service.backupValidate(args, scope);
+    else if (name === 'email_restore_preview') output = await service.restorePreview(args, scope);
+    else if (name === 'email_restore_execute') output = await service.restoreExecute(args, scope);
+    else if (name === 'email_storage_report') output = await service.storageReport(scope);
+    else if (name === 'email_storage_config_get') output = await service.storageConfigGet(scope);
+    else if (name === 'email_storage_config_update') output = await service.storageConfigUpdate(args, scope);
+    else if (name === 'email_storage_cleanup_preview') output = await service.cleanupPreview(args, scope);
+    else if (name === 'email_storage_cleanup_execute') output = await service.cleanupExecute(args, scope);
+    else if (name === 'email_storage_maintenance_run') output = await service.maintenanceRun(args, scope);
+    else if (name === 'email_operations_alerts') output = await service.operationsAlerts(args, scope);
+    else if (name === 'email_operations_history') output = await service.operationsHistory(args, scope);
     else if (name === 'email_deliverability_status') output = await service.deliverabilityStatus(scope);
     else if (name === 'email_deliverability_preflight') output = await service.deliverabilityPreflight(args, scope);
     else if (name === 'email_deliverability_config_get') output = await service.deliverabilityConfigGet(scope);

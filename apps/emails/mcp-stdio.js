@@ -11,6 +11,7 @@ const { createEmailService } = require('./core/email-service');
 const { createEmailAbusePolicy } = require('./core/abuse-policy');
 const { createEmailScheduler } = require('./core/email-scheduler');
 const { createEmailDeliverabilityEngine } = require('./core/deliverability-engine');
+const { createEmailBackupStorageManager } = require('./core/backup-storage-manager');
 const { createEmailMcpService } = require('./mcp-service');
 const { dispatchRpc, MODERN_PROTOCOL, SERVER_INFO } = require('./mcp-server');
 
@@ -38,7 +39,16 @@ const scheduler = createEmailScheduler({
     logger: () => {},
     intervalMs: Number(process.env.EMAIL_SCHEDULE_TICK_MS || 5000),
 }).start();
-const service = createEmailMcpService({ emailService, abusePolicy: policy, scheduler, deliverability });
+const operationsManager = createEmailBackupStorageManager({
+    emailService,
+    scheduler,
+    rootDir: path.join(cwd, 'localStorage'),
+    backupDir: process.env.EMAIL_BACKUP_DIR || path.join(cwd, 'localStorage', 'email-backups'),
+    controlDir: process.env.EMAIL_STORAGE_CONTROL_DIR || path.join(cwd, 'localStorage', 'email-storage'),
+    alertWebhook: process.env.EMAIL_OPS_ALERT_WEBHOOK || '',
+    logger: () => {},
+});
+const service = createEmailMcpService({ emailService, abusePolicy: policy, scheduler, deliverability, operationsManager });
 const session = {
     id: 'stdio',
     createdAt: Date.now(),

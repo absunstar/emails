@@ -10,6 +10,9 @@ const { createEmailAbusePolicy } = require('./apps/emails/core/abuse-policy');
 const { createEmailMcpService } = require('./apps/emails/mcp-service');
 const { createEmailScheduler } = require('./apps/emails/core/email-scheduler');
 const { createEmailDeliverabilityEngine } = require('./apps/emails/core/deliverability-engine');
+const { createEmailRuntimeMonitor } = require('./apps/emails/core/runtime-monitor');
+const { createEmailBackupStorageManager } = require('./apps/emails/core/backup-storage-manager');
+const { createEmailUnsubscribeService } = require('./apps/emails/core/unsubscribe-service');
 const { startEmailMcpServer } = require('./apps/emails/mcp-server');
 
 const site = require('../isite')({
@@ -29,6 +32,9 @@ const site = require('../isite')({
         save: false,
     },
 });
+
+site.emailRuntimeMonitor = createEmailRuntimeMonitor();
+site.emailRuntimeMonitor.component('site', 'starting');
 
 site.emailAbusePolicy = createEmailAbusePolicy({
     filePath: process.env.EMAIL_POLICY_FILE || path.join(site.cwd, 'localStorage', 'email-abuse-policy.json'),
@@ -60,6 +66,13 @@ site.emailDeliverability = createEmailDeliverabilityEngine({
     logger: (message) => site.log(message),
 });
 
+site.emailUnsubscribe = createEmailUnsubscribeService({
+    deliverability: site.emailDeliverability,
+    baseDir: process.env.EMAIL_UNSUBSCRIBE_DIR || path.join(site.cwd, 'localStorage', 'email-unsubscribe'),
+    publicOrigin: process.env.EMAIL_PUBLIC_ORIGIN || 'https://emails.social-browser.com',
+    monitor: site.emailRuntimeMonitor,
+});
+
 site.emailService = createEmailService({
     sendmail,
     dataDir: process.env.EMAIL_DATA_DIR || path.join(site.cwd, 'localStorage', 'email-files'),
@@ -68,10 +81,22 @@ site.emailService = createEmailService({
     logger: (message) => site.log(message),
     abusePolicy: site.emailAbusePolicy,
     deliverability: site.emailDeliverability,
+    unsubscribe: site.emailUnsubscribe,
+    monitor: site.emailRuntimeMonitor,
 });
 site.emailStore = site.emailService.store;
+site.emailOperationsManager = createEmailBackupStorageManager({
+    emailService: site.emailService,
+    monitor: site.emailRuntimeMonitor,
+    rootDir: path.join(site.cwd, 'localStorage'),
+    backupDir: process.env.EMAIL_BACKUP_DIR || path.join(site.cwd, 'localStorage', 'email-backups'),
+    controlDir: process.env.EMAIL_STORAGE_CONTROL_DIR || path.join(site.cwd, 'localStorage', 'email-storage'),
+    alertWebhook: process.env.EMAIL_OPS_ALERT_WEBHOOK || '',
+    logger: (message) => site.log(message),
+});
 
 site.get('robots.txt', (req, res) => res.txt('robots.txt'));
+site.get('sitemap.xml', (req, res) => res.txt('sitemap.xml'));
 site.get('app-ads.txt', (req, res) => res.txt('app-ads.txt'));
 
 function smtpError(message, responseCode) {
@@ -90,9 +115,15 @@ const smtpServer = new SMTPServer({
     },
 
     onConnect(session, callback) {
+        const storage = site.emailOperationsManager?.canAcceptInbound?.();
+        if (storage && storage.allowed === false) {
+            site.emailRuntimeMonitor.increment('smtpRejected');
+            return callback(smtpError(storage.reason || 'Temporary storage is unavailable', 452));
+        }
         const result = site.emailAbusePolicy.smtpConnect(remoteIp(session));
-        if (!result.allowed) return callback(smtpError(result.reason || 'SMTP connection rejected', 421));
+        if (!result.allowed) { site.emailRuntimeMonitor.increment('smtpRejected'); return callback(smtpError(result.reason || 'SMTP connection rejected', 421)); }
         session.__emailPolicyConnection = true;
+        site.emailRuntimeMonitor.increment('smtpAccepted');
         callback();
     },
 
@@ -239,7 +270,15 @@ const smtpServer = new SMTPServer({
     disabledCommands: ['AUTH'],
 });
 
-smtpServer.on('error', (err) => console.error('SMTP Error %s', err.message));
+smtpServer.on('error', (err) => {
+    console.error('SMTP Error %s', err.message);
+    site.emailRuntimeMonitor.component('smtp', 'error', { error: err.message });
+    site.emailRuntimeMonitor.error('smtp', err);
+});
+smtpServer.on('listening', () => {
+    const address = smtpServer.server?.address?.() || null;
+    site.emailRuntimeMonitor.component('smtp', 'listening', { address });
+});
 smtpServer.listen(Number(process.env.EMAIL_SMTP_PORT || 25), process.env.EMAIL_SMTP_HOST || undefined);
 
 const mcpSecret = 'SOCIALBROWERMANAGER';
@@ -250,11 +289,15 @@ site.emailScheduler = site.emailScheduler || createEmailScheduler({
     logger: (message) => site.log(message),
     intervalMs: Number(process.env.EMAIL_SCHEDULE_TICK_MS || 5000),
 }).start();
+site.emailRuntimeMonitor.component('scheduler', 'running', site.emailScheduler.status());
+site.emailOperationsManager.setScheduler(site.emailScheduler).start();
+site.emailRuntimeMonitor.component('storage', site.emailOperationsManager.status().storage.level, { backupCount: site.emailOperationsManager.listBackups().count });
 const mcpService = createEmailMcpService({
     emailService: site.emailService,
     abusePolicy: site.emailAbusePolicy,
     scheduler: site.emailScheduler,
     deliverability: site.emailDeliverability,
+    operationsManager: site.emailOperationsManager,
 });
 site.emailMcpServer = startEmailMcpServer({
     service: mcpService,
@@ -263,6 +306,7 @@ site.emailMcpServer = startEmailMcpServer({
     host: process.env.EMAIL_MCP_HOST || '127.0.0.1',
     port: Number(process.env.EMAIL_MCP_PORT || 60026),
     onListen(info) {
+        site.emailRuntimeMonitor.component('mcp', 'listening', { host: info.host, port: info.port, path: info.path, ssePath: info.ssePath });
         site.log('Email MCP Streamable HTTP: http://' + info.host + ':' + info.port + info.path);
         site.log('Email MCP Legacy SSE: http://' + info.host + ':' + info.port + info.ssePath);
         site.log('Email MCP STDIO: npm run mcp:stdio');
@@ -278,3 +322,4 @@ site.onGET({ name: '/html', path: site.dir + '/html' });
 
 site.loadLocalApp('client-side');
 site.start();
+site.emailRuntimeMonitor.component('site', 'ready', { httpPort: 60025 });

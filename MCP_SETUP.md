@@ -36,7 +36,7 @@ VIP mail is available to the MCP manager. Manual delete operations use administr
 
 ## Capabilities and tools
 
-The build exposes 43 tools.
+The build exposes 65 tools.
 
 ### Discovery, search and reading
 
@@ -376,6 +376,30 @@ The returned job includes `sendAt`, `sendAtUtc`, `timezone`, `status`, retry sta
 
 ## Scheduling and deliverability
 
-The MCP currently exposes 51 tools. For natural-language future sending requests, agents should select `email_schedule` and convert the requested time to an explicit ISO-8601 `sendAt` value with a timezone offset. `email_send` is for immediate delivery only.
+The MCP currently exposes 65 tools. For natural-language future sending requests, agents should select `email_schedule` and convert the requested time to an explicit ISO-8601 `sendAt` value with a timezone offset. `email_send` is for immediate delivery only.
 
 All real outbound sends are additionally protected by the persistent Deliverability Engine documented in `DELIVERABILITY_ENGINE.md`. Before a large or repeated campaign, clients can call `email_deliverability_status` and `email_deliverability_preflight`. Suppressed recipients, domain/provider pacing, warm-up limits and open circuit breakers cannot be bypassed by normal send tools.
+
+## Backup, disaster recovery and storage operations
+
+The manager also exposes operations tools backed by the same persistent Backup/Storage manager used by `/admin`:
+
+```text
+email_operations_status
+email_backup_create
+email_backups_list
+email_backup_validate
+email_restore_preview
+email_restore_execute
+email_storage_report
+email_storage_config_get
+email_storage_config_update
+email_storage_cleanup_preview
+email_storage_cleanup_execute
+email_storage_maintenance_run
+email_operations_alerts
+email_operations_history
+```
+
+Restore and cleanup are intentionally preview-first. The agent should call the preview tool, inspect the returned changes/candidates, then pass the short-lived `confirmToken` with `confirm=true` to the execute tool. Restore creates a safety backup before replacing managed data and returns `restartRequired=true`. See `BACKUP_DISASTER_RECOVERY.md`.
+

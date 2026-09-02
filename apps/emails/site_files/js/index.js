@@ -10,6 +10,7 @@
     const SOCIAL_BROWSER_ADDRESS_LIMIT = 100;
     const ADDRESS_BOOK_VERSION = 2;
     const LIVE_POLL_MS = 10000;
+    const LIVE_RECONCILE_MS = 60000;
 
     const state = {
         list: [],
@@ -18,6 +19,9 @@
         polling: false,
         pollReady: false,
         pollTimer: null,
+        liveSource: null,
+        liveMode: 'poll',
+        liveReconnectTimer: null,
         currentWhere: {},
         currentEmail: null,
         currentMailbox: '',
@@ -389,6 +393,7 @@
         if (options?.activate !== false) state.addressBook.active = normalized;
         saveAddressBook();
         renderAddressSidebar();
+        if (state.pollReady) scheduleLiveReconnect();
         if (state.addressBook.addresses.length === state.client.addressLimit) {
             const message = limitReachedMessage();
             showUpgrade(message);
@@ -426,6 +431,7 @@
         if (state.addressBook.active === normalized) state.addressBook.active = state.addressBook.addresses[Math.min(index, state.addressBook.addresses.length - 1)]?.email || '';
         saveAddressBook();
         renderAddressSidebar();
+        if (state.pollReady) scheduleLiveReconnect();
         toast(normalized + ' was removed from My Emails.', 'success', 'Address removed');
         const input = q('[data-mail-address]');
         if (!state.addressBook.active) {
@@ -821,10 +827,86 @@
         }
     }
 
-    function startLivePolling() {
+    function setLiveLabel(text) {
+        const lastPoll = q('[data-last-poll]');
+        if (lastPoll) lastPoll.textContent = text || '';
+    }
+
+    function setPollingInterval(ms) {
         if (state.pollTimer) clearInterval(state.pollTimer);
-        state.pollTimer = setInterval(pollAllInboxes, LIVE_POLL_MS);
+        state.pollTimer = setInterval(pollAllInboxes, Math.max(5000, Number(ms || LIVE_POLL_MS)));
+    }
+
+    function closeLiveSource() {
+        if (state.liveSource) {
+            try { state.liveSource.close(); } catch (_) {}
+        }
+        state.liveSource = null;
+    }
+
+    async function applyLiveMail(payload) {
+        const message = payload?.message || {};
+        const matched = Array.isArray(payload?.matched) ? payload.matched : [];
+        let refreshActive = false;
+        for (const email of matched) {
+            const item = addressEntry(email);
+            if (!item) continue;
+            item.messageCount = Math.max(0, Number(item.messageCount || 0)) + 1;
+            item.unreadCount = Math.max(0, Number(item.unreadCount || 0)) + 1;
+            item.lastCheckedAt = Date.now();
+            item.lastMessageAt = new Date(message.date || Date.now()).getTime() || Date.now();
+            item.lastMessageSubject = message.subject || item.lastMessageSubject;
+            item.lastMessageFrom = message.from || item.lastMessageFrom;
+            notifyNewMail(item.email, { latest: message }, 1);
+            if (item.email === state.addressBook.active && document.visibilityState === 'visible') refreshActive = true;
+        }
+        saveAddressBook();
+        renderAddressSidebar();
+        setLiveLabel('Live push');
+        if (refreshActive && !state.busy) await loadAll({ to: state.addressBook.active }, 500, { markRead: true, background: true, newCount: 1 });
+    }
+
+    function connectLiveSse() {
+        closeLiveSource();
+        if (mode !== 'free' || typeof EventSource === 'undefined' || !state.addressBook.addresses.length) {
+            state.liveMode = 'poll';
+            setPollingInterval(LIVE_POLL_MS);
+            setLiveLabel('Live polling');
+            return;
+        }
+        const addresses = state.addressBook.addresses.map((item) => item.email).join(',');
+        const source = new EventSource('/api/emails/live?addresses=' + encodeURIComponent(addresses));
+        state.liveSource = source;
+        source.addEventListener('ready', function () {
+            if (state.liveSource !== source) return;
+            state.liveMode = 'sse';
+            setPollingInterval(LIVE_RECONCILE_MS);
+            setLiveLabel('Live push');
+        });
+        source.addEventListener('mail', async function (event) {
+            if (state.liveSource !== source) return;
+            try { await applyLiveMail(JSON.parse(event.data || '{}')); } catch (_) {}
+        });
+        source.onerror = function () {
+            if (state.liveSource !== source) return;
+            closeLiveSource();
+            state.liveMode = 'poll';
+            setPollingInterval(LIVE_POLL_MS);
+            setLiveLabel('Reconnecting…');
+            if (state.liveReconnectTimer) clearTimeout(state.liveReconnectTimer);
+            state.liveReconnectTimer = setTimeout(connectLiveSse, 12000);
+        };
+    }
+
+    function scheduleLiveReconnect() {
+        if (state.liveReconnectTimer) clearTimeout(state.liveReconnectTimer);
+        state.liveReconnectTimer = setTimeout(connectLiveSse, 250);
+    }
+
+    function startLivePolling() {
+        setPollingInterval(LIVE_POLL_MS);
         pollAllInboxes();
+        connectLiveSse();
     }
 
     async function toggleNotifications() {

@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const path = require('path');
+const EventEmitter = require('events');
 const { EmailFileStore } = require('./json-store');
 const { messageBelongsToDomain } = require('./domain');
 const { buildEml } = require('./message-tools');
@@ -138,6 +139,10 @@ function createEmailService(options) {
     const sendmail = options.sendmail;
     const abusePolicy = options.abusePolicy || null;
     const deliverability = options.deliverability || null;
+    const unsubscribe = options.unsubscribe || null;
+    const monitor = options.monitor || null;
+    const events = new EventEmitter();
+    events.setMaxListeners(0);
     if (typeof sendmail !== 'function') throw new Error('sendmail function is required');
 
     let store;
@@ -249,6 +254,8 @@ function createEmailService(options) {
         await store.saveMessage(doc);
 
         try {
+            const singleRecipient = allRecipients.length === 1 ? allRecipients[0] : '';
+            const listHeaders = singleRecipient && unsubscribe && args.listUnsubscribe !== false && auditAction !== 'email_reply' ? unsubscribe.headersFor(singleRecipient) : null;
             const reply = await deliver({
                 from: doc.from,
                 to: doc.to,
@@ -258,12 +265,15 @@ function createEmailService(options) {
                 html: doc.html || undefined,
                 replyTo: doc.replyTo || undefined,
                 inReplyTo: doc.inReplyTo || undefined,
+                headers: listHeaders || args.headers || undefined,
             });
             doc.folder = 'send';
             doc.status = 'sent';
             doc.transportReply = typeof reply === 'string' ? reply : '';
             await store.saveMessage(doc);
             if (deliverability && typeof deliverability.recordSuccess === 'function') deliverability.recordSuccess(allRecipients);
+            monitor?.increment?.('outgoingSent', Math.max(1, allRecipients.length));
+            events.emit('event', { type: 'outgoing', status: 'sent', message: safeMessage(doc, false), recipients: allRecipients });
             await store.audit(auditAction || 'email_send', { guid: doc.guid, from: doc.from, to: doc.to, subject: doc.subject, success: true });
             return { sent: true, guid: doc.guid, from: doc.from, to: doc.to, subject: doc.subject, date: doc.date };
         } catch (error) {
@@ -272,6 +282,9 @@ function createEmailService(options) {
             doc.error = error?.message || String(error);
             await store.saveMessage(doc);
             if (deliverability && typeof deliverability.recordFailure === 'function') deliverability.recordFailure(allRecipients, error);
+            monitor?.increment?.('outgoingFailed', Math.max(1, allRecipients.length));
+            monitor?.error?.('outbound', error, { from: doc.from, to: doc.to, subject: doc.subject });
+            events.emit('event', { type: 'outgoing', status: 'failed', message: safeMessage(doc, false), recipients: allRecipients, error: doc.error });
             await store.audit(auditAction || 'email_send', { guid: doc.guid, from: doc.from, to: doc.to, subject: doc.subject, success: false, error: doc.error });
             throw error;
         }
@@ -283,6 +296,12 @@ function createEmailService(options) {
 
     const service = {
         store,
+
+        subscribe(listener) {
+            if (typeof listener !== 'function') throw new Error('listener must be a function');
+            events.on('event', listener);
+            return () => events.off('event', listener);
+        },
 
         isVipAddress,
         isVipMessage,
@@ -324,7 +343,11 @@ function createEmailService(options) {
                     protectedCount: saved.cleanup.protectedCount,
                 });
             }
-            return safeMessage(saved.message, false);
+            const publicMessage = safeMessage(saved.message, false);
+            const incomingRecipients = normalizeAddressList([saved.message.to, saved.message.cc]);
+            monitor?.increment?.('incomingStored');
+            events.emit('event', { type: 'incoming', status: 'received', message: publicMessage, recipients: incomingRecipients });
+            return publicMessage;
         },
 
         async search(args, context) {

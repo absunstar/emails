@@ -28,6 +28,16 @@
         policyDefaults: null,
         policyStatus: null,
         policyTab: 'rules',
+        schedules: [],
+        scheduleStatus: null,
+        deliverability: null,
+        deliverabilityConfig: null,
+        deliverabilityTab: 'overview',
+        suppressions: [],
+        health: null,
+        operations: null,
+        operationsConfig: null,
+        operationsCleanupPreview: null,
     };
 
     const q = (selector, base) => (base || document).querySelector(selector);
@@ -664,6 +674,600 @@
     }
 
 
+    function statusPill(value) {
+        const text = String(value || 'unknown').toLowerCase();
+        return '<span class="mail-status-pill is-' + escape(text.replace(/[^a-z0-9_-]/g, '-')) + '">' + escape(text.replace(/_/g, ' ')) + '</span>';
+    }
+
+    function renderScheduleMetrics() {
+        const host = q('[data-schedule-metrics]');
+        if (!host) return;
+        const counts = state.scheduleStatus?.counts || {};
+        const values = [
+            ['Scheduled', counts.scheduled || 0],
+            ['Sending', counts.sending || 0],
+            ['Sent', counts.sent || 0],
+            ['Failed', counts.failed || 0],
+            ['Cancelled', counts.cancelled || 0],
+        ];
+        host.innerHTML = values.map((item) => '<div class="mail-ops-metric"><small>' + item[0] + '</small><strong>' + Number(item[1]).toLocaleString() + '</strong></div>').join('');
+    }
+
+    function renderSchedules() {
+        const host = q('[data-schedule-list]');
+        const empty = q('[data-schedule-empty]');
+        if (!host) return;
+        const tasks = state.schedules || [];
+        host.innerHTML = tasks.map((task) => {
+            const message = task.message || {};
+            const status = String(task.status || '');
+            const buttons = [];
+            if (['scheduled', 'failed', 'cancelled'].includes(status)) buttons.push('<button type="button" data-admin-action="schedule-edit" data-schedule-id="' + escape(task.id) + '">Edit</button>');
+            if (status === 'scheduled') {
+                buttons.push('<button type="button" data-admin-action="schedule-send-now" data-schedule-id="' + escape(task.id) + '">Send now</button>');
+                buttons.push('<button type="button" class="danger" data-admin-action="schedule-cancel" data-schedule-id="' + escape(task.id) + '">Cancel</button>');
+            }
+            if (status === 'failed' || status === 'cancelled') buttons.push('<button type="button" data-admin-action="schedule-retry" data-schedule-id="' + escape(task.id) + '">Retry</button>');
+            return '<tr><td><strong>' + escape(dateTime(task.sendAtUtc)) + '</strong><br><small>' + escape(task.timezone || task.timezoneOffset || '') + '</small></td><td>' + escape(message.from || '') + '</td><td>' + escape(Array.isArray(message.to) ? message.to.join(', ') : message.to || '') + '</td><td>' + escape(message.subject || '(no subject)') + '</td><td>' + statusPill(status) + (task.lastError ? '<br><small title="' + escape(task.lastError) + '">' + escape(String(task.lastError).slice(0, 72)) + '</small>' : '') + '</td><td>' + Number(task.attempts || 0) + ' / ' + Number(task.maxRetries || 0) + '</td><td><div class="mail-ops-row-actions">' + buttons.join('') + '</div></td></tr>';
+        }).join('');
+        if (empty) empty.hidden = tasks.length > 0;
+    }
+
+    async function loadSchedules(options) {
+        const filter = q('[data-schedule-filter]')?.value || '';
+        const [statusResponse, listResponse] = await Promise.all([
+            post('/api/emails/admin/schedules/status', {}),
+            post('/api/emails/admin/schedules/list', { status: filter, limit: 500, includeBody: false }),
+        ]);
+        state.scheduleStatus = statusResponse.status || {};
+        state.schedules = listResponse.result?.tasks || [];
+        renderScheduleMetrics();
+        renderSchedules();
+        if (!options?.silent) toast('Scheduled email list updated.', 'success', 'Scheduler refreshed', { duration: 1500 });
+    }
+
+    async function openSchedules(button) {
+        setBusy(button, true, 'Opening…');
+        try {
+            await loadSchedules({ silent: true });
+            ui.show('#adminSchedulesModal');
+        } catch (error) {
+            toast(error.message || 'Unable to load schedules.', 'error', 'Scheduler unavailable');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    function resetScheduleEditor(task) {
+        const form = q('[data-schedule-form]');
+        if (!form) return;
+        form.reset();
+        const message = task?.message || {};
+        form.elements.id.value = task?.id || '';
+        form.elements.from.value = message.from || '';
+        form.elements.to.value = Array.isArray(message.to) ? message.to.join(', ') : message.to || '';
+        form.elements.cc.value = Array.isArray(message.cc) ? message.cc.join(', ') : message.cc || '';
+        form.elements.sendAt.value = task?.sendAt || task?.sendAtUtc || '';
+        form.elements.subject.value = message.subject || '';
+        form.elements.text.value = message.text || '';
+        form.elements.html.value = message.html || '';
+        form.elements.maxRetries.value = task?.maxRetries ?? 3;
+        form.elements.retryDelaySeconds.value = task?.retryDelaySeconds ?? 300;
+        const title = q('[data-schedule-editor-title]');
+        if (title) title.textContent = task ? 'Edit scheduled email' : 'New scheduled email';
+        const editor = q('[data-schedule-editor]');
+        if (editor) editor.hidden = false;
+        form.elements.from.focus();
+    }
+
+    async function editSchedule(id) {
+        try {
+            const response = await post('/api/emails/admin/schedules/get', { id });
+            resetScheduleEditor(response.task);
+        } catch (error) {
+            toast(error.message || 'Unable to load the scheduled email.', 'error', 'Schedule unavailable');
+        }
+    }
+
+    async function saveSchedule(button) {
+        const form = q('[data-schedule-form]');
+        if (!form) return;
+        const raw = Object.fromEntries(new FormData(form).entries());
+        if (!raw.from || !raw.to || !raw.sendAt || (!raw.text && !raw.html)) return toast('From, To, Send at and message content are required.', 'warning', 'Complete the schedule');
+        const data = {
+            id: raw.id || '',
+            sendAt: raw.sendAt,
+            maxRetries: Number(raw.maxRetries || 3),
+            retryDelaySeconds: Number(raw.retryDelaySeconds || 300),
+            message: { from: raw.from, to: raw.to, cc: raw.cc, subject: raw.subject, text: raw.text, html: raw.html },
+        };
+        setBusy(button, true, 'Saving…');
+        try {
+            await post(raw.id ? '/api/emails/admin/schedules/update' : '/api/emails/admin/schedules/create', data);
+            q('[data-schedule-editor]').hidden = true;
+            await loadSchedules({ silent: true });
+            toast(raw.id ? 'Scheduled email updated.' : 'Email scheduled successfully.', 'success', raw.id ? 'Schedule updated' : 'Email scheduled');
+        } catch (error) {
+            toast(error.message || 'Unable to save the scheduled email.', 'error', 'Schedule failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function scheduleCommand(action, id, button) {
+        const endpoints = {
+            'schedule-cancel': '/api/emails/admin/schedules/cancel',
+            'schedule-send-now': '/api/emails/admin/schedules/send-now',
+            'schedule-retry': '/api/emails/admin/schedules/retry',
+        };
+        const endpoint = endpoints[action];
+        if (!endpoint) return;
+        setBusy(button, true, action === 'schedule-send-now' ? 'Sending…' : 'Updating…');
+        try {
+            await post(endpoint, { id });
+            await loadSchedules({ silent: true });
+            toast(action === 'schedule-send-now' ? 'Scheduled email processed now.' : action === 'schedule-cancel' ? 'Schedule cancelled.' : 'Schedule queued for retry.', 'success', 'Scheduler updated');
+        } catch (error) {
+            toast(error.message || 'Unable to update the schedule.', 'error', 'Scheduler action failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    function providerStatusMap() {
+        const map = new Map();
+        for (const item of state.deliverability?.status?.providers || []) map.set(item.provider, item);
+        return map;
+    }
+
+    function renderDeliverabilityOverview() {
+        if (!state.deliverability) return;
+        const response = state.deliverability;
+        const status = response.status || {};
+        const config = response.config || {};
+        const global = status.global || {};
+        const summary = q('[data-deliverability-summary]');
+        if (summary) {
+            const items = [
+                ['Today attempts', Number(global.dayAttempts || 0).toLocaleString()],
+                ['Warm-up daily limit', Number(status.warmup?.currentDailyLimit || 0).toLocaleString()],
+                ['Hard bounces', Number(global.hardBounces || 0).toLocaleString()],
+                ['Complaints', Number(global.complaints || 0).toLocaleString()],
+            ];
+            summary.innerHTML = items.map((item) => '<div><small>' + item[0] + '</small><strong>' + item[1] + '</strong></div>').join('');
+        }
+        const providerMap = providerStatusMap();
+        const providerHost = q('[data-deliverability-providers]');
+        if (providerHost) {
+            const names = Object.keys(config.providers || {});
+            providerHost.innerHTML = names.concat(['other']).map((name) => {
+                const cfg = name === 'other' ? config.domain || {} : config.providers[name] || {};
+                const item = providerMap.get(name) || { health: 'healthy', dayAttempts: 0, hardBounces: 0, complaints: 0, failed: 0 };
+                return '<article class="mail-provider-card"><header><h4>' + escape(name) + '</h4>' + statusPill(item.health || 'healthy') + '</header><dl><dt>Today</dt><dd>' + Number(item.dayAttempts || 0).toLocaleString() + '</dd><dt>Hourly limit</dt><dd>' + Number(cfg.perHour || 0).toLocaleString() + '</dd><dt>Daily limit</dt><dd>' + Number(cfg.perDay || 0).toLocaleString() + '</dd><dt>Pacing</dt><dd>' + Number(cfg.minSecondsBetweenMessages || 0) + 's</dd><dt>Hard bounces</dt><dd>' + Number(item.hardBounces || 0) + '</dd><dt>Complaints</dt><dd>' + Number(item.complaints || 0) + '</dd></dl></article>';
+            }).join('');
+        }
+        const domains = q('[data-deliverability-domains]');
+        if (domains) {
+            domains.innerHTML = (status.domains || []).map((item) => '<tr><td>' + escape(item.domain) + '</td><td>' + escape(item.provider) + '</td><td>' + statusPill(item.health) + '</td><td>' + Number(item.dayAttempts || 0).toLocaleString() + '</td><td>' + Number(item.hardBounceRatePercent || 0).toFixed(2) + '%</td><td>' + Number(item.complaintRatePercent || 0).toFixed(2) + '%</td><td>' + Number(item.failureRatePercent || 0).toFixed(2) + '%</td><td>' + (item.circuitOpenUntil ? escape(dateTime(item.circuitOpenUntil)) : '—') + '</td></tr>').join('');
+        }
+        const feedback = q('[data-feedback-status]');
+        if (feedback) {
+            feedback.innerHTML = '<div><strong>One-click unsubscribe</strong><span>Enabled. Outbound single-recipient messages include List-Unsubscribe headers.</span></div><div><strong>Inbound DSN / ARF</strong><span>' + (response.inboundDsnDetection && response.inboundArfDetection ? 'Automatic bounce and complaint detection enabled.' : 'Not fully enabled.') + '</span></div><div><strong>Provider webhook</strong><span>' + (response.feedbackWebhookEnabled ? 'Enabled at ' + escape(response.feedbackEndpoint || '') : 'Disabled until EMAIL_FEEDBACK_TOKEN is configured.') + '</span></div>';
+        }
+    }
+
+    function renderDeliverabilitySettings() {
+        const host = q('[data-deliverability-settings]');
+        const config = state.deliverabilityConfig;
+        if (!host || !config) return;
+        const card = (title, fields) => '<article class="mail-delivery-settings-card"><h4>' + escape(title) + '</h4><div class="mail-delivery-settings-grid">' + fields.join('') + '</div></article>';
+        const numberField = (label, path, value, step) => '<label><span>' + escape(label) + '</span><input type="number" min="0" step="' + (step || '1') + '" data-delivery-config="' + escape(path) + '" value="' + escape(value) + '"></label>';
+        const checkField = (label, path, checked) => '<label><span>' + escape(label) + '</span><input type="checkbox" data-delivery-config="' + escape(path) + '" data-delivery-kind="boolean" ' + (checked ? 'checked' : '') + '></label>';
+        const blocks = [];
+        blocks.push(card('Global & domain', [
+            checkField('Engine enabled', 'enabled', config.enabled !== false),
+            numberField('Global / hour', 'global.perHour', config.global?.perHour || 0),
+            numberField('Global / day', 'global.perDay', config.global?.perDay || 0),
+            numberField('Domain / hour', 'domain.perHour', config.domain?.perHour || 0),
+            numberField('Domain / day', 'domain.perDay', config.domain?.perDay || 0),
+            numberField('Domain pacing seconds', 'domain.minSecondsBetweenMessages', config.domain?.minSecondsBetweenMessages || 0),
+        ]));
+        blocks.push(card('Warm-up & circuit breaker', [
+            checkField('Warm-up enabled', 'warmup.enabled', config.warmup?.enabled !== false),
+            numberField('Start / day', 'warmup.startPerDay', config.warmup?.startPerDay || 0),
+            numberField('Growth % / day', 'warmup.growthPercentPerDay', config.warmup?.growthPercentPerDay || 0),
+            numberField('Warm-up max / day', 'warmup.maxPerDay', config.warmup?.maxPerDay || 0),
+            checkField('Circuit breaker enabled', 'circuitBreaker.enabled', config.circuitBreaker?.enabled !== false),
+            numberField('Minimum sample', 'circuitBreaker.minSample', config.circuitBreaker?.minSample || 0),
+            numberField('Hard bounce threshold %', 'circuitBreaker.hardBounceRatePercent', config.circuitBreaker?.hardBounceRatePercent || 0, '0.01'),
+            numberField('Complaint threshold %', 'circuitBreaker.complaintRatePercent', config.circuitBreaker?.complaintRatePercent || 0, '0.01'),
+            numberField('Failure threshold %', 'circuitBreaker.failureRatePercent', config.circuitBreaker?.failureRatePercent || 0, '0.01'),
+            numberField('Pause minutes', 'circuitBreaker.pauseMinutes', config.circuitBreaker?.pauseMinutes || 0),
+        ]));
+        for (const [name, provider] of Object.entries(config.providers || {})) {
+            blocks.push(card(name.charAt(0).toUpperCase() + name.slice(1), [
+                checkField('Enabled', 'providers.' + name + '.enabled', provider.enabled !== false),
+                numberField('Per hour', 'providers.' + name + '.perHour', provider.perHour || 0),
+                numberField('Per day', 'providers.' + name + '.perDay', provider.perDay || 0),
+                numberField('Pacing seconds', 'providers.' + name + '.minSecondsBetweenMessages', provider.minSecondsBetweenMessages || 0),
+            ]));
+        }
+        host.innerHTML = blocks.join('');
+    }
+
+    function readDeliverabilitySettings() {
+        const config = policyClone(state.deliverabilityConfig || {});
+        qa('[data-delivery-config]').forEach((input) => {
+            const path = input.dataset.deliveryConfig;
+            const value = input.dataset.deliveryKind === 'boolean' ? !!input.checked : Number(input.value || 0);
+            policySet(config, path, value);
+        });
+        return config;
+    }
+
+    async function loadDeliverability(options) {
+        const response = await post('/api/emails/admin/deliverability/status', {});
+        state.deliverability = response;
+        state.deliverabilityConfig = policyClone(response.config || {});
+        renderDeliverabilityOverview();
+        renderDeliverabilitySettings();
+        if (!options?.silent) toast('Deliverability status refreshed.', 'success', 'Deliverability updated', { duration: 1500 });
+    }
+
+    async function loadSuppressions() {
+        const query = q('[data-suppression-search]')?.value || '';
+        const type = q('[data-suppression-type]')?.value || '';
+        const response = await post('/api/emails/admin/deliverability/suppressions/list', { query, type, limit: 500 });
+        state.suppressions = response.result?.items || [];
+        const host = q('[data-suppression-list]');
+        if (host) {
+            host.innerHTML = state.suppressions.map((item) => '<tr><td>' + escape(item.email) + '</td><td>' + escape(item.domain || '') + '</td><td>' + statusPill(item.type) + '</td><td>' + escape(item.reason || '—') + '</td><td>' + escape(item.source || '') + '</td><td>' + escape(dateTime(item.createdAt)) + '</td><td><div class="mail-ops-row-actions"><button class="danger" type="button" data-admin-action="suppression-remove" data-suppression-email="' + escape(item.email) + '">Remove</button></div></td></tr>').join('');
+        }
+    }
+
+    function showDeliverabilityTab(name) {
+        state.deliverabilityTab = name || 'overview';
+        qa('[data-deliverability-tab]').forEach((button) => button.classList.toggle('is-active', button.dataset.deliverabilityTab === state.deliverabilityTab));
+        qa('[data-deliverability-pane]').forEach((pane) => { pane.hidden = pane.dataset.deliverabilityPane !== state.deliverabilityTab; });
+        if (state.deliverabilityTab === 'suppressions') loadSuppressions().catch((error) => toast(error.message, 'error', 'Suppressions unavailable'));
+    }
+
+    async function openDeliverability(button) {
+        setBusy(button, true, 'Opening…');
+        try {
+            await Promise.all([loadDeliverability({ silent: true }), loadSuppressions()]);
+            showDeliverabilityTab(state.deliverabilityTab);
+            ui.show('#adminDeliverabilityModal');
+        } catch (error) {
+            toast(error.message || 'Unable to load deliverability controls.', 'error', 'Deliverability unavailable');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function saveDeliverability(button) {
+        setBusy(button, true, 'Saving…');
+        try {
+            const response = await post('/api/emails/admin/deliverability/config', { config: readDeliverabilitySettings() });
+            state.deliverabilityConfig = policyClone(response.config || {});
+            state.deliverability = Object.assign({}, state.deliverability || {}, { config: response.config, status: response.status });
+            renderDeliverabilityOverview();
+            renderDeliverabilitySettings();
+            toast('Deliverability limits are active immediately.', 'success', 'Settings saved');
+        } catch (error) {
+            toast(error.message || 'Unable to save deliverability settings.', 'error', 'Save failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function addSuppression(button) {
+        const email = q('[data-suppression-email]')?.value.trim() || '';
+        const type = q('[data-suppression-add-type]')?.value || 'manual';
+        const reason = q('[data-suppression-reason]')?.value.trim() || '';
+        if (!email) return toast('Enter an email address first.', 'warning', 'Email required');
+        setBusy(button, true, 'Adding…');
+        try {
+            await post('/api/emails/admin/deliverability/suppressions/add', { email, type, reason });
+            q('[data-suppression-email]').value = '';
+            q('[data-suppression-reason]').value = '';
+            await loadSuppressions();
+            toast('Recipient added to the suppression list.', 'success', 'Suppression added');
+        } catch (error) {
+            toast(error.message || 'Unable to add suppression.', 'error', 'Suppression failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function removeSuppression(email, button) {
+        setBusy(button, true, 'Removing…');
+        try {
+            await post('/api/emails/admin/deliverability/suppressions/remove', { email });
+            await loadSuppressions();
+            toast('Suppression removed.', 'success', 'Recipient allowed again');
+        } catch (error) {
+            toast(error.message || 'Unable to remove suppression.', 'error', 'Remove failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function reportFeedback(button) {
+        const email = q('[data-feedback-email]')?.value.trim() || '';
+        const type = q('[data-feedback-type]')?.value || 'complaint';
+        const reason = q('[data-feedback-reason]')?.value.trim() || '';
+        if (!email) return toast('Enter the affected recipient email.', 'warning', 'Email required');
+        setBusy(button, true, 'Recording…');
+        try {
+            await post('/api/emails/admin/deliverability/feedback', { email, type, reason });
+            await Promise.all([loadDeliverability({ silent: true }), loadSuppressions()]);
+            toast('Delivery feedback recorded and reputation state updated.', 'success', 'Feedback recorded');
+        } catch (error) {
+            toast(error.message || 'Unable to record feedback.', 'error', 'Feedback failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    function renderHealth() {
+        const snapshot = state.health;
+        if (!snapshot) return;
+        const components = q('[data-health-components]');
+        if (components) {
+            components.innerHTML = Object.entries(snapshot.components || {}).map(([name, item]) => '<article><small>Component</small><h4>' + escape(name) + '</h4>' + statusPill(item.status || 'unknown') + '<span>' + escape(item.updatedAt ? relativeTime(item.updatedAt) : '') + '</span></article>').join('');
+        }
+        const metrics = q('[data-health-metrics]');
+        if (metrics) {
+            const schedulerCounts = snapshot.scheduler?.counts || {};
+            const values = [
+                ['Uptime', Math.floor(Number(snapshot.process?.uptimeSeconds || 0) / 60).toLocaleString() + ' min'],
+                ['Memory RSS', formatBytes(snapshot.process?.memory?.rss || 0)],
+                ['Heap used', formatBytes(snapshot.process?.memory?.heapUsed || 0)],
+                ['Event loop lag', Number(snapshot.process?.eventLoopLagMs || 0).toLocaleString() + ' ms'],
+                ['Stored messages', Number(snapshot.mail?.storedTotal || 0).toLocaleString()],
+                ['Scheduled queue', Number(schedulerCounts.scheduled || 0).toLocaleString()],
+                ['SMTP accepted', Number(snapshot.counters?.smtpAccepted || 0).toLocaleString()],
+                ['SMTP rejected', Number(snapshot.counters?.smtpRejected || 0).toLocaleString()],
+                ['Incoming stored', Number(snapshot.counters?.incomingStored || 0).toLocaleString()],
+                ['Outgoing sent', Number(snapshot.counters?.outgoingSent || 0).toLocaleString()],
+                ['Outgoing failed', Number(snapshot.counters?.outgoingFailed || 0).toLocaleString()],
+                ['Live SSE connections', Number(snapshot.counters?.sseConnections || 0).toLocaleString()],
+                ['SSE events', Number(snapshot.counters?.sseEvents || 0).toLocaleString()],
+                ['Feedback events', Number(snapshot.counters?.feedbackEvents || 0).toLocaleString()],
+                ['Unsubscribes', Number(snapshot.counters?.unsubscribeEvents || 0).toLocaleString()],
+                ['Runtime errors', Number(snapshot.recentErrors?.length || 0).toLocaleString()],
+            ];
+            metrics.innerHTML = values.map((item) => '<div><small>' + item[0] + '</small><strong>' + item[1] + '</strong></div>').join('');
+        }
+        const errors = q('[data-health-errors]');
+        if (errors) errors.innerHTML = (snapshot.recentErrors || []).map((item) => '<tr><td>' + escape(dateTime(item.date)) + '</td><td>' + escape(item.component) + '</td><td>' + escape(item.message) + '</td><td class="mail-health-errors-details"><code>' + escape(item.details ? JSON.stringify(item.details) : '—') + '</code></td></tr>').join('');
+        const updated = q('[data-health-updated]');
+        if (updated) updated.textContent = 'Updated ' + dateTime(snapshot.timestamp);
+    }
+
+    async function loadHealth(options) {
+        const response = await post('/api/emails/admin/health', {});
+        state.health = response.snapshot || null;
+        renderHealth();
+        if (!options?.silent) toast('Production health metrics refreshed.', 'success', 'Health updated', { duration: 1500 });
+    }
+
+    async function openHealth(button) {
+        setBusy(button, true, 'Opening…');
+        try {
+            await loadHealth({ silent: true });
+            ui.show('#adminHealthModal');
+        } catch (error) {
+            toast(error.message || 'Unable to load service health.', 'error', 'Health unavailable');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+
+    function operationsGet(obj, path) {
+        return String(path || '').split('.').reduce((value, key) => value == null ? undefined : value[key], obj);
+    }
+
+    function operationsSet(obj, path, value) {
+        const parts = String(path || '').split('.');
+        let target = obj;
+        parts.forEach((key, index) => {
+            if (index === parts.length - 1) target[key] = value;
+            else {
+                if (!target[key] || typeof target[key] !== 'object') target[key] = {};
+                target = target[key];
+            }
+        });
+    }
+
+    function renderOperations() {
+        const status = state.operations;
+        if (!status) return;
+        const storage = status.storage || {};
+        const metrics = q('[data-operations-metrics]');
+        if (metrics) {
+            const values = [
+                ['Storage', statusPill(storage.level || 'unknown')],
+                ['Managed', formatBytes(storage.managedBytes || 0)],
+                ['Quota', Number(storage.quotaPercent || 0).toFixed(1) + '%'],
+                ['Disk free', storage.disk ? formatBytes(storage.disk.freeBytes || 0) : 'Unavailable'],
+                ['Backups', Number(status.backups?.count || 0).toLocaleString()],
+                ['Last backup', status.lastBackupAt ? relativeTime(status.lastBackupAt) : 'Never'],
+                ['Last cleanup', status.lastCleanupAt ? relativeTime(status.lastCleanupAt) : 'Never'],
+                ['Restart required', status.restartRequired ? 'Yes' : 'No'],
+            ];
+            metrics.innerHTML = values.map((item) => '<div class="mail-ops-metric"><small>' + escape(item[0]) + '</small><strong>' + item[1] + '</strong></div>').join('');
+        }
+        state.operationsConfig = status.config || state.operationsConfig || {};
+        qa('[data-operations-config]').forEach((input) => {
+            let value = operationsGet(state.operationsConfig, input.dataset.operationsConfig);
+            if (input.dataset.operationsKind === 'boolean') input.checked = !!value;
+            else {
+                if (input.dataset.operationsUnit === 'gb') value = Number(value || 0) / (1024 * 1024 * 1024);
+                input.value = Number.isFinite(Number(value)) ? Math.round(Number(value) * 100) / 100 : '';
+            }
+        });
+        const backupsHost = q('[data-operations-backups]');
+        const backups = Array.isArray(status.backupItems) ? status.backupItems : [];
+        if (backupsHost) backupsHost.innerHTML = backups.length ? backups.map((item) => '<tr><td>' + escape(dateTime(item.createdAt)) + '</td><td>' + escape(item.reason || '—') + '</td><td>' + Number(item.fileCount || 0).toLocaleString() + '</td><td>' + escape(formatBytes(item.totalBytes || 0)) + '</td><td><div class="mail-ops-row-actions"><button type="button" data-admin-action="backup-validate" data-backup-id="' + escape(item.id) + '">Validate</button><button type="button" class="danger" data-admin-action="backup-restore" data-backup-id="' + escape(item.id) + '">Restore</button></div></td></tr>').join('') : '<tr><td colspan="5">No backups yet.</td></tr>';
+        const historyHost = q('[data-operations-history]');
+        const history = Array.isArray(status.history) ? status.history.slice().reverse() : [];
+        if (historyHost) historyHost.innerHTML = history.length ? history.map((item) => '<tr><td>' + escape(dateTime(item.date)) + '</td><td>' + statusPill(item.level || 'unknown') + '</td><td>' + escape(formatBytes(item.managedBytes || 0)) + '</td><td>' + Number(item.quotaPercent || 0).toFixed(1) + '%</td><td>' + escape(item.diskFreeBytes == null ? 'Unavailable' : formatBytes(item.diskFreeBytes)) + '</td><td>' + Number(item.messageCount || 0).toLocaleString() + '</td><td>' + Number(item.backupCount || 0).toLocaleString() + '</td></tr>').join('') : '<tr><td colspan="7">No storage history samples yet.</td></tr>';
+        const alertsHost = q('[data-operations-alerts]');
+        const alerts = status.alerts?.alerts || [];
+        if (alertsHost) alertsHost.innerHTML = alerts.length ? alerts.map((item) => '<tr><td>' + escape(dateTime(item.date)) + '</td><td>' + statusPill(item.level || 'warning') + '</td><td>' + escape(item.type || '') + '</td><td>' + escape(item.message || '') + '</td><td><code>' + escape(JSON.stringify(item.details || {})) + '</code></td></tr>').join('') : '<tr><td colspan="5">No operational alerts.</td></tr>';
+    }
+
+    function renderCleanupPreview() {
+        const host = q('[data-operations-cleanup-preview]');
+        const preview = state.operationsCleanupPreview;
+        if (!host) return;
+        if (!preview) {
+            host.innerHTML = '<div><strong>No preview</strong><span>Run a preview before any retention cleanup.</span></div>';
+            return;
+        }
+        const c = preview.candidates || {};
+        host.innerHTML = '<div><strong>' + Number(c.messages || 0).toLocaleString() + '</strong><span>Messages</span></div><div><strong>' + Number(c.schedules || 0).toLocaleString() + '</strong><span>Schedules</span></div><div><strong>' + Number((c.auditFiles || 0) + (c.trackingFiles || 0)).toLocaleString() + '</strong><span>Operational files</span></div><div><strong>' + escape(formatBytes(preview.estimatedReclaimBytes || 0)) + '</strong><span>Estimated reclaim</span><button class="sb-btn sb-btn-ghost" type="button" data-admin-action="cleanup-execute">Execute preview</button></div>';
+    }
+
+    async function loadOperations(options) {
+        const response = await post('/api/emails/admin/operations/status', {});
+        const backups = await post('/api/emails/admin/operations/backups/list', {});
+        state.operations = response.status || null;
+        if (state.operations) state.operations.backupItems = backups.result?.backups || [];
+        renderOperations();
+        renderCleanupPreview();
+        if (!options?.silent) toast('Backup and storage status refreshed.', 'success', 'Operations updated', { duration: 1500 });
+    }
+
+    async function openOperations(button) {
+        setBusy(button, true, 'Opening…');
+        try {
+            await loadOperations({ silent: true });
+            ui.show('#adminOperationsModal');
+        } catch (error) {
+            toast(error.message || 'Unable to load backup and storage status.', 'error', 'Operations unavailable');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function createOperationsBackup(button) {
+        setBusy(button, true, 'Backing up…');
+        try {
+            const response = await post('/api/emails/admin/operations/backup/create', { reason: 'admin-manual' });
+            toast('Verified backup created: ' + (response.result?.backup?.id || ''), 'success', 'Backup complete');
+            await loadOperations({ silent: true });
+        } catch (error) {
+            toast(error.message || 'Unable to create backup.', 'error', 'Backup failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function validateOperationsBackup(id, button) {
+        setBusy(button, true, 'Validating…');
+        try {
+            const response = await post('/api/emails/admin/operations/backup/validate', { id });
+            toast(response.result?.valid ? 'All backup files match the SHA-256 manifest.' : 'Backup validation failed.', response.result?.valid ? 'success' : 'error', response.result?.valid ? 'Backup valid' : 'Backup invalid');
+        } catch (error) {
+            toast(error.message || 'Unable to validate backup.', 'error', 'Validation failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function restoreOperationsBackup(id, button) {
+        setBusy(button, true, 'Previewing…');
+        try {
+            const response = await post('/api/emails/admin/operations/restore/preview', { id });
+            const preview = response.result;
+            const changes = preview?.changes || {};
+            const ok = window.confirm('Restore backup ' + id + '?\n\nCreate: ' + Number(changes.createFiles || 0) + '\nOverwrite: ' + Number(changes.overwriteFiles || 0) + '\nRemove: ' + Number(changes.removeFiles || 0) + '\n\nA safety backup will be created first. The mail service must be restarted after restore.');
+            if (!ok) return;
+            setBusy(button, true, 'Restoring…');
+            const restored = await post('/api/emails/admin/operations/restore/execute', { id, confirm: true, confirmToken: preview.confirmToken });
+            toast('Restore completed. Restart the email service before continuing normal operations.', 'warning', 'Restart required', { duration: 8000 });
+            if (restored.result?.restartRequired) state.operations.restartRequired = true;
+            await loadOperations({ silent: true });
+        } catch (error) {
+            toast(error.message || 'Unable to restore backup.', 'error', 'Restore failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function saveOperationsConfig(button) {
+        const config = JSON.parse(JSON.stringify(state.operationsConfig || {}));
+        qa('[data-operations-config]').forEach((input) => {
+            let value;
+            if (input.dataset.operationsKind === 'boolean') value = !!input.checked;
+            else {
+                value = Number(input.value || 0);
+                if (input.dataset.operationsUnit === 'gb') value *= 1024 * 1024 * 1024;
+            }
+            operationsSet(config, input.dataset.operationsConfig, value);
+        });
+        setBusy(button, true, 'Saving…');
+        try {
+            const response = await post('/api/emails/admin/operations/config', { config });
+            state.operationsConfig = response.config || config;
+            state.operations = response.status || state.operations;
+            await loadOperations({ silent: true });
+            toast('Backup, retention and disk thresholds are active.', 'success', 'Storage policy saved');
+        } catch (error) {
+            toast(error.message || 'Unable to save storage policy.', 'error', 'Save failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function previewOperationsCleanup(button) {
+        setBusy(button, true, 'Previewing…');
+        try {
+            const response = await post('/api/emails/admin/operations/cleanup/preview', { emergency: false });
+            state.operationsCleanupPreview = response.result || null;
+            renderCleanupPreview();
+            toast('Cleanup preview is ready. No files were deleted.', 'info', 'Dry run complete');
+        } catch (error) {
+            toast(error.message || 'Unable to preview cleanup.', 'error', 'Preview failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function executeOperationsCleanup(button) {
+        const preview = state.operationsCleanupPreview;
+        if (!preview) return toast('Run cleanup preview first.', 'warning', 'Preview required');
+        if (!window.confirm('Delete exactly the items shown in the current cleanup preview? Protected/VIP messages remain preserved.')) return;
+        setBusy(button, true, 'Cleaning…');
+        try {
+            await post('/api/emails/admin/operations/cleanup/execute', { confirm: true, confirmToken: preview.confirmToken });
+            state.operationsCleanupPreview = null;
+            await loadOperations({ silent: true });
+            toast('Retention cleanup completed.', 'success', 'Storage cleaned');
+        } catch (error) {
+            toast(error.message || 'Unable to execute cleanup.', 'error', 'Cleanup failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
+    async function runOperationsMaintenance(button) {
+        setBusy(button, true, 'Running…');
+        try {
+            await post('/api/emails/admin/operations/maintenance/run', {});
+            await loadOperations({ silent: true });
+            toast('Backup due checks, quota assessment and retention maintenance completed.', 'success', 'Maintenance complete');
+        } catch (error) {
+            toast(error.message || 'Unable to run maintenance.', 'error', 'Maintenance failed');
+        } finally {
+            setBusy(button, false);
+        }
+    }
+
     const policyDefinitions = [
         { group: 'Incoming sender', name: 'blockFrom', title: 'Block From emails / patterns', help: 'Reject SMTP senders matching any entry.', placeholder: 'bad@example.com\n*@spam-domain.com' },
         { group: 'Incoming sender', name: 'allowFrom', title: 'Allow From emails / patterns', help: 'When enabled with entries, only matching SMTP senders are accepted.', placeholder: 'trusted@example.com\n*@partner.com' },
@@ -964,7 +1568,33 @@
         if (action === 'policy-refresh') { try { await loadPolicy({ silent: true }); toast('Protection activity refreshed.', 'success', 'Activity updated', { duration: 1600 }); } catch (error) { toast(error.message || 'Unable to refresh policy activity.', 'error', 'Refresh failed'); } return; }
         if (action === 'policy-tab') return showPolicyTab(button.dataset.policyTab || 'rules');
         if (action === 'policy-test') return testPolicy(button);
-        if (action === 'policy-clear-list') { const name = button.dataset.policyListName; const textarea = q('[data-policy-list-values= + name + ]'); if (textarea) textarea.value = ''; button.disabled = true; return; }
+        if (action === 'policy-clear-list') { const name = button.dataset.policyListName; const textarea = q('[data-policy-list-values="' + name + '"]'); if (textarea) textarea.value = ''; button.disabled = true; return; }
+        if (action === 'open-schedules') return openSchedules(button);
+        if (action === 'schedule-refresh') return loadSchedules();
+        if (action === 'schedule-new') return resetScheduleEditor(null);
+        if (action === 'schedule-editor-close') { const editor = q('[data-schedule-editor]'); if (editor) editor.hidden = true; return; }
+        if (action === 'schedule-save') return saveSchedule(button);
+        if (action === 'schedule-edit') return editSchedule(button.dataset.scheduleId);
+        if (action === 'schedule-cancel' || action === 'schedule-send-now' || action === 'schedule-retry') return scheduleCommand(action, button.dataset.scheduleId, button);
+        if (action === 'open-deliverability') return openDeliverability(button);
+        if (action === 'deliverability-tab') return showDeliverabilityTab(button.dataset.deliverabilityTab || 'overview');
+        if (action === 'deliverability-refresh') return loadDeliverability();
+        if (action === 'deliverability-save') return saveDeliverability(button);
+        if (action === 'suppression-refresh') return loadSuppressions();
+        if (action === 'suppression-add') return addSuppression(button);
+        if (action === 'suppression-remove') return removeSuppression(button.dataset.suppressionEmail, button);
+        if (action === 'feedback-report') return reportFeedback(button);
+        if (action === 'open-operations') return openOperations(button);
+        if (action === 'operations-refresh') return loadOperations();
+        if (action === 'operations-save') return saveOperationsConfig(button);
+        if (action === 'operations-maintenance') return runOperationsMaintenance(button);
+        if (action === 'backup-create') return createOperationsBackup(button);
+        if (action === 'backup-validate') return validateOperationsBackup(button.dataset.backupId, button);
+        if (action === 'backup-restore') return restoreOperationsBackup(button.dataset.backupId, button);
+        if (action === 'cleanup-preview') return previewOperationsCleanup(button);
+        if (action === 'cleanup-execute') return executeOperationsCleanup(button);
+        if (action === 'open-health') return openHealth(button);
+        if (action === 'health-refresh') return loadHealth();
         if (action === 'compose') return ui.show('#adminComposeModal');
         if (action === 'new-folder') {
             const panel = q('[data-admin-new-folder]');
@@ -1080,6 +1710,11 @@
             state.limit = Math.max(1, Math.min(Number(pageSize.value || 50), 250));
             state.offset = 0;
             loadMessages();
+            return;
+        }
+        const scheduleFilter = event.target.closest('[data-schedule-filter]');
+        if (scheduleFilter) {
+            loadSchedules({ silent: true });
             return;
         }
         const importFile = event.target.closest('[data-policy-import-file]');

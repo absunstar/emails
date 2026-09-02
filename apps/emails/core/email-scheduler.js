@@ -442,6 +442,47 @@ class EmailScheduler {
         }
     }
 
+    prunePreview(args) {
+        args = args || {};
+        const completedCutoff = Date.now() - Math.max(1, Number(args.completedDays || 30)) * 86400000;
+        const cancelledCutoff = Date.now() - Math.max(1, Number(args.cancelledDays || 7)) * 86400000;
+        const ids = [];
+        let bytes = 0;
+        for (const task of this._all()) {
+            const status = String(task.status || '');
+            let remove = false;
+            if (status === 'sent' || status === 'failed') {
+                const value = Date.parse(task.sentAt || task.failedAt || task.updatedAt || task.createdAt || 0);
+                remove = Number.isFinite(value) && value < completedCutoff;
+            } else if (status === 'cancelled') {
+                const value = Date.parse(task.cancelledAt || task.updatedAt || task.createdAt || 0);
+                remove = Number.isFinite(value) && value < cancelledCutoff;
+            }
+            if (!remove) continue;
+            ids.push(task.id);
+            try { bytes += fs.statSync(this._taskPath(task.id)).size; } catch (_) {}
+        }
+        return { count: ids.length, ids, bytes };
+    }
+
+    pruneByIds(ids) {
+        const unique = Array.from(new Set((ids || []).map((id) => String(id || '')).filter(Boolean)));
+        const deleted = [];
+        const skipped = [];
+        for (const id of unique) {
+            let task;
+            try { task = this._read(id); } catch (_) { task = null; }
+            if (!task) { skipped.push(id); continue; }
+            if (!['sent', 'failed', 'cancelled'].includes(String(task.status || ''))) { skipped.push(id); continue; }
+            try {
+                fs.rmSync(this._taskPath(id), { force: true });
+                try { fs.rmSync(this._lockPath(id), { force: true }); } catch (_) {}
+                deleted.push(id);
+            } catch (_) { skipped.push(id); }
+        }
+        return { deleted, skipped, count: deleted.length };
+    }
+
     status() {
         const tasks = this._all();
         const counts = {};

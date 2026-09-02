@@ -96,8 +96,8 @@ const { analyzeEmailHtml, sanitizeEmailHtml, qrSvg } = require('../apps/emails/c
     assert(/Backup &amp; Restore/.test(html));
     assert(/Export a backup/.test(html));
     assert(/Import saved emails/.test(html));
-    assert.strictEqual((html.match(/data-action="import-addresses"/g) || []).length, 1);
-    assert.strictEqual((html.match(/data-action="export-addresses"/g) || []).length, 1);
+    assert.strictEqual((html.match(/data-action="import-addresses"/g) || []).length, 2);
+    assert.strictEqual((html.match(/data-action="export-addresses"/g) || []).length, 2);
     assert(/data-address-progress/.test(html));
     assert(/prefers-reduced-motion/.test(html));
     assert(/data-action="show-qr"/.test(html));

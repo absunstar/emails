@@ -4,6 +4,7 @@ const root = path.join(__dirname, '..');
 const free = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/free.html'), 'utf8');
 const login = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/login.html'), 'utf8');
 const loginJs = fs.readFileSync(path.join(root, 'site_files/js/login.js'), 'utf8');
+const emailJs = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/index.js'), 'utf8');
 function assert(value, message) { if (!value) throw new Error(message); }
 assert(free.includes('class="hero-title"') && free.includes('hero-title-line'), 'Homepage hero line-height fix is missing');
 assert(free.includes('mailbox-pref-btn:after') && free.includes('mailbox-pref-btn.is-on:before'), 'Preference toggle treatment is missing');
@@ -19,4 +20,10 @@ assert(!login.includes('Continue securely in Social Browser'), 'Old login hierar
 assert(loginJs.includes("SBUI.copy(location.href)"), 'Login page link copy behavior is missing');
 assert(loginJs.includes("SBUI.toast('Page link copied."), 'Login copy feedback is missing');
 assert(loginJs.includes("setState('needs-browser')") && loginJs.includes("setState('is-ready')"), 'Login visual states are missing');
+
+assert(free.includes('mailbox-addresses-panel') && free.includes('Saved inboxes'), 'Saved inboxes must be the visually primary sidebar section');
+assert(free.includes('mailbox-secondary-tools') && free.includes('mailbox-transfer-row'), 'Notification, sound, import and export tools must live in the secondary bottom area');
+const selectAddressStart = emailJs.indexOf('async function selectAddress');
+const selectAddressEnd = emailJs.indexOf('async function loadClientContext', selectAddressStart);
+assert(selectAddressStart >= 0 && selectAddressEnd > selectAddressStart && !emailJs.slice(selectAddressStart, selectAddressEnd).includes('Address removed'), 'Selecting a saved inbox must never show removal feedback');
 console.log('Homepage and login UI polish checks passed');

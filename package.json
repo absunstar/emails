@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "node --max-old-space-size=8192 server.js",
-    "test": "node tests/frontend-zero-deps.js && node tests/runtime-domain.js && node tests/client-local-addresses.js && node tests/browser-auth.js && node tests/file-store-service.js && node tests/competitive-features.js && node tests/action-feedback.js && node tests/ui-polish.js && node tests/admin-dashboard.js && node tests/abuse-policy.js && node tests/mcp-smoke.js && node tests/mcp-manager-service.js"
+    "test": "node tests/frontend-zero-deps.js && node tests/runtime-domain.js && node tests/client-local-addresses.js && node tests/browser-auth.js && node tests/file-store-service.js && node tests/competitive-features.js && node tests/action-feedback.js && node tests/ui-polish.js && node tests/sidebar-email-list-layout.js && node tests/admin-dashboard.js && node tests/abuse-policy.js && node tests/mcp-smoke.js && node tests/mcp-manager-service.js"
   },
   "keywords": [
     "email",

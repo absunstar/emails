@@ -361,7 +361,7 @@
             const originalIndex = state.addressBook.addresses.findIndex((entry) => entry.email === item.email) + 1;
             const active = item.email === state.addressBook.active;
             const unread = Math.max(0, Number(item.unreadCount || 0));
-            const remove = state.client.canRemoveAddress ? '<button class="mailbox-address-remove" type="button" data-action="remove-address" data-email="' + escape(item.email) + '" title="Remove address from this browser" aria-label="Remove ' + escape(item.email) + '">×</button>' : '';
+            const remove = state.client.canRemoveAddress ? '<button class="mailbox-address-remove" type="button" data-action="remove-address" data-email="' + escape(item.email) + '" title="Remove address from this browser" aria-label="Remove ' + escape(item.email) + '"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m8 11 1 8h6l1-8"></path></svg></button>' : '';
             const status = item.lastMessageAt ? (escape(item.lastMessageSubject || 'New message') + ' · ' + relativeTime(item.lastMessageAt)) : (Number(item.messageCount || 0) + ' message' + (Number(item.messageCount || 0) === 1 ? '' : 's') + (item.lastCheckedAt ? ' · checked ' + relativeTime(item.lastCheckedAt) : ''));
             return '<div class="mailbox-address-item' + (active ? ' is-active' : '') + (unread ? ' has-unread' : '') + '"><button class="mailbox-address-select" type="button" data-action="select-address" data-email="' + escape(item.email) + '"><span class="mailbox-address-index">' + originalIndex + '</span><span class="mailbox-address-copy"><strong>' + escape(item.label || item.email) + '</strong>' + (item.label ? '<small>' + escape(item.email) + '</small>' : '') + '<small>' + status + '</small></span>' + (unread ? '<span class="mailbox-unread">' + unread + '</span>' : '<span></span>') + '</button>' + remove + '</div>';
         }).join('');
@@ -445,7 +445,6 @@
         state.addressBook.active = normalized;
         saveAddressBook();
         renderAddressSidebar();
-        toast(normalized + ' was removed from My Emails.', 'success', 'Address removed');
         const input = q('[data-mail-address]');
         if (input) input.value = normalized;
         const loaded = await loadAll({ to: normalized }, 500, { markRead: true });

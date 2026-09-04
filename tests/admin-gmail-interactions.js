@@ -1,0 +1,14 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const root = path.resolve(__dirname, '..');
+const js = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/admin.js'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'site_files/css/zero-ui.css'), 'utf8');
+assert(js.includes("document.addEventListener('contextmenu'"), 'admin list should expose a row context menu');
+assert(js.includes("row && !interactive"), 'clicking a non-interactive part of a row should open the message');
+assert(js.includes('context-delete'), 'context menu should support delete');
+assert(js.includes('context-read') && js.includes('context-unread'), 'context menu should support read/unread');
+assert(js.includes('data-admin-context-folder'), 'context menu should support moving to folders');
+assert(css.includes('min-width:0!important;table-layout:fixed!important'), 'admin table should be fixed-width without forced horizontal overflow');
+assert(css.includes('.mail-admin-table-wrap{overflow-x:hidden!important'), 'horizontal scrolling should be disabled');
+console.log('admin-gmail-interactions tests passed');

@@ -1507,6 +1507,111 @@
         }
     }
 
+    let contextMenu = null;
+    let contextMenuGuid = '';
+
+    function closeContextMenu() {
+        if (contextMenu) contextMenu.hidden = true;
+        contextMenuGuid = '';
+    }
+
+    function contextMenuIcon(name) {
+        const icons = {
+            open: '<svg viewBox="0 0 24 24"><path d="M4 12h14M13 7l5 5-5 5"></path></svg>',
+            read: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg>',
+            unread: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M4 8h16"></path></svg>',
+            star: '<svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"></path></svg>',
+            folder: '<svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v10H3z"></path></svg>',
+            download: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"></path></svg>',
+            trash: '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>',
+        };
+        return icons[name] || '';
+    }
+
+    function ensureContextMenu() {
+        if (contextMenu) return contextMenu;
+        contextMenu = document.createElement('div');
+        contextMenu.className = 'mail-admin-context-menu';
+        contextMenu.hidden = true;
+        contextMenu.setAttribute('role', 'menu');
+        document.body.appendChild(contextMenu);
+        return contextMenu;
+    }
+
+    function renderContextMenu(doc) {
+        const menu = ensureContextMenu();
+        const folders = folderEntries().map((entry) => entry.name).filter(Boolean);
+        const readAction = doc.read ? 'context-unread' : 'context-read';
+        const readLabel = doc.read ? 'Mark as unread' : 'Mark as read';
+        const readIcon = doc.read ? 'unread' : 'read';
+        const favoriteLabel = doc.favorite ? 'Remove star' : 'Add star';
+        menu.innerHTML =
+            '<button type="button" data-admin-context-action="open">' + contextMenuIcon('open') + '<span>Open message</span></button>' +
+            '<div class="mail-admin-context-separator"></div>' +
+            '<button type="button" data-admin-context-action="' + readAction + '">' + contextMenuIcon(readIcon) + '<span>' + readLabel + '</span></button>' +
+            '<button type="button" data-admin-context-action="context-favorite">' + contextMenuIcon('star') + '<span>' + favoriteLabel + '</span></button>' +
+            '<div class="mail-admin-context-submenu-wrap">' +
+                '<button type="button" data-admin-context-action="context-move-menu">' + contextMenuIcon('folder') + '<span>Move to folder</span><b>›</b></button>' +
+                '<div class="mail-admin-context-submenu">' + folders.map((name) => '<button type="button" data-admin-context-folder="' + escape(name) + '"><span>' + escape(name) + '</span></button>').join('') + '<button type="button" data-admin-context-folder="__custom__"><span>Other folder…</span></button></div>' +
+            '</div>' +
+            '<a href="/api/emails/eml?guid=' + encodeURIComponent(doc.guid) + '" download>' + contextMenuIcon('download') + '<span>Download EML</span></a>' +
+            '<div class="mail-admin-context-separator"></div>' +
+            '<button type="button" class="danger" data-admin-context-action="context-delete">' + contextMenuIcon('trash') + '<span>Delete</span></button>';
+        return menu;
+    }
+
+    function openContextMenu(event, row) {
+        const guid = row && row.dataset.adminRow;
+        const doc = state.items.find((item) => String(item.guid) === String(guid));
+        if (!doc) return;
+        event.preventDefault();
+        event.stopPropagation();
+        contextMenuGuid = String(guid);
+        const menu = renderContextMenu(doc);
+        menu.hidden = false;
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+        const rect = menu.getBoundingClientRect();
+        const gap = 8;
+        const left = Math.max(gap, Math.min(event.clientX, window.innerWidth - rect.width - gap));
+        const top = Math.max(gap, Math.min(event.clientY, window.innerHeight - rect.height - gap));
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+    }
+
+    async function handleContextAction(action, target) {
+        const guid = contextMenuGuid;
+        const doc = state.items.find((item) => String(item.guid) === String(guid));
+        if (!guid || !doc) return closeContextMenu();
+        closeContextMenu();
+        if (action === 'open') return openMessage(guid);
+        if (action === 'context-read') {
+            await updateOne(guid, { read: true });
+            return toast('Message marked as read.', 'success', 'Read state updated', { duration: 1500 });
+        }
+        if (action === 'context-unread') {
+            await updateOne(guid, { read: false });
+            return toast('Message marked as unread.', 'success', 'Read state updated', { duration: 1500 });
+        }
+        if (action === 'context-favorite') {
+            await updateOne(guid, { favorite: !doc.favorite });
+            return toast(doc.favorite ? 'Removed from favorites.' : 'Added to favorites.', 'success', 'Favorite updated', { duration: 1500 });
+        }
+        if (action === 'context-delete') return deleteOne(guid, false);
+        if (action === 'context-move-menu') return;
+    }
+
+    async function moveContextMessage(folderName) {
+        const guid = contextMenuGuid;
+        if (!guid) return closeContextMenu();
+        let nextFolder = String(folderName || '').trim();
+        if (nextFolder === '__custom__') nextFolder = String(window.prompt('Move message to folder:', '') || '').trim();
+        if (!nextFolder) return closeContextMenu();
+        closeContextMenu();
+        await updateOne(guid, { folder: nextFolder });
+        toast('Message moved to ' + nextFolder + '.', 'success', 'Folder updated', { duration: 1600 });
+    }
+
     async function testPolicy(button) {
         const type = q('[data-policy-test-type]')?.value || 'from';
         const value = String(q('[data-policy-test-value]')?.value || '').trim();
@@ -1556,7 +1661,12 @@
         const quick = event.target.closest('[data-admin-quick-filter]');
         if (quick) return setQuickFilter(quick.dataset.adminQuickFilter || 'all');
         const button = event.target.closest('[data-admin-action]');
-        if (!button) return;
+        if (!button) {
+            const row = event.target.closest('[data-admin-row]');
+            const interactive = event.target.closest('a,button,input,select,textarea,label');
+            if (row && !interactive) return openMessage(row.dataset.adminRow);
+            return;
+        }
         const action = button.dataset.adminAction;
         const guid = button.dataset.guid || '';
         if (action === 'refresh' || action === 'refresh-folders') return refreshAll(button);
@@ -1677,6 +1787,35 @@
         if (action === 'close-inline-compose') { q('[data-admin-reply-panel]').hidden = true; q('[data-admin-forward-panel]').hidden = true; return; }
         if (action === 'send-reply') return sendReply(button);
         if (action === 'send-forward') return sendForward(button);
+    });
+
+    document.addEventListener('contextmenu', function (event) {
+        const row = event.target.closest('[data-admin-row]');
+        if (!row) return;
+        openContextMenu(event, row);
+    });
+
+    document.addEventListener('click', function (event) {
+        const folder = event.target.closest('[data-admin-context-folder]');
+        if (folder) {
+            event.preventDefault();
+            event.stopPropagation();
+            return moveContextMessage(folder.dataset.adminContextFolder).catch((error) => toast(error.message || 'Unable to move message.', 'error', 'Move failed'));
+        }
+        const item = event.target.closest('[data-admin-context-action]');
+        if (item) {
+            event.preventDefault();
+            event.stopPropagation();
+            return handleContextAction(item.dataset.adminContextAction, item).catch((error) => toast(error.message || 'Unable to update message.', 'error', 'Action failed'));
+        }
+        if (contextMenu && !event.target.closest('.mail-admin-context-menu')) closeContextMenu();
+    }, true);
+
+    window.addEventListener('blur', closeContextMenu);
+    window.addEventListener('resize', closeContextMenu);
+    document.addEventListener('scroll', closeContextMenu, true);
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closeContextMenu();
     });
 
     document.addEventListener('change', function (event) {

@@ -604,8 +604,9 @@
             const mailbox = normalizeMailbox(state.currentWhere?.to || listed?.to || q('[data-mail-address]')?.value || '');
             const response = await ui.post('/api/emails/view', { guid, to: mailbox });
             if (!response.done) throw new Error(response.error || 'Email not found');
-            if (response.isVIP && !response.doc) throw new Error('VIP Email Protected');
-            const mail = response.doc;
+            const mail = response.doc || response.message || (Array.isArray(response.list) ? response.list[0] : null);
+            if (response.isVIP && !mail) throw new Error('VIP Email Protected');
+            if (!mail) throw new Error(response.error || 'Email not found');
             state.currentEmail = mail;
             state.currentMailbox = mailbox;
             document.querySelector('[data-view-from]').textContent = mail?.from || '';

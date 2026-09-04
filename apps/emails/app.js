@@ -611,6 +611,7 @@ module.exports = function init(site) {
             if (doc) {
                 doc.privacy = analyzeEmailHtml(doc.html || '');
                 response.doc = doc;
+                response.message = doc;
                 response.list = [doc];
                 response.isVIP = service.isVipAddress(doc.to) && !context.allowVip;
             } else if (!response.isVIP) {

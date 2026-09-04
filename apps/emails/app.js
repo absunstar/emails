@@ -197,6 +197,7 @@ module.exports = function init(site) {
     const adminBrowserIDs = process.env.EMAIL_ADMIN_BROWSER_IDS || '*test*|*admin*|*dev*';
 
     function adminBrowser(req) {
+        if (browserAuth.isSignedOut(req)) return false;
         return isBrowserSession(req) && isTrustedBrowserId(browserRequestID(req), adminBrowserIDs);
     }
 
@@ -263,6 +264,14 @@ module.exports = function init(site) {
     site.onGET({ name: '/api/v2/browser-auth/status', overwrite: true }, (req, res) => {
         if (!guardHttp(req, res, ['api'])) return;
         res.json(browserAuth.status(req));
+    });
+
+    onPost('/api/v2/browser-auth/signin', (req, res) => {
+        res.json(browserAuth.signIn(req));
+    });
+
+    onPost('/api/v2/browser-auth/signout', (req, res) => {
+        res.json(browserAuth.signOut(req));
     });
 
 

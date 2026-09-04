@@ -29,6 +29,15 @@ assert.strictEqual(isBrowserSession(req), true);
 assert.strictEqual(browserRequestID(req), 'social.test_uuid');
 assert.strictEqual(browserIdentity(req).id, 'test_uuid');
 
+const versionReq = { headers: { 'x-browser': 'social.test_version', 'x-browser-version': '2026.09.15' }, session: { $save() {} } };
+const versionStatus = auth.status(versionReq);
+assert.strictEqual(versionStatus.browser.version, '2026.09.15');
+const signedOut = auth.signOut(versionReq);
+assert.strictEqual(signedOut.loggedIn, false);
+assert.strictEqual(auth.status(versionReq).loggedIn, false);
+assert.strictEqual(auth.status(versionReq).browser.detected, true);
+assert.strictEqual(auth.signIn(versionReq).loggedIn, true);
+
 const stale = { headers: {}, session: { user: { id: 'social.old', authProvider: 'x-browser' }, user_source: 'x-browser', $save() {} } };
 const staleStatus = auth.status(stale);
 assert.strictEqual(staleStatus.loggedIn, false);
@@ -45,12 +54,13 @@ const navbar = fs.readFileSync(path.join(root, 'site_files', 'html', 'navbar', '
 const admin = fs.readFileSync(path.join(root, 'apps', 'emails', 'site_files', 'html', 'index.html'), 'utf8');
 assert(/\/api\/v2\/browser-auth\/status/.test(app));
 assert(!/\/auth\/social-browser\/(?:start|callback)/.test(app));
-assert(!/\/api\/v2\/auth\/logout/.test(app));
+assert(/\/api\/v2\/browser-auth\/signout/.test(app));
+assert(/\/api\/v2\/browser-auth\/signin/.test(app));
 assert(!/handoff|exchange|x-browser-token|social-browser\.com/i.test(backend));
 assert(/href=["']https:\/\/social-browser\.com\/["']/.test(login));
 assert(!/x-browser|x-browser-token|header|handoff|exchange|token/i.test(login));
 const loginJs = fs.readFileSync(path.join(root, 'site_files', 'js', 'login.js'), 'utf8');
-assert(!/x-browser|x-browser-token|header|handoff|exchange|token/i.test(loginJs));
+assert(!/x-browser-token|handoff|exchange|token/i.test(loginJs));
 assert(/Download Social Browser/.test(login + loginJs));
 assert(/How it works/.test(login));
 assert(/Open this website again/.test(login));

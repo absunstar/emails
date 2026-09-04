@@ -2,10 +2,17 @@
     <a class="sb-brand" href="/">##word.brand_title## <span>##word.brand_tag##</span></a>
     <div class="sb-navbar-actions">
         <button id="btn_login" class="sb-btn sb-btn-ghost" data-browser-signin type="button">Sign in with Social Browser</button>
-        <button class="sb-btn sb-btn-ghost" data-browser-account type="button" hidden>Social Browser</button>
+        <button class="sb-browser-account" data-browser-account type="button" hidden aria-label="Social Browser account details">
+            <span class="sb-browser-account-main" data-browser-account-name>Social Browser</span>
+            <span class="sb-browser-account-meta"><span data-browser-account-version>Version —</span><span class="sb-browser-meta-dot">•</span><span data-browser-account-id>Browser ID</span></span>
+        </button>
+        <button class="sb-btn sb-btn-ghost sb-browser-signout" data-browser-signout type="button" hidden>Sign out</button>
     </div>
     <div class="user-menu" data-browser-user-menu hidden>
-        <div class="userPrint" data-browser-user-name>Social Browser</div>
-        <div class="userPrint" data-browser-user-id></div>
+        <div class="userPrint sb-user-menu-title" data-browser-user-name>Social Browser</div>
+        <div class="userPrint"><span class="sb-user-menu-label">Version</span><strong data-browser-user-version>—</strong></div>
+        <div class="userPrint"><span class="sb-user-menu-label">Browser ID</span><strong data-browser-user-id></strong></div>
+        <div class="userPrint" data-browser-platform-row hidden><span class="sb-user-menu-label">Platform</span><strong data-browser-user-platform></strong></div>
+        <button type="button" class="sb-user-menu-signout" data-browser-menu-signout>Sign out</button>
     </div>
 </header>

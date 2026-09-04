@@ -53,6 +53,12 @@ async function run() {
     assert(css.includes('.sb-btn .ui-icon{display:block;flex:0 0 18px;width:18px;height:18px'), 'Action SVG icons must have explicit dimensions');
     assert(css.includes('[data-admin-action=\"toggle-filters\"]{min-width:112px;height:44px'), 'Admin filters button sizing regression protection is missing');
     assert(css.includes('.mail-admin-sort') && css.includes('.mail-admin-columns-panel') && css.includes('.mail-admin-table-wrap.is-empty'), 'Admin table polish styles are missing');
+    assert(css.includes('.mail-admin-shell{width:calc(100% - 24px);max-width:none'), 'Admin dashboard must use the full page width');
+    assert(css.includes('td[data-admin-col=\"from\"] .mail-admin-cell-primary') && css.includes('font-size:14px'), 'Sender/recipient email text must be readable');
+    const navbarHtml = fs.readFileSync(path.join(root, 'site_files/html/navbar/index.html'), 'utf8');
+    const navbarJs = fs.readFileSync(path.join(root, 'site_files/js/navbar.js'), 'utf8');
+    assert(navbarHtml.includes('data-browser-account-version') && navbarHtml.includes('data-browser-account-id'), 'Browser version/id must be visible in the navbar');
+    assert(navbarHtml.includes('data-browser-signout') && navbarJs.includes('SBBrowserAuth.signOut'), 'Navbar sign-out control is missing');
 
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-email-admin-'));
     const service = createEmailService({

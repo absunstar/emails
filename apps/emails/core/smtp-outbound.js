@@ -6,6 +6,12 @@ const dns = require('dns').promises;
 const net = require('net');
 const tls = require('tls');
 const crypto = require('crypto');
+const { loadProjectEnv } = require('./env-loader');
+
+// Node.js does not read .env files automatically. Load the project .env before
+// resolving SMTP/DKIM options so every outbound path (HTTP/MCP/scheduler/stdio)
+// receives the same multi-domain, multi-server configuration.
+loadProjectEnv();
 
 function extractAddresses(value) {
     return String(value || '').match(/[A-Z0-9._%+-]+@(?:[A-Z0-9.-]+\.[A-Z]{2,}|localhost)/gi) || [];
@@ -388,6 +394,8 @@ function groupRecipients(message) {
 function createSmtpOutboundTransport(config) {
     config = config || {};
     const logger = typeof config.logger === 'function' ? config.logger : () => {};
+    // Reload is harmless and lets a caller set EMAIL_ENV_FILE before transport creation.
+    loadProjectEnv({ logger });
     const options = {
         hostname: sanitizeHeader(config.hostname || process.env.SMTP_HOSTNAME || require('os').hostname() || 'localhost'),
         port: Number(config.port || process.env.SMTP_OUTBOUND_PORT || 25),
@@ -403,6 +411,8 @@ function createSmtpOutboundTransport(config) {
             logger,
         },
     };
+
+    logger('SMTP outbound configured: hostname=' + options.hostname + ', port=' + options.port + ', dkim=' + (options.dkim.enabled ? 'enabled' : 'disabled') + ', requireSigning=' + (options.dkim.requireSigning ? 'true' : 'false') + ', selector=' + options.dkim.selector + ', keyBase=' + options.dkim.basePath);
 
     async function send(message) {
         const envelopeFrom = firstAddress(message.from);

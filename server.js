@@ -4,7 +4,8 @@ const path = require('path');
 const { PassThrough } = require('stream');
 const SMTPServer = require('smtp-server').SMTPServer;
 const parser = require('mailparser').simpleParser;
-const sendmail = require('sendmail')();
+const { createDkimSendmail } = require('./apps/emails/core/dkim-mailer');
+const sendmail = createDkimSendmail({ logger: (message) => console.log(message) });
 const { createEmailService } = require('./apps/emails/core/email-service');
 const { createEmailAbusePolicy } = require('./apps/emails/core/abuse-policy');
 const { createEmailMcpService } = require('./apps/emails/mcp-service');
@@ -110,6 +111,7 @@ function remoteIp(session) {
 }
 
 const smtpServer = new SMTPServer({
+    name: process.env.SMTP_HOSTNAME || 'mail.social-browser.com',
     onAuth(auth, session, callback) {
         callback(null, { user: auth.username });
     },

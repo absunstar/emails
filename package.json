@@ -6,11 +6,12 @@
   "dependencies": {
     "mailparser": "^3.9.9",
     "sendmail": "^1.6.1",
-    "smtp-server": "^3.18.5"
+    "smtp-server": "^3.18.5",
+    "nodemailer": "8.0.10"
   },
   "scripts": {
     "start": "node --max-old-space-size=8192 server.js",
-    "test": "node tests/frontend-zero-deps.js && node tests/runtime-domain.js && node tests/client-local-addresses.js && node tests/browser-auth.js && node tests/file-store-service.js && node tests/competitive-features.js && node tests/action-feedback.js && node tests/ui-polish.js && node tests/message-view-contract.js && node tests/sidebar-email-list-layout.js && node tests/admin-dashboard.js && node tests/abuse-policy.js && node tests/mcp-smoke.js && node tests/mcp-transport-compat.js && node tests/mcp-stdio-smoke.js && node tests/mcp-manager-service.js && node tests/email-scheduler.js && node tests/mcp-send-limits.js && node tests/deliverability-engine.js && node tests/ops-features.js && node tests/seo-expansion.js && node tests/backup-storage-manager.js && node tests/admin-gmail-interactions.js",
+    "test": "node tests/dkim-multi-domain.js && node tests/frontend-zero-deps.js && node tests/runtime-domain.js && node tests/client-local-addresses.js && node tests/browser-auth.js && node tests/file-store-service.js && node tests/competitive-features.js && node tests/action-feedback.js && node tests/ui-polish.js && node tests/message-view-contract.js && node tests/sidebar-email-list-layout.js && node tests/admin-dashboard.js && node tests/abuse-policy.js && node tests/mcp-smoke.js && node tests/mcp-transport-compat.js && node tests/mcp-stdio-smoke.js && node tests/mcp-manager-service.js && node tests/email-scheduler.js && node tests/mcp-send-limits.js && node tests/deliverability-engine.js && node tests/ops-features.js && node tests/seo-expansion.js && node tests/backup-storage-manager.js && node tests/admin-gmail-interactions.js",
     "mcp:stdio": "node apps/emails/mcp-stdio.js",
     "test:ops": "node tests/ops-features.js",
     "test:load": "node tests/production-load.js",

@@ -2,6 +2,7 @@
 
 const path = require('path');
 const { createEmailService, extractAddresses, normalizeEmail } = require('./core/email-service');
+const { createDkimSendmail } = require('./core/dkim-mailer');
 const { isAdminRequest, isBrowserSession, hasVipAccess, isTrustedBrowserId, browserRequestID } = require('./core/access');
 const { requestDomain, apiDomain, addressBelongsToDomain, messageBelongsToDomain, mailboxForDomain } = require('./core/domain');
 const { getClientContext } = require('./core/client-context');
@@ -14,7 +15,7 @@ const { createEmailBackupStorageManager } = require('./core/backup-storage-manag
 const { createEmailUnsubscribeService } = require('./core/unsubscribe-service');
 
 module.exports = function init(site) {
-    const sendmail = require('sendmail')();
+    const sendmail = createDkimSendmail({ logger: (message) => site.log(message) });
     const policy = site.emailAbusePolicy || createEmailAbusePolicy({
         filePath: process.env.EMAIL_POLICY_FILE || path.join(site.cwd, 'localStorage', 'email-abuse-policy.json'),
         initial: {

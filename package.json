@@ -5,7 +5,8 @@
   "main": "server.js",
   "dependencies": {
     "mailparser": "^3.9.9",
-    "smtp-server": "^3.18.5"
+    "smtp-server": "^3.18.5",
+    "nodemailer": "8.0.10"
   },
   "scripts": {
     "start": "node --max-old-space-size=8192 server.js",

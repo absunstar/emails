@@ -50,170 +50,103 @@ function normalizeCrlf(value) {
     return String(value == null ? '' : value).replace(/\r?\n/g, '\r\n');
 }
 
-function relaxedBodyCanonicalize(body) {
-    const lines = normalizeCrlf(body).split('\r\n').map((line) => line.replace(/[ \t]+$/g, '').replace(/[ \t]+/g, ' '));
-    while (lines.length && lines[lines.length - 1] === '') lines.pop();
-    return (lines.length ? lines.join('\r\n') : '') + '\r\n';
-}
-
-function relaxedHeaderCanonicalize(name, value) {
-    const unfolded = String(value || '').replace(/\r\n[ \t]+/g, ' ');
-    return String(name || '').toLowerCase().trim() + ':' + unfolded.replace(/[ \t]+/g, ' ').trim() + '\r\n';
-}
-
-function parseHeaderLines(rawHeaders) {
-    const rows = normalizeCrlf(rawHeaders).split('\r\n');
-    const list = [];
-    let current = null;
-    for (const row of rows) {
-        if (!row) continue;
-        if (/^[ \t]/.test(row) && current) {
-            current.value += '\r\n' + row;
-            continue;
-        }
-        const index = row.indexOf(':');
-        if (index <= 0) continue;
-        current = { name: row.slice(0, index), value: row.slice(index + 1).trimStart() };
-        list.push(current);
-    }
-    return list;
-}
-
-function buildMimeMessage(message, hostname) {
-    const boundary = 'sb-alt-' + crypto.randomBytes(12).toString('hex');
-    const from = sanitizeHeader(message.from);
-    const to = sanitizeHeader(message.to);
-    const cc = sanitizeHeader(message.cc);
-    const subject = encodeHeader(message.subject || '');
-    const date = new Date().toUTCString();
-    const messageId = '<' + crypto.randomBytes(12).toString('hex') + '.' + Date.now() + '@' + sanitizeHeader(hostname || 'localhost') + '>';
-    const headers = [
-        ['From', from],
-        ['To', to],
-    ];
-    if (cc) headers.push(['Cc', cc]);
-    if (message.replyTo) headers.push(['Reply-To', sanitizeHeader(message.replyTo)]);
-    headers.push(['Subject', subject]);
-    headers.push(['Date', date]);
-    headers.push(['Message-ID', messageId]);
-    if (message.inReplyTo) headers.push(['In-Reply-To', sanitizeHeader(message.inReplyTo)]);
-    headers.push(['MIME-Version', '1.0']);
-    headers.push(['Content-Type', 'multipart/alternative; boundary="' + boundary + '"']);
-
-    const extra = message.headers && typeof message.headers === 'object' ? message.headers : {};
-    for (const [name, value] of Object.entries(extra)) {
-        if (value === undefined || value === null || value === '') continue;
-        const safeName = String(name).replace(/[^A-Za-z0-9-]/g, '');
-        if (!safeName) continue;
-        headers.push([safeName, sanitizeHeader(Array.isArray(value) ? value.join(', ') : value)]);
-    }
-
-    const body = [
-        '--' + boundary,
-        'Content-Type: text/plain; charset=utf-8',
-        'Content-Transfer-Encoding: 8bit',
-        '',
-        normalizeCrlf(message.text || ''),
-        '--' + boundary,
-        'Content-Type: text/html; charset=utf-8',
-        'Content-Transfer-Encoding: 8bit',
-        '',
-        normalizeCrlf(message.html || ''),
-        '--' + boundary + '--',
-        '',
-    ].join('\r\n');
-
-    return {
-        headers,
-        body,
-        messageId,
-        raw: headers.map(([name, value]) => name + ': ' + value).join('\r\n') + '\r\n\r\n' + body,
-    };
-}
-
 function resolveDkimKey(fromDomain, selector, basePath) {
     const file = path.join(basePath, fromDomain, selector + '.private');
     return { file, privateKey: fs.readFileSync(file, 'utf8') };
 }
 
-function signDkim(raw, fromAddress, options) {
-    const enabled = options.enabled;
-    if (!enabled) return raw;
+function createMessageId(hostname) {
+    return '<' + crypto.randomBytes(12).toString('hex') + '.' + Date.now() + '@' + sanitizeHeader(hostname || 'localhost') + '>';
+}
+
+function normalizeExtraHeaders(headers) {
+    const result = {};
+    if (!headers || typeof headers !== 'object') return result;
+    for (const [name, value] of Object.entries(headers)) {
+        if (value === undefined || value === null || value === '') continue;
+        const safeName = String(name).replace(/[^A-Za-z0-9-]/g, '');
+        if (!safeName) continue;
+        result[safeName] = Array.isArray(value) ? value.map((v) => sanitizeHeader(v)).join(', ') : sanitizeHeader(value);
+    }
+    return result;
+}
+
+function getNodemailer() {
+    try {
+        return require('nodemailer');
+    } catch (error) {
+        const wrapped = new Error('Nodemailer is required for outbound MIME/DKIM signing. Run npm install after deploying this build.');
+        wrapped.cause = error;
+        throw wrapped;
+    }
+}
+
+function resolveDkimSigning(fromAddress, options) {
+    if (!options.enabled) return null;
     const domain = domainOf(fromAddress);
     if (!domain) throw new Error('DKIM: cannot derive signing domain from From header');
     const allowed = options.allowedDomains || [];
     if (allowed.length && !allowed.includes(domain)) throw new Error('DKIM: From domain is not allowed for signing: ' + domain);
 
-    let key;
     try {
-        key = resolveDkimKey(domain, options.selector, options.basePath);
+        const key = resolveDkimKey(domain, options.selector, options.basePath);
+        options.logger?.('DKIM configured from=' + firstAddress(fromAddress) + ' d=' + domain + ' s=' + options.selector + ' key=' + key.file);
+        return {
+            domain,
+            file: key.file,
+            config: {
+                domainName: domain,
+                keySelector: options.selector,
+                privateKey: key.privateKey,
+            },
+        };
     } catch (error) {
-        if (options.requireSigning) throw new Error('DKIM private key not found for ' + domain + ' at ' + path.join(options.basePath, domain, options.selector + '.private'));
-        options.logger?.('DKIM skipped for ' + domain + ': ' + error.message);
-        return raw;
-    }
-
-    const separator = raw.indexOf('\r\n\r\n');
-    const headerRaw = separator === -1 ? raw : raw.slice(0, separator);
-    const bodyRaw = separator === -1 ? '' : raw.slice(separator + 4);
-    const headers = parseHeaderLines(headerRaw);
-    // Keep the signed header set intentionally conservative for maximum verifier
-    // interoperability. Operational/list headers may legitimately be added/re-written by
-    // downstream infrastructure, so they remain present in the message but are not part of
-    // the cryptographic header hash.
-    const wanted = ['from', 'to', 'cc', 'subject', 'date', 'message-id', 'reply-to', 'in-reply-to', 'mime-version', 'content-type'];
-    const selected = [];
-    for (const wantedName of wanted) {
-        const matches = headers.filter((h) => h.name.toLowerCase() === wantedName);
-        if (matches.length) selected.push(matches[matches.length - 1]);
-    }
-    if (!selected.some((h) => h.name.toLowerCase() === 'from')) throw new Error('DKIM: From header is required');
-
-    const canonicalBody = relaxedBodyCanonicalize(bodyRaw);
-    const bodyHash = crypto.createHash('sha256').update(canonicalBody, 'utf8').digest('base64');
-    const hList = selected.map((h) => h.name.toLowerCase()).join(':');
-    const dkimValueWithoutSignature = [
-        'v=1',
-        'a=rsa-sha256',
-        'c=relaxed/relaxed',
-        'd=' + domain,
-        's=' + options.selector,
-        'q=dns/txt',
-        't=' + Math.floor(Date.now() / 1000),
-        'h=' + hList,
-        'bh=' + bodyHash,
-        'b=',
-    ].join('; ');
-
-    let signingData = '';
-    for (const header of selected) signingData += relaxedHeaderCanonicalize(header.name, header.value);
-    signingData += relaxedHeaderCanonicalize('DKIM-Signature', dkimValueWithoutSignature);
-
-    const signer = crypto.createSign('RSA-SHA256');
-    signer.update(signingData, 'utf8');
-    signer.end();
-    const signature = signer.sign({ key: key.privateKey, padding: crypto.constants.RSA_PKCS1_PADDING }, 'base64');
-
-    // Fold the transmitted DKIM header to short, standards-friendly physical lines. With
-    // relaxed header canonicalization these folds normalize to the same single spaces used
-    // in signingData, while avoiding interoperability problems in older SMTP/DKIM stacks.
-    const tags = (dkimValueWithoutSignature + signature).split('; ');
-    const folded = [];
-    let line = 'DKIM-Signature: ';
-    for (let index = 0; index < tags.length; index += 1) {
-        const piece = tags[index] + (index < tags.length - 1 ? ';' : '');
-        const spacer = line === 'DKIM-Signature: ' ? '' : ' ';
-        if ((line + spacer + piece).length > 76 && line !== 'DKIM-Signature: ') {
-            folded.push(line);
-            line = ' ' + piece;
-        } else {
-            line += spacer + piece;
+        if (options.requireSigning) {
+            throw new Error('DKIM private key not found for ' + domain + ' at ' + path.join(options.basePath, domain, options.selector + '.private'));
         }
+        options.logger?.('DKIM skipped for ' + domain + ': ' + error.message);
+        return null;
     }
-    folded.push(line);
-    const dkimHeader = folded.join('\r\n');
-    options.logger?.('DKIM signed from=' + firstAddress(fromAddress) + ' d=' + domain + ' s=' + options.selector + ' key=' + key.file);
-    return dkimHeader + '\r\n' + raw;
+}
+
+async function buildOutboundMessage(message, hostname, dkimOptions) {
+    const nodemailer = getNodemailer();
+    const signing = resolveDkimSigning(message.from, dkimOptions);
+    const messageId = createMessageId(hostname);
+    const transportOptions = {
+        streamTransport: true,
+        buffer: true,
+        newline: 'windows',
+    };
+    if (signing) transportOptions.dkim = signing.config;
+
+    // Nodemailer owns the complete MIME serialization and DKIM signing step. The returned
+    // byte stream is then handed to our direct-to-MX SMTP transport without modification.
+    // This prevents post-signing header/body changes from invalidating DKIM.
+    const transport = nodemailer.createTransport(transportOptions);
+    const mail = {
+        from: sanitizeHeader(message.from),
+        to: sanitizeHeader(message.to),
+        subject: message.subject == null ? '' : String(message.subject),
+        text: message.text == null ? '' : String(message.text),
+        html: message.html == null ? '' : String(message.html),
+        messageId,
+        date: new Date(),
+        headers: normalizeExtraHeaders(message.headers),
+    };
+    if (message.cc) mail.cc = sanitizeHeader(message.cc);
+    if (message.replyTo) mail.replyTo = sanitizeHeader(message.replyTo);
+    if (message.inReplyTo) mail.inReplyTo = sanitizeHeader(message.inReplyTo);
+
+    const info = await transport.sendMail(mail);
+    const raw = Buffer.isBuffer(info.message) ? info.message.toString('utf8') : String(info.message || '');
+    if (!raw) throw new Error('Nodemailer produced an empty outbound message');
+    return {
+        raw: normalizeCrlf(raw).replace(/\r\n+$/, '') + '\r\n',
+        messageId: info.messageId || messageId,
+        dkimDomain: signing ? signing.domain : '',
+        dkimSelector: signing ? dkimOptions.selector : '',
+    };
 }
 
 function createLineReader(socket, timeoutMs) {
@@ -379,7 +312,8 @@ async function smtpConversation(host, envelopeFrom, recipients, raw, options, sk
         writeLine(socket, 'DATA');
         reply = await reader.response();
         expect(reply, 300, 399, 'DATA');
-        socket.write(dotStuff(raw) + '\r\n.\r\n');
+        const stuffed = dotStuff(raw);
+        socket.write(stuffed + (stuffed.endsWith('\r\n') ? '.\r\n' : '\r\n.\r\n'));
         reply = await reader.response();
         expect(reply, 200, 299, 'message delivery');
         try { writeLine(socket, 'QUIT'); } catch (_) {}
@@ -443,8 +377,8 @@ function createSmtpOutboundTransport(config) {
         const groups = groupRecipients(message);
         if (!groups.size) throw new Error('SMTP outbound: no valid recipients');
 
-        const mime = buildMimeMessage(message, options.hostname);
-        const raw = signDkim(mime.raw, message.from, options.dkim);
+        const mime = await buildOutboundMessage(message, options.hostname, options.dkim);
+        const raw = mime.raw;
         const deliveries = [];
         for (const [recipientDomain, recipients] of groups.entries()) {
             const targets = await resolveTargets(recipientDomain);
@@ -484,9 +418,7 @@ function createSmtpOutboundTransport(config) {
 
 module.exports = {
     createSmtpOutboundTransport,
-    buildMimeMessage,
-    signDkim,
-    relaxedBodyCanonicalize,
-    relaxedHeaderCanonicalize,
+    buildOutboundMessage,
+    resolveDkimSigning,
     domainOf,
 };

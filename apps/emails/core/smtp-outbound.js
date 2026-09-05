@@ -222,9 +222,11 @@ function expect(reply, min, max, step) {
     }
 }
 
-async function connectTcp(host, port, timeoutMs) {
+async function connectTcp(host, port, timeoutMs, ipFamily) {
     return await new Promise((resolve, reject) => {
-        const socket = net.connect({ host, port });
+        const connectOptions = { host, port };
+        if (ipFamily === 4 || ipFamily === 6) connectOptions.family = ipFamily;
+        const socket = net.connect(connectOptions);
         let settled = false;
         const timer = setTimeout(() => {
             if (settled) return;
@@ -264,7 +266,7 @@ function dotStuff(raw) {
 }
 
 async function smtpConversation(host, envelopeFrom, recipients, raw, options, skipStartTls) {
-    let socket = await connectTcp(host, options.port, options.timeoutMs);
+    let socket = await connectTcp(host, options.port, options.timeoutMs, options.ipFamily);
     let reader = createLineReader(socket, options.timeoutMs);
     try {
         let reply = await reader.response();
@@ -357,6 +359,12 @@ function createSmtpOutboundTransport(config) {
         hostname: sanitizeHeader(config.hostname || process.env.SMTP_HOSTNAME || require('os').hostname() || 'localhost'),
         port: Number(config.port || process.env.SMTP_OUTBOUND_PORT || 25),
         timeoutMs: Number(config.timeoutMs || process.env.SMTP_OUTBOUND_TIMEOUT_MS || 20000),
+        // IPv4 is the production default because SPF/PTR/fcrDNS are provisioned per sending IP.
+        // Set SMTP_OUTBOUND_IP_FAMILY=6 for an IPv6-provisioned server, or 0 for OS auto-selection.
+        ipFamily: (() => {
+            const value = Number(config.ipFamily !== undefined ? config.ipFamily : (process.env.SMTP_OUTBOUND_IP_FAMILY || 4));
+            return value === 6 ? 6 : (value === 0 ? 0 : 4);
+        })(),
         requireTls: config.requireTls !== undefined ? !!config.requireTls : boolEnv(process.env.SMTP_REQUIRE_TLS, false),
         tlsVerify: config.tlsVerify !== undefined ? !!config.tlsVerify : boolEnv(process.env.SMTP_TLS_VERIFY, false),
         dkim: {
@@ -369,7 +377,7 @@ function createSmtpOutboundTransport(config) {
         },
     };
 
-    logger('SMTP outbound configured: hostname=' + options.hostname + ', port=' + options.port + ', dkim=' + (options.dkim.enabled ? 'enabled' : 'disabled') + ', requireSigning=' + (options.dkim.requireSigning ? 'true' : 'false') + ', selector=' + options.dkim.selector + ', keyBase=' + options.dkim.basePath);
+    logger('SMTP outbound configured: hostname=' + options.hostname + ', port=' + options.port + ', ipFamily=' + (options.ipFamily || 'auto') + ', dkim=' + (options.dkim.enabled ? 'enabled' : 'disabled') + ', requireSigning=' + (options.dkim.requireSigning ? 'true' : 'false') + ', selector=' + options.dkim.selector + ', keyBase=' + options.dkim.basePath);
 
     async function send(message) {
         const envelopeFrom = firstAddress(message.from);

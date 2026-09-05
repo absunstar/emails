@@ -32,6 +32,16 @@ if (process.env.DKIM_ENABLED !== 'true') throw new Error('dkim enabled not loade
 if (process.env.DKIM_REQUIRE_SIGNING !== 'true') throw new Error('require signing not loaded');
 if (process.env.DKIM_SELECTOR !== 'mail77') throw new Error('selector not loaded');
 if (process.env.DKIM_BASE_PATH !== '/tmp/dkim-test') throw new Error('base path not loaded');
+const { createSmtpOutboundTransport } = require(${JSON.stringify(path.join(root, 'apps/emails/core/smtp-outbound.js'))});
+delete process.env.SMTP_OUTBOUND_IP_FAMILY;
+const transport4 = createSmtpOutboundTransport({ logger() {} });
+if (transport4.config.ipFamily !== 4) throw new Error('IPv4 must be the default outbound family');
+process.env.SMTP_OUTBOUND_IP_FAMILY = '6';
+const transport6 = createSmtpOutboundTransport({ logger() {} });
+if (transport6.config.ipFamily !== 6) throw new Error('IPv6 override not honored');
+process.env.SMTP_OUTBOUND_IP_FAMILY = '0';
+const transportAuto = createSmtpOutboundTransport({ logger() {} });
+if (transportAuto.config.ipFamily !== 0) throw new Error('auto IP family override not honored');
 console.log('ok');
 `;
 const run = spawnSync(process.execPath, ['-e', script], { cwd: root, encoding: 'utf8' });

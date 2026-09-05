@@ -157,7 +157,11 @@ function signDkim(raw, fromAddress, options) {
     const headerRaw = separator === -1 ? raw : raw.slice(0, separator);
     const bodyRaw = separator === -1 ? '' : raw.slice(separator + 4);
     const headers = parseHeaderLines(headerRaw);
-    const wanted = ['from', 'to', 'cc', 'subject', 'date', 'message-id', 'reply-to', 'in-reply-to', 'mime-version', 'content-type', 'list-unsubscribe', 'list-unsubscribe-post'];
+    // Keep the signed header set intentionally conservative for maximum verifier
+    // interoperability. Operational/list headers may legitimately be added/re-written by
+    // downstream infrastructure, so they remain present in the message but are not part of
+    // the cryptographic header hash.
+    const wanted = ['from', 'to', 'cc', 'subject', 'date', 'message-id', 'reply-to', 'in-reply-to', 'mime-version', 'content-type'];
     const selected = [];
     for (const wantedName of wanted) {
         const matches = headers.filter((h) => h.name.toLowerCase() === wantedName);
@@ -174,6 +178,7 @@ function signDkim(raw, fromAddress, options) {
         'c=relaxed/relaxed',
         'd=' + domain,
         's=' + options.selector,
+        'q=dns/txt',
         't=' + Math.floor(Date.now() / 1000),
         'h=' + hList,
         'bh=' + bodyHash,
@@ -187,8 +192,26 @@ function signDkim(raw, fromAddress, options) {
     const signer = crypto.createSign('RSA-SHA256');
     signer.update(signingData, 'utf8');
     signer.end();
-    const signature = signer.sign(key.privateKey, 'base64');
-    const dkimHeader = 'DKIM-Signature: ' + dkimValueWithoutSignature + signature;
+    const signature = signer.sign({ key: key.privateKey, padding: crypto.constants.RSA_PKCS1_PADDING }, 'base64');
+
+    // Fold the transmitted DKIM header to short, standards-friendly physical lines. With
+    // relaxed header canonicalization these folds normalize to the same single spaces used
+    // in signingData, while avoiding interoperability problems in older SMTP/DKIM stacks.
+    const tags = (dkimValueWithoutSignature + signature).split('; ');
+    const folded = [];
+    let line = 'DKIM-Signature: ';
+    for (let index = 0; index < tags.length; index += 1) {
+        const piece = tags[index] + (index < tags.length - 1 ? ';' : '');
+        const spacer = line === 'DKIM-Signature: ' ? '' : ' ';
+        if ((line + spacer + piece).length > 76 && line !== 'DKIM-Signature: ') {
+            folded.push(line);
+            line = ' ' + piece;
+        } else {
+            line += spacer + piece;
+        }
+    }
+    folded.push(line);
+    const dkimHeader = folded.join('\r\n');
     options.logger?.('DKIM signed from=' + firstAddress(fromAddress) + ' d=' + domain + ' s=' + options.selector + ' key=' + key.file);
     return dkimHeader + '\r\n' + raw;
 }

@@ -2,9 +2,10 @@
 
 const path = require('path');
 const readline = require('readline');
+const { createSmtpOutboundTransport } = require('./core/smtp-outbound');
 let sendmailImpl = null;
 function sendmail(message, callback) {
-    if (!sendmailImpl) sendmailImpl = require('sendmail')();
+    if (!sendmailImpl) sendmailImpl = createSmtpOutboundTransport({ logger: (value) => console.error('[smtp-outbound]', value) });
     return sendmailImpl(message, callback);
 }
 const { createEmailService } = require('./core/email-service');

@@ -13,5 +13,6 @@ assert(app.includes("requestedMailbox ? 'id+mailbox+domain' : 'legacy-id+domain'
 assert(app.includes("for (const key of ['from', 'to', 'cc', 'subject', 'text', 'html', 'date'"), 'View API must expose top-level legacy message aliases');
 assert(app.includes("response.resolvedBy = requestedMailbox ? 'id+mailbox+domain' : 'legacy-id+domain'"), 'View API must trust canonical id within the deployment domain');
 assert(app.includes('service.store.getMessagesById'), 'View API must support duplicate legacy numeric ids');
-assert(app.includes("candidates = all.filter((item) => String(item.id) === String(input.id))"), 'View API must fall back to raw storage when the id index misses');
+assert(app.includes("candidates = all.filter((item) => idLike(item.id, input.id))"), 'View API must use like-compatible id matching when the id index misses');
+assert(app.includes("typeof left.like === 'function'"), 'View API must prefer String.like when available');
 assert(app.includes('response.mailboxHeaderMismatch = true'), 'Mailbox/header mismatch must be diagnostic only, not a view blocker');

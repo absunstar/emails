@@ -54,6 +54,20 @@ function walkJsonFiles(dir, out) {
     return out;
 }
 
+function idLike(leftValue, rightValue) {
+    const left = String(leftValue ?? '').trim();
+    const right = String(rightValue ?? '').trim();
+    if (!left || !right) return false;
+    try {
+        if (typeof left.like === 'function' && left.like(right)) return true;
+        if (typeof right.like === 'function' && right.like(left)) return true;
+    } catch (_) {}
+    const leftNumber = Number(left);
+    const rightNumber = Number(right);
+    if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber) && leftNumber === rightNumber) return true;
+    return left.toLowerCase() === right.toLowerCase();
+}
+
 class EmailFileStore {
     constructor(options) {
         options = options || {};
@@ -256,12 +270,24 @@ class EmailFileStore {
     }
 
     async getMessagesById(id) {
-        const bucket = this.messagesById.get(String(id));
-        if (bucket instanceof Map) return Array.from(bucket.values()).map(clone);
-        // Compatibility with any in-memory state created before the multi-value
-        // index was introduced.
-        if (bucket) return [clone(bucket)];
-        return [];
+        const requested = String(id ?? '').trim();
+        const exactBucket = this.messagesById.get(requested);
+        if (exactBucket instanceof Map) return Array.from(exactBucket.values()).map(clone);
+        if (exactBucket) return [clone(exactBucket)];
+
+        // Legacy compatibility: ids may have crossed API/storage boundaries as
+        // Number/String or with harmless numeric formatting. Resolve buckets using
+        // like-compatible comparison instead of requiring an exact Map key.
+        const matches = [];
+        for (const [storedId, bucket] of this.messagesById.entries()) {
+            if (!idLike(storedId, requested)) continue;
+            if (bucket instanceof Map) {
+                for (const doc of bucket.values()) matches.push(clone(doc));
+            } else if (bucket) {
+                matches.push(clone(bucket));
+            }
+        }
+        return matches;
     }
 
     async getMessageById(id) {

@@ -189,6 +189,28 @@ module.exports = function init(site) {
         return extractAddresses([message?.to, message?.cc].join(',')).map((item) => item.toLowerCase()).includes(email);
     }
 
+    // Legacy/mobile message ids have existed as both numbers and strings across
+    // released clients and imported stores. Prefer Social Browser's String.like
+    // when it is present, but keep this server runnable under plain Node.js too.
+    function idLike(leftValue, rightValue) {
+        const left = String(leftValue ?? '').trim();
+        const right = String(rightValue ?? '').trim();
+        if (!left || !right) return false;
+
+        try {
+            if (typeof left.like === 'function' && left.like(right)) return true;
+            if (typeof right.like === 'function' && right.like(left)) return true;
+        } catch (_) {}
+
+        // Numeric legacy ids may have been serialized with harmless formatting
+        // differences (number vs string, leading zeroes). Compare canonical
+        // numeric values before falling back to case-insensitive string equality.
+        const leftNumber = Number(left);
+        const rightNumber = Number(right);
+        if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber) && leftNumber === rightNumber) return true;
+        return left.toLowerCase() === right.toLowerCase();
+    }
+
     // Compatibility only: older UI/code may read this property. The canonical
     // source remains localStorage/vip-email-list.json managed by EmailFileStore.
     Object.defineProperty(site, 'vipEmailList', {
@@ -628,7 +650,7 @@ module.exports = function init(site) {
                 // and the detail result must always agree on the same numeric id.
                 if (!Array.isArray(candidates) || !candidates.length) {
                     const all = await service.store.listMessages();
-                    candidates = all.filter((item) => String(item.id) === String(input.id));
+                    candidates = all.filter((item) => idLike(item.id, input.id));
                 }
 
                 if (context.domain) {

@@ -22,6 +22,8 @@ function writeMessage(root, doc) {
     assert(matches.length === 2, 'Duplicate numeric ids must keep all legacy candidates');
     assert(matches.some((m) => m.guid === 'legacy-a'), 'First legacy message must remain indexed');
     assert(matches.some((m) => m.guid === 'legacy-b'), 'Second legacy message must remain indexed');
+    const formattedMatches = await store.getMessagesById('077');
+    assert(formattedMatches.length === 2, 'Like-compatible id lookup must accept harmless numeric formatting differences');
     await store.deleteMessage('legacy-a');
     const remaining = await store.getMessagesById(77);
     assert(remaining.length === 1 && remaining[0].guid === 'legacy-b', 'Deleting one duplicate id must not remove the other from the index');

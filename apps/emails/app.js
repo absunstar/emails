@@ -1,6 +1,8 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const { createEmailService, extractAddresses, normalizeEmail } = require('./core/email-service');
 const { isAdminRequest, isBrowserSession, hasVipAccess, isTrustedBrowserId, browserRequestID } = require('./core/access');
 const { requestDomain, apiDomain, addressBelongsToDomain, messageBelongsToDomain, mailboxForDomain } = require('./core/domain');
@@ -65,6 +67,245 @@ module.exports = function init(site) {
     });
     site.emailService = service;
     site.emailStore = service.store;
+
+
+    // Mailbox ownership + per-mailbox delete tombstones used by the paid mobile
+    // app. Tokens are returned only when a mailbox is generated, stored locally
+    // by the app, and only a SHA-256 hash is persisted on the server.
+    const ownershipFile = process.env.EMAIL_OWNERSHIP_FILE || path.join(site.cwd, 'localStorage', 'email-mailbox-ownership.json');
+    const deletedForMailboxFile = process.env.EMAIL_MAILBOX_DELETIONS_FILE || path.join(site.cwd, 'localStorage', 'email-mailbox-deletions.json');
+    const ownership = new Map();
+    const deletedForMailbox = new Map();
+
+    function readJsonFile(filePath, fallback) {
+        try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch (_) { return fallback; }
+    }
+
+    function writeJsonFile(filePath, value) {
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        const tmp = filePath + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
+        fs.renameSync(tmp, filePath);
+    }
+
+    function loadOwnershipState() {
+        const saved = readJsonFile(ownershipFile, { mailboxes: {} });
+        for (const [email, doc] of Object.entries(saved?.mailboxes || {})) {
+            const normalized = normalizeEmail(email);
+            const hash = String(doc?.tokenHash || '');
+            if (normalized && hash) ownership.set(normalized, { tokenHash: hash, createdAt: doc?.createdAt || '', proOnly: doc?.proOnly === true });
+        }
+        const deleted = readJsonFile(deletedForMailboxFile, { mailboxes: {} });
+        for (const [email, values] of Object.entries(deleted?.mailboxes || {})) {
+            const normalized = normalizeEmail(email);
+            if (!normalized || !Array.isArray(values)) continue;
+            deletedForMailbox.set(normalized, new Set(values.map(String).filter(Boolean)));
+        }
+    }
+
+    function persistOwnership() {
+        const mailboxes = {};
+        for (const [email, doc] of ownership) mailboxes[email] = doc;
+        writeJsonFile(ownershipFile, { version: 1, mailboxes });
+    }
+
+    function persistMailboxDeletions() {
+        const mailboxes = {};
+        for (const [email, values] of deletedForMailbox) {
+            if (values.size) mailboxes[email] = Array.from(values);
+        }
+        writeJsonFile(deletedForMailboxFile, { version: 1, mailboxes });
+    }
+
+    function hashOwnershipToken(token) {
+        return crypto.createHash('sha256').update(String(token || ''), 'utf8').digest('hex');
+    }
+
+    function issueOwnershipToken(email, options = {}) {
+        const normalized = normalizeEmail(email);
+        if (!normalized) return '';
+        const token = crypto.randomBytes(32).toString('base64url');
+        ownership.set(normalized, {
+            tokenHash: hashOwnershipToken(token),
+            createdAt: new Date().toISOString(),
+            proOnly: options.proOnly === true,
+        });
+        persistOwnership();
+        return token;
+    }
+
+    function verifyOwnershipToken(email, token) {
+        const normalized = normalizeEmail(email);
+        const record = ownership.get(normalized);
+        if (!normalized || !record || !token) return false;
+        const expected = Buffer.from(String(record.tokenHash), 'hex');
+        const actual = Buffer.from(hashOwnershipToken(token), 'hex');
+        return expected.length === actual.length && expected.length > 0 && crypto.timingSafeEqual(expected, actual);
+    }
+
+    function isProOnlyMailbox(email) {
+        const normalized = normalizeEmail(email);
+        return !!(normalized && ownership.get(normalized)?.proOnly === true);
+    }
+
+    // Pro-mailbox read access is tied to the paid Pro application, not to
+    // the device/mailbox that originally created the address. This lets any
+    // official VIP Temp Mail Pro installation open both normal and Pro-only
+    // mailboxes while Free/Web clients can open normal mailboxes only.
+    const defaultProAppAccessKey = 'vtmp-pro-2026-09-09-y4Q9Hn7m2Kx8Wc5Rz3Pd6Ls1Tf0BaVuE';
+    const configuredProAppAccessKeys = String(process.env.EMAIL_PRO_APP_KEYS || defaultProAppAccessKey)
+        .split(/[|,\n]/g).map((value) => value.trim()).filter(Boolean);
+
+    function timingSafeTextEqual(a, b) {
+        const left = Buffer.from(String(a || ''), 'utf8');
+        const right = Buffer.from(String(b || ''), 'utf8');
+        return left.length === right.length && left.length > 0 && crypto.timingSafeEqual(left, right);
+    }
+
+    function proAppAccessKey(req, data = null) {
+        const doc = data || body(req) || {};
+        return String(
+            doc.proAccessKey || doc.proAppKey ||
+            req.headers?.['x-vip-temp-mail-pro'] ||
+            req.query?.proAccessKey || req.query?.proAppKey || ''
+        ).trim();
+    }
+
+    function isProAppRequest(req, data = null) {
+        const doc = data || body(req) || {};
+        const client = String(
+            doc.client || req.headers?.['x-vip-temp-mail-client'] || req.query?.client || ''
+        ).trim().toLowerCase();
+        if (client && client !== 'vip-temp-mail-pro') return false;
+        const candidate = proAppAccessKey(req, doc);
+        return configuredProAppAccessKeys.some((allowed) => timingSafeTextEqual(candidate, allowed));
+    }
+
+    function hasProMailboxAccess(email, req, data = null) {
+        return !isProOnlyMailbox(email) || isProAppRequest(req, data);
+    }
+
+    const proNoticeById = new Map();
+    const proNoticeByGuid = new Map();
+
+    function proNoticeIdentity(email) {
+        const normalized = normalizeEmail(email);
+        const hash = crypto.createHash('sha256').update('vip-temp-mail-pro-required:' + normalized).digest('hex');
+        // 12 hex digits remain exactly representable by JavaScript Number and Dart int.
+        const id = Number.parseInt(hash.slice(0, 12), 16);
+        const guid = 'pro-required-' + hash.slice(0, 32);
+        if (normalized) {
+            proNoticeById.set(String(id), normalized);
+            proNoticeByGuid.set(guid, normalized);
+        }
+        return { id, guid };
+    }
+
+    function proNoticeMailboxFromId(id) {
+        const key = String(id ?? '').trim();
+        if (!key) return '';
+        const cached = proNoticeById.get(key);
+        if (cached) return cached;
+        for (const [email, record] of ownership) {
+            if (record?.proOnly !== true) continue;
+            const hash = crypto.createHash('sha256').update('vip-temp-mail-pro-required:' + email).digest('hex');
+            if (String(Number.parseInt(hash.slice(0, 12), 16)) === key) {
+                proNoticeById.set(key, email);
+                return email;
+            }
+        }
+        return '';
+    }
+
+    function proNoticeMailboxFromGuid(guid) {
+        const key = String(guid || '').trim();
+        if (!key) return '';
+        const cached = proNoticeByGuid.get(key);
+        if (cached) return cached;
+        for (const [email, record] of ownership) {
+            if (record?.proOnly !== true) continue;
+            const hash = crypto.createHash('sha256').update('vip-temp-mail-pro-required:' + email).digest('hex');
+            if ('pro-required-' + hash.slice(0, 32) === key) {
+                proNoticeByGuid.set(key, email);
+                return email;
+            }
+        }
+        return '';
+    }
+
+    function makeProRequiredMessage(email) {
+        const normalized = normalizeEmail(email);
+        const identity = proNoticeIdentity(normalized);
+        const subject = 'VIP Temp Mail Pro required';
+        const text = 'This email address was created by VIP Temp Mail Pro. Its real messages can only be opened from VIP Temp Mail Pro.';
+        const html = '<div style="font-family:Arial,sans-serif;padding:20px;line-height:1.6">' +
+            '<h2 style="margin:0 0 12px">VIP Temp Mail Pro required</h2>' +
+            '<p>This email address was created by <strong>VIP Temp Mail Pro</strong>.</p>' +
+            '<p>Its real messages can only be opened from VIP Temp Mail Pro. Free versions and the website cannot open Pro mailboxes.</p>' +
+            '</div>';
+        return {
+            id: identity.id,
+            guid: identity.guid,
+            from: 'VIP Temp Mail Pro <no-reply@egytag.com>',
+            to: normalized,
+            cc: '',
+            subject,
+            text,
+            html,
+            date: new Date().toISOString(),
+            folder: 'inbox',
+            status: 'read',
+            read: true,
+            favorite: false,
+            attachments: [],
+            hasAttachments: false,
+            proRequired: true,
+            virtual: true,
+        };
+    }
+
+    function proOnlyMailboxFromMessage(message) {
+        if (!message) return '';
+        const recipients = [
+            ...extractAddresses(message.to || ''),
+            ...extractAddresses(message.cc || ''),
+        ].map(normalizeEmail).filter(Boolean);
+        return recipients.find(isProOnlyMailbox) || '';
+    }
+
+    function proRequiredResponse(email, base = {}) {
+        const doc = makeProRequiredMessage(email);
+        return {
+            ...base,
+            done: true,
+            list: [doc],
+            count: 1,
+            doc,
+            message: doc,
+            id: doc.id,
+            guid: doc.guid,
+            proRequired: true,
+            proOnly: true,
+        };
+    }
+
+    function isDeletedForMailbox(email, guid) {
+        const normalized = normalizeEmail(email);
+        const key = String(guid || '');
+        return !!(normalized && key && deletedForMailbox.get(normalized)?.has(key));
+    }
+
+    function markDeletedForMailbox(email, guid) {
+        const normalized = normalizeEmail(email);
+        const key = String(guid || '');
+        if (!normalized || !key) return;
+        let set = deletedForMailbox.get(normalized);
+        if (!set) deletedForMailbox.set(normalized, set = new Set());
+        set.add(key);
+        persistMailboxDeletions();
+    }
+
+    loadOwnershipState();
 
     // Legacy/mobile message-reference bridge. The website opens messages by GUID,
     // while published mobile clients open the same row by numeric `id`. Remember
@@ -644,6 +885,45 @@ module.exports = function init(site) {
         }
     });
 
+
+    onPost('/api/emails/pro/delete', async (req, res) => {
+        const data = body(req);
+        const guid = String(data.guid || '').trim();
+        const email = normalizeEmail(data.email || data.to || '');
+        const ownerToken = String(data.ownerToken || data.ownershipToken || '').trim();
+        if (!guid || !email || !ownerToken) return res.json({ done: false, error: 'guid, email and ownerToken are required' });
+        if (!verifyOwnershipToken(email, ownerToken)) { res.status(403); return res.json({ done: false, error: 'Mailbox ownership could not be verified.' }); }
+
+        try {
+            const domain = apiDomain(req, email);
+            if (!addressBelongsToDomain(email, domain)) { res.status(403); return res.json({ done: false, error: 'Mailbox domain mismatch.' }); }
+            const raw = await service.store.getMessage(guid);
+            if (!raw || !messageBelongsToDomain(raw, domain)) return res.json({ done: false, error: 'Email not found' });
+            if (service.isVipMessage(raw)) { res.status(403); return res.json({ done: false, error: 'Protected messages cannot be deleted from the public mailbox.' }); }
+
+            const recipients = new Set([
+                ...extractAddresses(raw.to || ''),
+                ...extractAddresses(raw.cc || ''),
+            ].map(normalizeEmail).filter(Boolean));
+            if (!recipients.has(email)) { res.status(403); return res.json({ done: false, error: 'This message does not belong to this mailbox.' }); }
+
+            // Always hide the message for this owned mailbox. If this message was
+            // delivered only to that mailbox, also remove the underlying JSON
+            // message to reclaim storage. Multi-recipient messages stay available
+            // to their other recipients and are only tombstoned for this mailbox.
+            markDeletedForMailbox(email, guid);
+            let physicallyDeleted = false;
+            if (recipients.size === 1) {
+                const result = await service.store.deleteMessage(guid);
+                physicallyDeleted = !!result?.deleted;
+            }
+            await service.store.audit('email_owner_delete', { guid, email, physicallyDeleted });
+            res.json({ done: true, guid, email, physicallyDeleted });
+        } catch (error) {
+            res.json({ done: false, error: error?.message || String(error) });
+        }
+    });
+
     onPost('/api/emails/delete', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         const guid = body(req).guid;
@@ -669,11 +949,35 @@ module.exports = function init(site) {
             id: input.id,
         };
         const context = readContext(req, { maxLimit: 1000 }, apiDomain(req, input.email, input.to, input.from));
+        const ownerToken = String(input.ownerToken || input.ownershipToken || '').trim();
+        let requestedMailboxForDelete = normalizeEmail(input.email || input.to || '');
+        if (!requestedMailboxForDelete && input.guid) requestedMailboxForDelete = proNoticeMailboxFromGuid(input.guid);
+        if (!requestedMailboxForDelete && input.id !== undefined && input.id !== null) requestedMailboxForDelete = proNoticeMailboxFromId(input.id);
+        if (requestedMailboxForDelete && isProOnlyMailbox(requestedMailboxForDelete) && !isProAppRequest(req, input)) {
+            return res.json(proRequiredResponse(requestedMailboxForDelete, {
+                browserID: req.browserID,
+                toEmail: input.to,
+                index: input.index,
+            }));
+        }
+        if (input.guid && requestedMailboxForDelete && isDeletedForMailbox(requestedMailboxForDelete, input.guid)) {
+            response.done = true;
+            response.error = 'Email not found';
+            return res.json(response);
+        }
         try {
             let doc = null;
             if (input.guid) {
                 try {
                     doc = (await service.read(String(input.guid), context)).message;
+                    const protectedMailbox = proOnlyMailboxFromMessage(doc);
+                    if (protectedMailbox && !isProAppRequest(req)) {
+                        return res.json(proRequiredResponse(protectedMailbox, {
+                            browserID: req.browserID,
+                            toEmail: input.to,
+                            index: input.index,
+                        }));
+                    }
                 } catch (error) {
                     if (error.code === 'VIP_REQUIRED') {
                         response.done = true;
@@ -748,6 +1052,14 @@ module.exports = function init(site) {
                 }
 
                 if (raw) {
+                    const protectedMailbox = requestedMailbox || proOnlyMailboxFromMessage(raw);
+                    if (protectedMailbox && isProOnlyMailbox(protectedMailbox) && !isProAppRequest(req, input)) {
+                        return res.json(proRequiredResponse(protectedMailbox, {
+                            browserID: req.browserID,
+                            toEmail: input.to,
+                            index: input.index,
+                        }));
+                    }
                     if (service.isVipMessage(raw) && !context.allowVip) {
                         response.done = true;
                         response.isVIP = true;
@@ -825,6 +1137,20 @@ module.exports = function init(site) {
         const where = data.where || {};
         const limit = Math.max(1, Math.min(Number(data.limit || 500), 5000));
         const context = readContext(req, { maxLimit: 5000 }, apiDomain(req, data.email, where.email, where.to, where.from));
+        const requestedMailbox = normalizeEmail(where.to || data.email || '');
+        const ownerToken = String(data.ownerToken || data.ownershipToken || '').trim();
+        if (requestedMailbox && isProOnlyMailbox(requestedMailbox) && !isProAppRequest(req, data)) {
+            const notice = makeProRequiredMessage(requestedMailbox);
+            return res.json({
+                done: true,
+                list: [notice],
+                count: 1,
+                isVIP: false,
+                proRequired: true,
+                proOnly: true,
+                storage: 'virtual-pro-notice',
+            });
+        }
         const args = {
             from: where.from,
             to: data.exactTo ? undefined : where.to,
@@ -839,10 +1165,13 @@ module.exports = function init(site) {
         };
         try {
             const result = await service.search(args, context);
+            if (requestedMailbox) {
+                result.messages = result.messages.filter((message) => !isDeletedForMailbox(requestedMailbox, message?.guid));
+                result.totalMatches = result.messages.length;
+            }
 
             // Bind every mobile-visible numeric id to the exact GUID returned in
             // this inbox response. Old clients only send the id when opening a row.
-            const requestedMailbox = normalizeEmail(where.to || data.email || '');
             for (const message of result.messages) {
                 if (!message || message.id === undefined || !message.guid) continue;
                 if (requestedMailbox) rememberLegacyViewRef(requestedMailbox, message.id, message.guid);
@@ -867,9 +1196,20 @@ module.exports = function init(site) {
         try {
             const guid = String(req.query?.guid || '');
             const mailbox = String(req.query?.email || req.query?.to || '');
+            const normalizedMailbox = normalizeEmail(mailbox);
+            const ownerToken = String(req.query?.ownerToken || req.query?.ownershipToken || '').trim();
             if (!guid) return res.sendHTML('<h1>Email Not Exists</h1>');
+            if (normalizedMailbox && isProOnlyMailbox(normalizedMailbox) && !isProAppRequest(req)) {
+                const notice = makeProRequiredMessage(normalizedMailbox);
+                return res.sendHTML(notice.html);
+            }
             const result = await service.read(guid, admin(req) ? adminGlobalContext({ maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, req.query?.email, req.query?.to, req.query?.from)));
             const doc = result.message;
+            const protectedMailbox = proOnlyMailboxFromMessage(doc);
+            if (protectedMailbox && !isProAppRequest(req)) {
+                const notice = makeProRequiredMessage(protectedMailbox);
+                return res.sendHTML(notice.html);
+            }
             const html = doc.html || ('<pre>' + String(doc.text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>');
             res.sendHTML(sanitizeEmailHtml(html, { allowRemoteImages: String(req.query?.remote || '') === '1', attachments: doc.attachments, guid, mailbox }));
         } catch (error) {
@@ -884,7 +1224,12 @@ module.exports = function init(site) {
             const guid = String(req.query?.guid || '');
             const id = String(req.query?.id || '');
             const mailbox = String(req.query?.email || req.query?.to || '');
+            const normalizedMailbox = normalizeEmail(mailbox);
+            const ownerToken = String(req.query?.ownerToken || req.query?.ownershipToken || '').trim();
             if (!guid || !id) return res.status(400).send('Attachment request is incomplete');
+            if (normalizedMailbox && isProOnlyMailbox(normalizedMailbox) && !isProAppRequest(req)) {
+                return res.status(403).send('VIP Temp Mail Pro required');
+            }
             const result = await service.readAttachment(guid, id, admin(req) ? adminGlobalContext({ maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, mailbox)));
             const filename = safeFilename(result.meta.filename, 'attachment.bin');
             res.set('Content-Type', result.meta.contentType || 'application/octet-stream');
@@ -901,7 +1246,12 @@ module.exports = function init(site) {
         try {
             const guid = String(req.query?.guid || '');
             const mailbox = String(req.query?.email || req.query?.to || '');
+            const normalizedMailbox = normalizeEmail(mailbox);
+            const ownerToken = String(req.query?.ownerToken || req.query?.ownershipToken || '').trim();
             if (!guid) return res.status(400).send('Email guid is required');
+            if (normalizedMailbox && isProOnlyMailbox(normalizedMailbox) && !isProAppRequest(req)) {
+                return res.status(403).send('VIP Temp Mail Pro required');
+            }
             const result = await service.exportEml(guid, admin(req) ? adminGlobalContext({ maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, mailbox)));
             const subject = safeFilename(result.message.subject || 'email', 'email');
             res.set('Content-Type', 'message/rfc822');
@@ -1447,6 +1797,13 @@ module.exports = function init(site) {
     });
 
     onPost({ name: '/generate-new-email' }, (req, res) => {
+        const data = body(req);
+        const wantsProOnly = data.proOnly === true || String(data.client || '').trim().toLowerCase() === 'vip-temp-mail-pro';
+        const proOnly = wantsProOnly && isProAppRequest(req, data);
+        if (wantsProOnly && !proOnly) {
+            res.status(403);
+            return res.json({ done: false, error: 'VIP Temp Mail Pro authorization is required.' });
+        }
         let result = '';
         const characters = 'abcdefghijklmnopqrstuvwxyz';
         const numbers = '0123456789';
@@ -1475,6 +1832,12 @@ module.exports = function init(site) {
         const domain = currentDomain(req);
         if (!domain) return res.json({ done: false, error: 'Unable to determine current mail domain' });
         result += '@' + domain;
-        res.json({ done: true, email: result, domain });
+        const ownerToken = proOnly ? issueOwnershipToken(result, { proOnly: true }) : '';
+        res.json({
+            done: true,
+            email: result,
+            domain,
+            ...(ownerToken ? { ownerToken, proOnly: true } : {}),
+        });
     });
 };

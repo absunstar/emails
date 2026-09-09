@@ -613,48 +613,33 @@ module.exports = function init(site) {
                     if (error.message !== 'Email not found') throw error;
                 }
             } else if (input.id !== undefined && input.id !== null && input.id !== '') {
-                // Backward-compatible mobile lookup. Older VIP Temp Mail builds send
-                // only { id }, while newer builds also include { email, to }. Resolve
-                // the numeric id from the file store, but scope it as tightly as the
-                // client allows so old clients keep working without weakening
-                // multi-domain isolation.
-                const all = await service.store.listMessages();
-                const requestedMailbox = normalizeEmail(input.email || input.to || '');
-                let raw = all.find((item) => String(item.id) === String(input.id));
+                // Mobile compatibility: the numeric id is the canonical message
+                // identity. Do not require an exact mailbox-string match here: SMTP
+                // envelope recipients and RFC To/Cc headers can legitimately differ,
+                // and older clients send only {id}. Keep isolation at the deployment
+                // mail-domain boundary instead.
+                let raw = service.store.getMessageById
+                    ? await service.store.getMessageById(input.id)
+                    : (await service.store.listMessages()).find((item) => String(item.id) === String(input.id));
 
-                if (raw && requestedMailbox) {
-                    // Exact mailbox ownership is stronger than a root-domain check and
-                    // also tolerates legacy messages whose address formatting differs.
-                    if (!messageRecipientMatches(raw, requestedMailbox)) raw = null;
-                } else if (raw && context.domain && !messageBelongsToDomain(raw, context.domain)) {
-                    // Legacy id-only clients have no mailbox in the request, so retain
-                    // the historical host-domain isolation rule.
+                if (raw && context.domain && !messageBelongsToDomain(raw, context.domain)) {
                     raw = null;
                 }
 
-                // Compatibility fallback for migrated/legacy stores: if the id lookup
-                // did not resolve but the client supplied its mailbox, search that one
-                // mailbox with bodies included and match the id there. This avoids a
-                // false response with no `doc`, which older Flutter builds interpret as
-                // an invalid message response.
-                if (!raw && requestedMailbox) {
-                    const found = await service.search({ toExact: requestedMailbox, limit: 1000, includeBody: true }, context);
-                    response.isVIP = found.blockedVipCount > 0;
-                    const match = found.messages.find((item) => String(item.id) === String(input.id));
-                    if (match) {
-                        doc = match;
-                        response.resolvedBy = 'mailbox-id-fallback';
-                    }
-                }
-
-                if (!doc && raw) {
+                if (raw) {
                     if (service.isVipMessage(raw) && !context.allowVip) {
                         response.done = true;
                         response.isVIP = true;
                         return res.json(response);
                     }
                     doc = service.safeMessage(raw, true);
-                    response.resolvedBy = requestedMailbox ? 'id+mailbox' : 'legacy-id';
+                    const requestedMailbox = normalizeEmail(input.email || input.to || '');
+                    response.resolvedBy = requestedMailbox ? 'id+domain' : 'legacy-id';
+                    if (requestedMailbox && !messageRecipientMatches(raw, requestedMailbox)) {
+                        // Diagnostic only. Never reject a valid id because header To/Cc
+                        // differs from the SMTP envelope mailbox used by the client.
+                        response.mailboxHeaderMismatch = true;
+                    }
                 }
             } else if (input.to) {
                 const found = await service.search({ toExact: input.to, limit: 1000, includeBody: true }, context);

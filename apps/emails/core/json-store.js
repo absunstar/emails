@@ -71,6 +71,7 @@ class EmailFileStore {
         this.logger = typeof options.logger === 'function' ? options.logger : () => {};
         this.isProtectedMessage = typeof options.isProtectedMessage === 'function' ? options.isProtectedMessage : () => false;
         this.messages = new Map();
+        this.messagesById = new Map();
         this.vipEntries = [];
         this.adminFolders = [];
         this._mutationQueue = Promise.resolve();
@@ -113,6 +114,7 @@ class EmailFileStore {
 
     _loadMessages() {
         this.messages.clear();
+        this.messagesById.clear();
         let maxId = 0;
         const files = walkJsonFiles(this.messagesDir, []);
         for (const filePath of files) {
@@ -121,7 +123,10 @@ class EmailFileStore {
                 if (!doc || !doc.guid) continue;
                 this.messages.set(String(doc.guid), doc);
                 const id = Number(doc.id || 0);
-                if (Number.isFinite(id) && id > maxId) maxId = id;
+                if (Number.isFinite(id) && id > 0) {
+                    this.messagesById.set(String(id), doc);
+                    if (id > maxId) maxId = id;
+                }
             } catch (error) {
                 this.logger('Skipped invalid email JSON ' + filePath + ': ' + (error.message || error));
             }
@@ -208,6 +213,7 @@ class EmailFileStore {
             });
             atomicWriteJson(this._messagePath(key), copy);
             this.messages.set(key, copy);
+            if (copy.id) this.messagesById.set(String(copy.id), copy);
             const cleanup = await this._cleanupUnlocked();
             this._syncMeta(cleanup.deleted.length ? { lastCleanupAt: now, lastCleanupDeleted: cleanup.deleted.length } : {});
             return { message: clone(copy), cleanup };
@@ -216,6 +222,10 @@ class EmailFileStore {
 
     async getMessage(guid) {
         return clone(this.messages.get(String(guid)) || null);
+    }
+
+    async getMessageById(id) {
+        return clone(this.messagesById.get(String(id)) || null);
     }
 
     async saveAttachments(guid, attachments) {
@@ -273,6 +283,7 @@ class EmailFileStore {
             });
             atomicWriteJson(this._messagePath(key), next);
             this.messages.set(key, next);
+            if (next.id) this.messagesById.set(String(next.id), next);
             this._syncMeta();
             return clone(next);
         });
@@ -289,6 +300,7 @@ class EmailFileStore {
         try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (error) { throw error; }
         try { fs.rmSync(this._attachmentDir(key), { recursive: true, force: true }); } catch (_) {}
         this.messages.delete(key);
+        if (existing.id) this.messagesById.delete(String(existing.id));
         if (syncMeta) this._syncMeta();
         return { deleted: true, guid: key, message: clone(existing) };
     }

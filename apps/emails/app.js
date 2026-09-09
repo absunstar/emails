@@ -65,6 +65,54 @@ module.exports = function init(site) {
     });
     site.emailService = service;
     site.emailStore = service.store;
+
+    // Legacy/mobile message-reference bridge. The website opens messages by GUID,
+    // while published mobile clients open the same row by numeric `id`. Remember
+    // the exact GUID that was returned by /api/emails/all so a later {id} view
+    // request is resolved through the same GUID-based read path as the website.
+    const legacyViewRefs = new Map();
+    const legacyViewRefTtlMs = 60 * 60 * 1000;
+    const legacyViewRefMax = 50000;
+
+    function legacyRefKey(scope, id) {
+        const left = String(scope || '').trim().toLowerCase();
+        const right = String(id ?? '').trim();
+        return left && right ? left + '::' + right : '';
+    }
+
+    function rememberLegacyViewRef(scope, id, guid) {
+        const key = legacyRefKey(scope, id);
+        const value = String(guid || '').trim();
+        if (!key || !value) return;
+        // Keep the first result from the date-desc inbox list for an ambiguous
+        // legacy id. Refresh its TTL on subsequent inbox loads.
+        const existing = legacyViewRefs.get(key);
+        legacyViewRefs.set(key, { guid: existing?.guid || value, expiresAt: Date.now() + legacyViewRefTtlMs });
+        if (legacyViewRefs.size > legacyViewRefMax) {
+            const now = Date.now();
+            for (const [k, ref] of legacyViewRefs) {
+                if (!ref || ref.expiresAt <= now || legacyViewRefs.size > legacyViewRefMax) legacyViewRefs.delete(k);
+                if (legacyViewRefs.size <= legacyViewRefMax) break;
+            }
+        }
+    }
+
+    function resolveLegacyViewRef(scopes, id) {
+        const now = Date.now();
+        for (const scope of scopes || []) {
+            const key = legacyRefKey(scope, id);
+            if (!key) continue;
+            const ref = legacyViewRefs.get(key);
+            if (!ref) continue;
+            if (ref.expiresAt <= now) {
+                legacyViewRefs.delete(key);
+                continue;
+            }
+            ref.expiresAt = now + legacyViewRefTtlMs;
+            return ref.guid;
+        }
+        return '';
+    }
     const scheduler = site.emailScheduler || null;
     site.emailOperationsManager = site.emailOperationsManager || createEmailBackupStorageManager({
         emailService: service,
@@ -641,9 +689,35 @@ module.exports = function init(site) {
                 // and older clients send only {id}. Keep isolation at the deployment
                 // mail-domain boundary instead.
                 const requestedMailbox = normalizeEmail(input.email || input.to || '');
-                let candidates = service.store.getMessagesById
+
+                // First use the exact id->guid association created when this client
+                // loaded its inbox. This makes old/new mobile clients use the same
+                // GUID read path as the working web UI.
+                const rememberedGuid = resolveLegacyViewRef(
+                    [requestedMailbox, context.domain],
+                    input.id
+                );
+                if (rememberedGuid) {
+                    try {
+                        doc = (await service.read(rememberedGuid, context)).message;
+                        response.guid = rememberedGuid;
+                        response.resolvedBy = 'legacy-list-id-to-guid';
+                    } catch (error) {
+                        // Stale cache entries must never block the normal fallback.
+                        if (error.code !== 'VIP_REQUIRED' && error.message !== 'Email not found') throw error;
+                        if (error.code === 'VIP_REQUIRED') {
+                            response.done = true;
+                            response.isVIP = true;
+                            return res.json(response);
+                        }
+                        doc = null;
+                    }
+                }
+
+                let candidates = doc ? [] : (service.store.getMessagesById
                     ? await service.store.getMessagesById(input.id)
-                    : [];
+                    : []);
+
 
                 // Fallback for stores created before the id index existed, stale
                 // in-memory indexes, or imported legacy JSON sets. The list result
@@ -710,9 +784,38 @@ module.exports = function init(site) {
                 response.isVIP = service.isVipAddress(doc.to) && !context.allowVip;
             } else if (!response.isVIP) {
                 response.error = 'Not Found Any Email Message';
+                site.log('[email-view] NOT_FOUND ' + JSON.stringify({
+                    id: input.id,
+                    guid: input.guid,
+                    email: input.email,
+                    to: input.to,
+                    domain: context.domain,
+                    resolvedBy: response.resolvedBy || '',
+                }));
             }
         } catch (error) {
             response.error = error?.message || String(error);
+            site.log('[email-view] ERROR ' + JSON.stringify({
+                id: input.id,
+                guid: input.guid,
+                email: input.email,
+                to: input.to,
+                domain: context.domain,
+                error: response.error,
+            }));
+        }
+        if (process.env.EMAIL_VIEW_DEBUG === '1') {
+            site.log('[email-view] RESPONSE ' + JSON.stringify({
+                id: input.id,
+                requestedGuid: input.guid,
+                returnedGuid: response.guid || response.doc?.guid || '',
+                domain: context.domain,
+                resolvedBy: response.resolvedBy || '',
+                done: response.done,
+                hasDoc: !!response.doc,
+                isVIP: !!response.isVIP,
+                error: response.error || '',
+            }));
         }
         res.json(response);
     });
@@ -736,6 +839,15 @@ module.exports = function init(site) {
         };
         try {
             const result = await service.search(args, context);
+
+            // Bind every mobile-visible numeric id to the exact GUID returned in
+            // this inbox response. Old clients only send the id when opening a row.
+            const requestedMailbox = normalizeEmail(where.to || data.email || '');
+            for (const message of result.messages) {
+                if (!message || message.id === undefined || !message.guid) continue;
+                if (requestedMailbox) rememberLegacyViewRef(requestedMailbox, message.id, message.guid);
+                if (context.domain) rememberLegacyViewRef(context.domain, message.id, message.guid);
+            }
             const response = {
                 done: true,
                 list: result.messages,

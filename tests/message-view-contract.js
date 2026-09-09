@@ -9,8 +9,9 @@ assert(frontend.includes("if (!mail) throw new Error(response.error || 'Email no
 assert(app.includes('response.doc = doc;') && app.includes('response.message = doc;') && app.includes('response.list = [doc];'), 'View API must expose canonical and compatibility single-message response keys');
 console.log('Message view API/UI contract checks passed');
 assert(app.includes("const requestedMailbox = normalizeEmail(input.email || input.to || '')"), 'View API must support mailbox-scoped new mobile clients');
-assert(app.includes("requestedMailbox ? 'id+domain' : 'legacy-id'"), 'View API must preserve id-only legacy mobile lookup');
+assert(app.includes("requestedMailbox ? 'id+mailbox+domain' : 'legacy-id+domain'"), 'View API must preserve id-only legacy mobile lookup');
 assert(app.includes("for (const key of ['from', 'to', 'cc', 'subject', 'text', 'html', 'date'"), 'View API must expose top-level legacy message aliases');
-
-assert(app.includes("response.resolvedBy = requestedMailbox ? 'id+domain' : 'legacy-id'"), 'View API must trust canonical id within the deployment domain');
+assert(app.includes("response.resolvedBy = requestedMailbox ? 'id+mailbox+domain' : 'legacy-id+domain'"), 'View API must trust canonical id within the deployment domain');
+assert(app.includes('service.store.getMessagesById'), 'View API must support duplicate legacy numeric ids');
+assert(app.includes("candidates = all.filter((item) => String(item.id) === String(input.id))"), 'View API must fall back to raw storage when the id index misses');
 assert(app.includes('response.mailboxHeaderMismatch = true'), 'Mailbox/header mismatch must be diagnostic only, not a view blocker');

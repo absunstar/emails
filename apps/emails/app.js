@@ -618,12 +618,37 @@ module.exports = function init(site) {
                 // envelope recipients and RFC To/Cc headers can legitimately differ,
                 // and older clients send only {id}. Keep isolation at the deployment
                 // mail-domain boundary instead.
-                let raw = service.store.getMessageById
-                    ? await service.store.getMessageById(input.id)
-                    : (await service.store.listMessages()).find((item) => String(item.id) === String(input.id));
+                const requestedMailbox = normalizeEmail(input.email || input.to || '');
+                let candidates = service.store.getMessagesById
+                    ? await service.store.getMessagesById(input.id)
+                    : [];
 
-                if (raw && context.domain && !messageBelongsToDomain(raw, context.domain)) {
-                    raw = null;
+                // Fallback for stores created before the id index existed, stale
+                // in-memory indexes, or imported legacy JSON sets. The list result
+                // and the detail result must always agree on the same numeric id.
+                if (!Array.isArray(candidates) || !candidates.length) {
+                    const all = await service.store.listMessages();
+                    candidates = all.filter((item) => String(item.id) === String(input.id));
+                }
+
+                if (context.domain) {
+                    candidates = candidates.filter((item) => messageBelongsToDomain(item, context.domain));
+                }
+
+                // New clients provide the mailbox. Prefer an exact recipient match,
+                // but do not require it because SMTP envelope recipients can differ
+                // from RFC To/Cc headers. Old clients provide only {id} and therefore
+                // select the best candidate within the request domain.
+                let raw = null;
+                if (requestedMailbox) {
+                    raw = candidates.find((item) => messageRecipientMatches(item, requestedMailbox)) || null;
+                }
+                if (!raw && candidates.length) {
+                    const timeOf = (item) => {
+                        const value = new Date(item?.date || item?._fileStore?.createdAt || 0).getTime();
+                        return Number.isNaN(value) ? 0 : value;
+                    };
+                    raw = candidates.slice().sort((a, b) => timeOf(b) - timeOf(a))[0];
                 }
 
                 if (raw) {
@@ -633,8 +658,7 @@ module.exports = function init(site) {
                         return res.json(response);
                     }
                     doc = service.safeMessage(raw, true);
-                    const requestedMailbox = normalizeEmail(input.email || input.to || '');
-                    response.resolvedBy = requestedMailbox ? 'id+domain' : 'legacy-id';
+                    response.resolvedBy = requestedMailbox ? 'id+mailbox+domain' : 'legacy-id+domain';
                     if (requestedMailbox && !messageRecipientMatches(raw, requestedMailbox)) {
                         // Diagnostic only. Never reject a valid id because header To/Cc
                         // differs from the SMTP envelope mailbox used by the client.

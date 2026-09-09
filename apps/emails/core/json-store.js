@@ -71,6 +71,9 @@ class EmailFileStore {
         this.logger = typeof options.logger === 'function' ? options.logger : () => {};
         this.isProtectedMessage = typeof options.isProtectedMessage === 'function' ? options.isProtectedMessage : () => false;
         this.messages = new Map();
+        // id -> Map<guid, doc>. Legacy installations can contain duplicate numeric
+        // ids after migrations/imports or multi-domain consolidation, so a single
+        // id must be allowed to resolve to more than one stored message.
         this.messagesById = new Map();
         this.vipEntries = [];
         this.adminFolders = [];
@@ -91,6 +94,33 @@ class EmailFileStore {
         this._loadVip();
         this._loadAdminFolders();
         this._syncMeta();
+    }
+
+
+    _indexMessageById(doc) {
+        if (!doc || doc.id === undefined || doc.id === null || doc.id === '') return;
+        const id = String(doc.id);
+        const guid = String(doc.guid || '');
+        if (!guid) return;
+        let bucket = this.messagesById.get(id);
+        if (!(bucket instanceof Map)) {
+            bucket = new Map();
+            this.messagesById.set(id, bucket);
+        }
+        bucket.set(guid, doc);
+    }
+
+    _unindexMessageById(doc) {
+        if (!doc || doc.id === undefined || doc.id === null || doc.id === '') return;
+        const id = String(doc.id);
+        const guid = String(doc.guid || '');
+        const bucket = this.messagesById.get(id);
+        if (!(bucket instanceof Map)) {
+            this.messagesById.delete(id);
+            return;
+        }
+        if (guid) bucket.delete(guid);
+        if (!bucket.size) this.messagesById.delete(id);
     }
 
     _messagePath(guid) {
@@ -124,7 +154,7 @@ class EmailFileStore {
                 this.messages.set(String(doc.guid), doc);
                 const id = Number(doc.id || 0);
                 if (Number.isFinite(id) && id > 0) {
-                    this.messagesById.set(String(id), doc);
+                    this._indexMessageById(doc);
                     if (id > maxId) maxId = id;
                 }
             } catch (error) {
@@ -213,7 +243,8 @@ class EmailFileStore {
             });
             atomicWriteJson(this._messagePath(key), copy);
             this.messages.set(key, copy);
-            if (copy.id) this.messagesById.set(String(copy.id), copy);
+            if (previous) this._unindexMessageById(previous);
+            this._indexMessageById(copy);
             const cleanup = await this._cleanupUnlocked();
             this._syncMeta(cleanup.deleted.length ? { lastCleanupAt: now, lastCleanupDeleted: cleanup.deleted.length } : {});
             return { message: clone(copy), cleanup };
@@ -224,8 +255,18 @@ class EmailFileStore {
         return clone(this.messages.get(String(guid)) || null);
     }
 
+    async getMessagesById(id) {
+        const bucket = this.messagesById.get(String(id));
+        if (bucket instanceof Map) return Array.from(bucket.values()).map(clone);
+        // Compatibility with any in-memory state created before the multi-value
+        // index was introduced.
+        if (bucket) return [clone(bucket)];
+        return [];
+    }
+
     async getMessageById(id) {
-        return clone(this.messagesById.get(String(id)) || null);
+        const list = await this.getMessagesById(id);
+        return list.length ? list[0] : null;
     }
 
     async saveAttachments(guid, attachments) {
@@ -283,7 +324,8 @@ class EmailFileStore {
             });
             atomicWriteJson(this._messagePath(key), next);
             this.messages.set(key, next);
-            if (next.id) this.messagesById.set(String(next.id), next);
+            this._unindexMessageById(previous);
+            this._indexMessageById(next);
             this._syncMeta();
             return clone(next);
         });
@@ -300,7 +342,7 @@ class EmailFileStore {
         try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (error) { throw error; }
         try { fs.rmSync(this._attachmentDir(key), { recursive: true, force: true }); } catch (_) {}
         this.messages.delete(key);
-        if (existing.id) this.messagesById.delete(String(existing.id));
+        this._unindexMessageById(existing);
         if (syncMeta) this._syncMeta();
         return { deleted: true, guid: key, message: clone(existing) };
     }

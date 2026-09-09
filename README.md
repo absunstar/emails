@@ -36,7 +36,7 @@ VIP/company addresses remain protected. Their list is stored in `localStorage/vi
 
 Manual deletion is an administrator operation. This applies to single delete and bulk delete APIs.
 
-Automatic retention cleanup is separate: the file store starts removing the **oldest non-VIP messages only after the stored message count exceeds 10,000** (configurable with `EMAIL_MAX_MESSAGES`). VIP/company mail is protected from this automatic cleanup.
+Automatic retention cleanup is separate: the file store starts removing the **oldest non-VIP messages only after the stored message count exceeds 100,000** (configurable with `EMAIL_MAX_MESSAGES` and at runtime through MCP). VIP/company mail is protected from this automatic cleanup.
 
 ## MCP
 

@@ -152,7 +152,7 @@ function createEmailMcpService(options) {
                     'scheduled-send', 'scheduled-bulk-send', 'schedule-list', 'schedule-update', 'schedule-cancel', 'schedule-send-now', 'schedule-retry',
                     'deliverability-status', 'deliverability-preflight', 'deliverability-config', 'per-domain-throttling', 'provider-throttling', 'warmup-ramp',
                     'bounce-suppression', 'unsubscribe-suppression', 'complaint-suppression', 'delivery-circuit-breaker',
-                    'automatic-backup', 'backup-validation', 'disaster-recovery-preview', 'disaster-recovery-restore', 'disk-quota', 'retention-cleanup', 'emergency-low-space-mode', 'operational-alerts', 'storage-history',
+                    'automatic-backup', 'backup-validation', 'disaster-recovery-preview', 'disaster-recovery-restore', 'disk-quota', 'message-limit-control', 'retention-cleanup', 'emergency-low-space-mode', 'operational-alerts', 'storage-history',
                 ],
             };
         },
@@ -359,6 +359,24 @@ function createEmailMcpService(options) {
             const config = operationsRequired().updateConfig(args.config || {});
             await emailService.store.audit('mcp_storage_config_update', { updatedAt: new Date().toISOString() });
             return { updated: true, config };
+        },
+
+        async storageMessageLimitGet(scope) {
+            enforceAdminRate(scope, false);
+            return { limit: emailService.store.getMessageLimit ? emailService.store.getMessageLimit() : { maxMessages: emailService.store.maxMessages, messageCount: emailService.store.messages?.size || 0 } };
+        },
+
+        async storageMessageLimitSet(args, scope) {
+            enforceAdminRate(scope, true);
+            const next = Math.floor(Number(args.maxMessages));
+            if (!Number.isFinite(next) || next < 1 || next > 1000000) throw new Error('maxMessages must be between 1 and 1000000');
+            const currentCount = Number(emailService.store.messages?.size || 0);
+            if (next < currentCount && args.confirm !== true) {
+                throw new Error('The requested limit is below the current stored message count (' + currentCount + '). Set confirm=true to allow this change. Oldest non-protected messages may be removed when cleanup runs.');
+            }
+            const result = await emailService.store.setMessageLimit(next, { source: 'mcp-manager', managed: true, cleanupNow: args.cleanupNow === true });
+            await emailService.store.audit('mcp_storage_message_limit_set', { previousMaxMessages: result.previousMaxMessages, maxMessages: result.maxMessages, cleanupNow: args.cleanupNow === true, deleted: result.cleanup?.deleted?.length || 0 });
+            return { updated: true, limit: result };
         },
 
         async cleanupPreview(args, scope) {

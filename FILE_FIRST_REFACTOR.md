@@ -12,7 +12,7 @@
 - Fixed the old **Set as Normal** frontend route bug.
 - Manual single/bulk deletion requires administrator context.
 - MCP secret is the administrator credential for MCP destructive tools.
-- Automatic cleanup starts only above the configured threshold (10,000 by default) and removes oldest non-VIP mail first.
+- Automatic cleanup starts only above the configured threshold (100,000 by default) and removes oldest non-VIP mail first.
 - Bulk MCP operations include multi-read, multi-send, explicit multi-delete, filtered preview/confirmed delete, and multi-message read-state changes.
 
 ## Primary modules

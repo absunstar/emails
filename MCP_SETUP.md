@@ -394,6 +394,8 @@ email_restore_execute
 email_storage_report
 email_storage_config_get
 email_storage_config_update
+email_storage_message_limit_get
+email_storage_message_limit_set
 email_storage_cleanup_preview
 email_storage_cleanup_execute
 email_storage_maintenance_run
@@ -403,3 +405,8 @@ email_operations_history
 
 Restore and cleanup are intentionally preview-first. The agent should call the preview tool, inspect the returned changes/candidates, then pass the short-lived `confirmToken` with `confirm=true` to the execute tool. Restore creates a safety backup before replacing managed data and returns `restartRequired=true`. See `BACKUP_DISASTER_RECOVERY.md`.
 
+
+
+### Stored-message cap control
+
+`email_storage_message_limit_get` returns the active cap and current count. `email_storage_message_limit_set` persistently changes the cap (1..1,000,000). Lowering below the current count requires `confirm=true`; `cleanupNow=true` immediately prunes oldest non-protected messages. The default cap is 100,000.

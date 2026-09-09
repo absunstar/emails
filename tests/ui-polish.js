@@ -26,4 +26,12 @@ assert(free.includes('mailbox-secondary-tools') && free.includes('mailbox-transf
 const selectAddressStart = emailJs.indexOf('async function selectAddress');
 const selectAddressEnd = emailJs.indexOf('async function loadClientContext', selectAddressStart);
 assert(selectAddressStart >= 0 && selectAddressEnd > selectAddressStart && !emailJs.slice(selectAddressStart, selectAddressEnd).includes('Address removed'), 'Selecting a saved inbox must never show removal feedback');
+
+const recentSortStart = emailJs.indexOf('function sortedAddresses');
+const recentSortEnd = emailJs.indexOf('function renderAddressSidebar', recentSortStart);
+const recentSortSource = emailJs.slice(recentSortStart, recentSortEnd);
+assert(recentSortStart >= 0 && recentSortEnd > recentSortStart, 'Saved inbox sorting function is missing');
+assert(!recentSortSource.includes('lastCheckedAt || 0'), 'Selecting/checking an inbox must not move it to the top of the Recent list');
+assert(free.includes('.mailbox-address-copy strong{font-size:14px}') && free.includes('.mailbox-address-copy small{font-size:11.5px'), 'Saved inbox typography should be larger and easier to read');
+
 console.log('Homepage and login UI polish checks passed');

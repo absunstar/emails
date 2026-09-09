@@ -10,7 +10,7 @@
         offset: 0,
         limit: 50,
         selected: new Set(),
-        stats: { total: 0, unread: 0, favorite: 0, attachments: 0, failed: 0, folders: {}, maxMessages: 10000 },
+        stats: { total: 0, unread: 0, favorite: 0, attachments: 0, failed: 0, folders: {}, maxMessages: 100000 },
         folders: [],
         customFolders: [],
         current: null,
@@ -193,7 +193,7 @@
             qa('[data-admin-stat="' + key + '"]').forEach((el) => { el.textContent = value.toLocaleString(); });
             qa('[data-admin-side-count="' + key + '"]').forEach((el) => { el.textContent = value.toLocaleString(); });
         });
-        const max = Math.max(1, Number(stats.maxMessages || 10000));
+        const max = Math.max(1, Number(stats.maxMessages || 100000));
         const stored = Math.max(0, Number(stats.storedTotal || stats.total || 0));
         const storageText = q('[data-admin-storage-text]');
         const storageBar = q('[data-admin-storage-bar]');

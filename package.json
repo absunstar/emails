@@ -10,12 +10,12 @@
   },
   "scripts": {
     "start": "node --max-old-space-size=8192 server.js",
-    "test": "node tests/frontend-zero-deps.js && node tests/runtime-domain.js && node tests/client-local-addresses.js && node tests/browser-auth.js && node tests/file-store-service.js && node tests/competitive-features.js && node tests/action-feedback.js && node tests/ui-polish.js && node tests/message-view-contract.js && node tests/sidebar-email-list-layout.js && node tests/admin-dashboard.js && node tests/abuse-policy.js && node tests/mcp-smoke.js && node tests/mcp-transport-compat.js && node tests/mcp-stdio-smoke.js && node tests/mcp-manager-service.js && node tests/email-scheduler.js && node tests/mcp-send-limits.js && node tests/deliverability-engine.js && node tests/ops-features.js && node tests/seo-expansion.js && node tests/backup-storage-manager.js && node tests/admin-gmail-interactions.js && node tests/smtp-outbound-multidomain.js && node tests/env-loader-smtp-config.js",
+    "test": "node tests/frontend-zero-deps.js && node tests/runtime-domain.js && node tests/client-local-addresses.js && node tests/browser-auth.js && node tests/file-store-service.js && node tests/competitive-features.js && node tests/action-feedback.js && node tests/ui-polish.js && node tests/message-view-contract.js && node tests/sidebar-email-list-layout.js && node tests/admin-dashboard.js && node tests/abuse-policy.js && node tests/mcp-smoke.js && node tests/mcp-transport-compat.js && node tests/mcp-stdio-smoke.js && node tests/mcp-manager-service.js && node tests/email-scheduler.js && node tests/mcp-send-limits.js && node tests/deliverability-engine.js && node tests/ops-features.js && node tests/seo-expansion.js && node tests/storage-message-limit.js && node tests/backup-storage-manager.js && node tests/admin-gmail-interactions.js && node tests/smtp-outbound-multidomain.js && node tests/env-loader-smtp-config.js",
     "mcp:stdio": "node apps/emails/mcp-stdio.js",
     "test:ops": "node tests/ops-features.js",
     "test:load": "node tests/production-load.js",
     "test:load:full": "node tests/production-load.js --full",
-    "test:storage": "node tests/backup-storage-manager.js"
+    "test:storage": "node tests/storage-message-limit.js && node tests/backup-storage-manager.js"
   },
   "keywords": [
     "email",

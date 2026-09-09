@@ -180,6 +180,12 @@ const TOOLS = [
     tool('email_storage_report', 'Storage and disk report', 'Return managed storage bytes, server free disk space, quota level, category sizes, and per-mail-domain estimates.', {}),
     tool('email_storage_config_get', 'Get backup and retention configuration', 'Read backup cadence, retention periods, quota thresholds, emergency cleanup settings, and maintenance interval.', {}),
     tool('email_storage_config_update', 'Update backup and retention configuration', 'Update backup cadence, retention, quota, and low-space maintenance settings. This does not execute cleanup by itself.', { config: { type: 'object' } }, ['config'], { readOnlyHint: false }),
+    tool('email_storage_message_limit_get', 'Get stored-message limit', 'Read the active maximum stored-message count, current message count, source, and whether MCP runtime management is active.', {}),
+    tool('email_storage_message_limit_set', 'Set stored-message limit', 'Persistently change the maximum stored-message count (1..1,000,000). Raising the limit is non-destructive. Lowering below the current count requires confirm=true. cleanupNow=true immediately removes oldest non-protected messages down to the new limit.', {
+        maxMessages: { type: 'integer', minimum: 1, maximum: 1000000 },
+        confirm: { type: 'boolean', default: false },
+        cleanupNow: { type: 'boolean', default: false },
+    }, ['maxMessages'], { readOnlyHint: false }),
     tool('email_storage_cleanup_preview', 'Preview retention cleanup', 'Dry-run storage cleanup. Protected/VIP messages are preserved. Returns candidate counts, estimated reclaimable bytes, and a confirmToken.', {
         emergency: { type: 'boolean', default: false, description: 'Use the configured emergency retention windows for low-space recovery.' },
     }),
@@ -376,7 +382,7 @@ function validateScheduleRetryFields(args) {
 
 function validateToolArguments(name, raw) {
     const args = objectArgs(raw);
-    if (name === 'email_capabilities' || name === 'email_vip_list' || name === 'email_folders_list' || name === 'email_policy_get' || name === 'email_policy_export' || name === 'email_policy_status' || name === 'email_scheduler_status' || name === 'email_deliverability_status' || name === 'email_deliverability_config_get' || name === 'email_operations_status' || name === 'email_backups_list' || name === 'email_storage_report' || name === 'email_storage_config_get') return { ok: true, args: {} };
+    if (name === 'email_capabilities' || name === 'email_vip_list' || name === 'email_folders_list' || name === 'email_policy_get' || name === 'email_policy_export' || name === 'email_policy_status' || name === 'email_scheduler_status' || name === 'email_deliverability_status' || name === 'email_deliverability_config_get' || name === 'email_operations_status' || name === 'email_backups_list' || name === 'email_storage_report' || name === 'email_storage_config_get' || name === 'email_storage_message_limit_get') return { ok: true, args: {} };
     if (name === 'email_search') {
         const checked = validateSearch(args, 500);
         if (!checked.ok) return checked;
@@ -472,6 +478,11 @@ function validateToolArguments(name, raw) {
     if (name === 'email_storage_config_update') {
         if (!args.config || typeof args.config !== 'object' || Array.isArray(args.config)) return fail('config must be an object');
         return { ok: true, args: { config: args.config } };
+    }
+    if (name === 'email_storage_message_limit_set') {
+        const maxMessages = Number(args.maxMessages);
+        if (!Number.isInteger(maxMessages) || maxMessages < 1 || maxMessages > 1000000) return fail('maxMessages must be an integer between 1 and 1000000');
+        return { ok: true, args: { maxMessages, confirm: args.confirm === true, cleanupNow: args.cleanupNow === true } };
     }
     if (name === 'email_storage_cleanup_preview') return { ok: true, args: { emergency: args.emergency === true } };
     if (name === 'email_storage_cleanup_execute') {
@@ -965,6 +976,8 @@ async function executeTool(name, args, service, scope) {
     else if (name === 'email_storage_report') output = await service.storageReport(scope);
     else if (name === 'email_storage_config_get') output = await service.storageConfigGet(scope);
     else if (name === 'email_storage_config_update') output = await service.storageConfigUpdate(args, scope);
+    else if (name === 'email_storage_message_limit_get') output = await service.storageMessageLimitGet(scope);
+    else if (name === 'email_storage_message_limit_set') output = await service.storageMessageLimitSet(args, scope);
     else if (name === 'email_storage_cleanup_preview') output = await service.cleanupPreview(args, scope);
     else if (name === 'email_storage_cleanup_execute') output = await service.cleanupExecute(args, scope);
     else if (name === 'email_storage_maintenance_run') output = await service.maintenanceRun(args, scope);

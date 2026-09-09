@@ -65,7 +65,9 @@ class EmailFileStore {
         this.metaPath = path.join(this.baseDir, 'meta.json');
         this.adminFoldersPath = path.join(this.baseDir, 'admin-folders.json');
         this.vipPath = path.resolve(options.vipPath || path.join(process.cwd(), 'localStorage', 'vip-email-list.json'));
-        this.maxMessages = Math.max(1, Number(options.maxMessages || 10000));
+        this.configuredMaxMessages = Math.max(1, Number(options.maxMessages || 100000));
+        this.maxMessages = this.configuredMaxMessages;
+        this.maxMessagesManaged = false;
         this.logger = typeof options.logger === 'function' ? options.logger : () => {};
         this.isProtectedMessage = typeof options.isProtectedMessage === 'function' ? options.isProtectedMessage : () => false;
         this.messages = new Map();
@@ -78,6 +80,12 @@ class EmailFileStore {
         ensureDir(this.trackingDir);
         ensureDir(this.auditDir);
         ensureDir(path.dirname(this.vipPath));
+        const persistedMeta = readJson(this.metaPath, {});
+        const persistedLimit = Number(persistedMeta?.maxMessages);
+        if (persistedMeta?.maxMessagesManaged === true && Number.isFinite(persistedLimit) && persistedLimit >= 1) {
+            this.maxMessages = Math.floor(persistedLimit);
+            this.maxMessagesManaged = true;
+        }
         this._loadMessages();
         this._loadVip();
         this._loadAdminFolders();
@@ -175,6 +183,8 @@ class EmailFileStore {
             storage: 'json-files-only',
             messageCount: this.messages.size,
             maxMessages: this.maxMessages,
+            maxMessagesManaged: this.maxMessagesManaged === true,
+            maxMessagesSource: this.maxMessagesManaged === true ? 'runtime-mcp' : 'startup-config',
             nextId: this.nextId || 1,
             updatedAt: now,
         });
@@ -306,15 +316,51 @@ class EmailFileStore {
         });
     }
 
+    getMessageLimit() {
+        return {
+            maxMessages: this.maxMessages,
+            configuredMaxMessages: this.configuredMaxMessages,
+            managedByMcp: this.maxMessagesManaged === true,
+            source: this.maxMessagesManaged === true ? 'runtime-mcp' : 'startup-config',
+            messageCount: this.messages.size,
+            overLimit: Math.max(0, this.messages.size - this.maxMessages),
+        };
+    }
+
+    async setMessageLimit(value, options) {
+        options = options || {};
+        const next = Math.floor(Number(value));
+        if (!Number.isFinite(next) || next < 1 || next > 1000000) throw new Error('maxMessages must be between 1 and 1000000');
+        return this._queueMutation(async () => {
+            const previous = this.maxMessages;
+            this.maxMessages = next;
+            this.maxMessagesManaged = options.managed !== false;
+            this._syncMeta({
+                maxMessagesChangedAt: new Date().toISOString(),
+                maxMessagesChangedBy: String(options.source || 'runtime'),
+            });
+            let cleanup = null;
+            if (options.cleanupNow === true && this.messages.size > this.maxMessages) cleanup = await this._cleanupUnlocked();
+            if (cleanup?.deleted?.length) this._syncMeta({ lastCleanupAt: new Date().toISOString(), lastCleanupDeleted: cleanup.deleted.length });
+            return Object.assign({ previousMaxMessages: previous, cleanup }, this.getMessageLimit());
+        });
+    }
+
     async _cleanupUnlocked() {
         const excess = this.messages.size - this.maxMessages;
-        if (excess <= 0) return { triggered: false, deleted: [], protectedCount: 0, remaining: this.messages.size };
+        if (excess <= 0) return { triggered: false, deleted: [], protectedCount: 0, remaining: this.messages.size, limit: this.maxMessages };
 
-        const targetCount = Math.max(1, excess);
+        // At a 100k cap, deleting exactly one oldest message for every new inbound
+        // message would require scanning the full store on every delivery. Keep a
+        // small reserve instead: ~1% of the cap, capped at 1,000 messages. This
+        // preserves the hard maximum while amortizing cleanup work across many
+        // subsequent deliveries.
+        const reserve = this.maxMessages >= 10000 ? Math.min(1000, Math.max(1, Math.floor(this.maxMessages * 0.01))) : 0;
+        const targetCount = Math.max(1, excess + reserve);
         const candidates = [];
         let protectedCount = 0;
         const timeOf = (doc) => {
-            const value = new Date(doc?.date || 0).getTime();
+            const value = new Date(doc?.date || doc?._fileStore?.createdAt || 0).getTime();
             return Number.isNaN(value) ? 0 : value;
         };
         for (const doc of this.messages.values()) {
@@ -322,29 +368,23 @@ class EmailFileStore {
                 protectedCount += 1;
                 continue;
             }
-            if (candidates.length < targetCount) {
-                candidates.push(doc);
-                continue;
-            }
-            let newestIndex = 0;
-            let newestTime = timeOf(candidates[0]);
-            for (let index = 1; index < candidates.length; index += 1) {
-                const candidateTime = timeOf(candidates[index]);
-                if (candidateTime > newestTime) {
-                    newestTime = candidateTime;
-                    newestIndex = index;
-                }
-            }
-            if (timeOf(doc) < newestTime) candidates[newestIndex] = doc;
+            candidates.push({ guid: String(doc.guid), time: timeOf(doc) });
         }
-        candidates.sort((a, b) => timeOf(a) - timeOf(b));
+        candidates.sort((a, b) => a.time - b.time);
         const deleted = [];
-        for (const doc of candidates) {
-            if (this.messages.size <= this.maxMessages) break;
-            const result = this._deleteUnlocked(String(doc.guid), false);
-            if (result.deleted) deleted.push(String(doc.guid));
+        for (const item of candidates.slice(0, targetCount)) {
+            if (this.messages.size <= Math.max(0, this.maxMessages - reserve)) break;
+            const result = this._deleteUnlocked(item.guid, false);
+            if (result.deleted) deleted.push(item.guid);
         }
-        return { triggered: true, deleted, protectedCount, remaining: this.messages.size, limit: this.maxMessages };
+        return {
+            triggered: true,
+            deleted,
+            protectedCount,
+            remaining: this.messages.size,
+            limit: this.maxMessages,
+            cleanupReserve: reserve,
+        };
     }
 
     listVip() {

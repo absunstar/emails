@@ -348,7 +348,7 @@
         const list = state.addressBook.addresses.filter((item) => !query || [item.email, item.label, item.lastMessageSubject, item.lastMessageFrom].some((value) => String(value || '').toLowerCase().includes(query)));
         if (state.sidebarSort === 'unread') return list.sort((a, b) => Number(b.unreadCount || 0) - Number(a.unreadCount || 0) || Number(b.lastMessageAt || 0) - Number(a.lastMessageAt || 0));
         if (state.sidebarSort === 'created') return list.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
-        return list.sort((a, b) => Math.max(Number(b.lastMessageAt || 0), Number(b.lastCheckedAt || 0), Number(b.createdAt || 0)) - Math.max(Number(a.lastMessageAt || 0), Number(a.lastCheckedAt || 0), Number(a.createdAt || 0)));
+        return list.sort((a, b) => Math.max(Number(b.lastMessageAt || 0), Number(b.createdAt || 0)) - Math.max(Number(a.lastMessageAt || 0), Number(a.createdAt || 0)));
     }
 
     function renderAddressSidebar() {

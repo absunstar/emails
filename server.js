@@ -78,7 +78,7 @@ site.emailService = createEmailService({
     sendmail,
     dataDir: process.env.EMAIL_DATA_DIR || path.join(site.cwd, 'localStorage', 'email-files'),
     vipPath: process.env.EMAIL_VIP_FILE || path.join(site.cwd, 'localStorage', 'vip-email-list.json'),
-    maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 10000),
+    maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 100000),
     logger: (message) => site.log(message),
     abusePolicy: site.emailAbusePolicy,
     deliverability: site.emailDeliverability,

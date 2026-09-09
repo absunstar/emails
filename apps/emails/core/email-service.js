@@ -164,7 +164,7 @@ function createEmailService(options) {
     store = new EmailFileStore({
         baseDir: options.dataDir || path.join(process.cwd(), 'localStorage', 'email-files'),
         vipPath: options.vipPath || path.join(process.cwd(), 'localStorage', 'vip-email-list.json'),
-        maxMessages: Number(options.maxMessages || process.env.EMAIL_MAX_MESSAGES || 10000),
+        maxMessages: Number(options.maxMessages || process.env.EMAIL_MAX_MESSAGES || 100000),
         logger,
         isProtectedMessage: isVipMessage,
     });

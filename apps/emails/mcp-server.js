@@ -648,6 +648,10 @@ function validateToolArguments(name, raw) {
         if (args.value === undefined) return fail('value is required');
         return { ok: true, args: { group: args.group, key: args.key.trim(), value: args.value } };
     }
+    // Host-admin tools perform their own strict schema/domain/path validation.
+    if (emailHostAdmin.tools.some((entry) => entry.name === name)) {
+        return { ok: true, args: args && typeof args === 'object' && !Array.isArray(args) ? args : {} };
+    }
     return fail('Unknown tool');
 }
 

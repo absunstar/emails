@@ -88,9 +88,17 @@ module.exports = function init(site) {
 
     function clientIp(req) {
         const direct = String(req?.socket?.remoteAddress || req?.connection?.remoteAddress || req?.ip || '').trim();
-        if (process.env.EMAIL_TRUST_PROXY === 'true') {
+        const normalizedDirect = direct.replace(/^::ffff:/, '');
+        const localProxy = normalizedDirect === '127.0.0.1' || normalizedDirect === '::1';
+        // Trust X-Forwarded-For only when explicitly enabled or when the direct
+        // peer is the local reverse proxy. This keeps public clients from
+        // spoofing their rate-limit identity while allowing Nginx to preserve
+        // each real visitor IP without extra environment configuration.
+        if (process.env.EMAIL_TRUST_PROXY === 'true' || localProxy) {
             const forwarded = String(req?.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
             if (forwarded) return forwarded;
+            const real = String(req?.headers?.['x-real-ip'] || '').trim();
+            if (real) return real;
         }
         return direct || 'unknown';
     }
@@ -140,18 +148,25 @@ module.exports = function init(site) {
         return String(route?.name || '');
     }
 
-    function postBuckets(name) {
+    function postBuckets(name, req) {
         if (name.includes('/admin/list') || name.includes('/admin/summary') || name.includes('/admin/policy/test')) return ['admin', 'expensive'];
         if (name.includes('/admin/')) return ['admin'];
         if (name.includes('/inboxes/status') || name.endsWith('/view')) return ['inbox'];
-        if (name.endsWith('/all')) return ['expensive'];
+        if (name.endsWith('/all')) {
+            // A mailbox poll is a normal inbox operation, not a broad expensive
+            // search. Keep broad /all searches under the stricter bucket.
+            const data = body(req) || {};
+            const where = data.where || {};
+            if (data.exactTo === true && String(where.to || '').trim()) return ['inbox'];
+            return ['expensive'];
+        }
         return ['api'];
     }
 
     function onPost(route, handler) {
         const name = routeName(route);
         return site.onPOST(route, function guardedPost(req, res) {
-            if (!guardHttp(req, res, postBuckets(name))) return;
+            if (!guardHttp(req, res, postBuckets(name, req))) return;
             return handler(req, res);
         });
     }

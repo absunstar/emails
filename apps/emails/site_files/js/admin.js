@@ -692,6 +692,14 @@
         qa('[data-admin-quick-filter]').forEach((button) => button.classList.toggle('is-active', button.dataset.adminQuickFilter === name));
         if (name === 'all') return clearFilters();
         resetQuickViewFields();
+
+        // Quick Views are global mailbox views, not refinements of the currently
+        // selected folder. Without this reset, clicking e.g. Attachments while
+        // Sent is selected becomes `folder=send AND hasAttachments=true`, which
+        // can incorrectly show 0 even though the global attachment counter is > 0.
+        const folder = q('[data-admin-filter="folder"]');
+        if (folder) folder.value = 'all';
+
         const favorite = q('[data-admin-filter="favorite"]');
         const attachments = q('[data-admin-filter="hasAttachments"]');
         const read = q('[data-admin-filter="read"]');
@@ -702,6 +710,7 @@
         if (name === 'read' && read) read.value = 'read';
         if (name === 'failed' && status) status.value = 'failed';
         state.offset = 0;
+        renderFolders();
         updateFilterBadge();
         return loadMessages();
     }

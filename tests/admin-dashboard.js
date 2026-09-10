@@ -77,6 +77,21 @@ async function run() {
     const folderResult = await service.addAdminFolder('Support Queue');
     assert(folderResult.folder === 'Support Queue' && service.listAdminFolders().includes('Support Queue'), 'Persistent admin folders failed');
 
+    // Regression: multiple long-running processes can share one JSON store.
+    // A process that started earlier must see messages written later by another
+    // SMTP/MCP/Admin process without requiring a restart.
+    const sharedDir = path.join(temp, 'shared-email-files');
+    const sharedVip = path.join(temp, 'shared-vip.json');
+    const serviceA = createEmailService({ dataDir: sharedDir, vipPath: sharedVip, maxMessages: 100, sendmail: (message, callback) => callback(null, 'ok'), logger: () => {} });
+    const serviceB = createEmailService({ dataDir: sharedDir, vipPath: sharedVip, maxMessages: 100, sendmail: (message, callback) => callback(null, 'ok'), logger: () => {} });
+    await serviceA.ingestIncoming({ from: 'a@example.net', to: 'one@egytag.com', subject: 'Cross process A', date: new Date().toISOString(), attachments: [] });
+    const sharedStatsB = await serviceB.stats({ allowVip: true });
+    assert(sharedStatsB.total === 1, 'Long-running second process did not refresh externally written message');
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    await serviceB.ingestIncoming({ from: 'b@example.net', to: 'two@egytag.com', subject: 'Cross process B', date: new Date().toISOString(), attachments: [] });
+    const sharedSearchA = await serviceA.search({ sortBy: 'date', sortDir: 'desc', limit: 10 }, { allowVip: true, maxLimit: 100 });
+    assert(sharedSearchA.totalMatches === 2, 'First process did not refresh second process write');
+
     service.store.messages.clear();
     const base = Date.now() - 10000 * 1000;
     for (let index = 1; index <= 10000; index += 1) {

@@ -3,6 +3,7 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const os = require('os');
 const { createEmailService, extractAddresses, normalizeEmail } = require('./core/email-service');
 const { isAdminRequest, isBrowserSession, hasVipAccess, isTrustedBrowserId, browserRequestID } = require('./core/access');
 const { requestDomain, apiDomain, addressBelongsToDomain, messageBelongsToDomain, mailboxForDomain } = require('./core/domain');
@@ -56,8 +57,8 @@ module.exports = function init(site) {
     });
     const service = site.emailService || createEmailService({
         sendmail,
-        dataDir: path.join(site.cwd, 'localStorage', 'email-files'),
-        vipPath: path.join(site.cwd, 'localStorage', 'vip-email-list.json'),
+        dataDir: process.env.EMAIL_DATA_DIR || path.join(site.cwd, 'localStorage', 'email-files'),
+        vipPath: process.env.EMAIL_VIP_FILE || path.join(site.cwd, 'localStorage', 'vip-email-list.json'),
         maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 100000),
         logger: (message) => site.log(message),
         abusePolicy: policy,
@@ -1312,6 +1313,13 @@ module.exports = function init(site) {
                 vip: service.listVip(),
                 folders: service.listAdminFolders(),
                 storage: 'json-files-only',
+                runtime: {
+                    hostname: os.hostname(),
+                    pid: process.pid,
+                    dataDir: service.store.baseDir,
+                    messageCount: service.store.messages.size,
+                    meta: service.store.readMeta(),
+                },
             });
         } catch (error) {
             res.json({ done: false, error: error?.message || String(error) });
@@ -1354,6 +1362,7 @@ module.exports = function init(site) {
                 durationMs: result.durationMs,
                 sortBy: args.sortBy,
                 sortDir: args.sortDir,
+                runtime: { hostname: os.hostname(), pid: process.pid, dataDir: service.store.baseDir, messageCount: service.store.messages.size },
             });
         } catch (error) {
             res.json({ done: false, list: [], count: 0, error: error?.message || String(error) });

@@ -57,6 +57,10 @@
                 <span class="mail-admin-stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5l3 2"></path></svg></span>
                 <span><small>Unread</small><strong data-admin-stat="unread">0</strong></span>
             </button>
+            <button type="button" class="mail-admin-stat" data-admin-quick-filter="read">
+                <span class="mail-admin-stat-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path><path d="m9.5 12.5 1.8 1.8 3.5-3.8"></path></svg></span>
+                <span><small>Read</small><strong data-admin-stat="read">0</strong></span>
+            </button>
             <button type="button" class="mail-admin-stat" data-admin-quick-filter="favorite">
                 <span class="mail-admin-stat-icon"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"></path></svg></span>
                 <span><small>Favorites</small><strong data-admin-stat="favorite">0</strong></span>
@@ -93,10 +97,11 @@
                 <div class="mail-admin-sidebar-divider"></div>
                 <div class="mail-admin-panel-head compact"><div><small>QUICK VIEWS</small><h2>Filters</h2></div></div>
                 <div class="mail-admin-quick-list">
-                    <button type="button" data-admin-quick-filter="favorite"><span>★</span><span>Favorites</span><strong data-admin-side-count="favorite">0</strong></button>
-                    <button type="button" data-admin-quick-filter="unread"><span>●</span><span>Unread</span><strong data-admin-side-count="unread">0</strong></button>
-                    <button type="button" data-admin-quick-filter="attachments"><span>↗</span><span>Attachments</span><strong data-admin-side-count="attachments">0</strong></button>
-                    <button type="button" data-admin-quick-filter="failed"><span>!</span><span>Failed sends</span><strong data-admin-side-count="failed">0</strong></button>
+                    <button type="button" data-admin-quick-filter="favorite"><span class="mail-admin-quick-icon"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"></path></svg></span><span>Favorites</span><strong data-admin-side-count="favorite">0</strong></button>
+                    <button type="button" data-admin-quick-filter="unread"><span class="mail-admin-quick-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M4 8h16"></path><circle cx="18" cy="6" r="2"></circle></svg></span><span>Unread</span><strong data-admin-side-count="unread">0</strong></button>
+                    <button type="button" data-admin-quick-filter="read"><span class="mail-admin-quick-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path><path d="m9.5 12.5 1.8 1.8 3.5-3.8"></path></svg></span><span>Read</span><strong data-admin-side-count="read">0</strong></button>
+                    <button type="button" data-admin-quick-filter="attachments"><span class="mail-admin-quick-icon"><svg viewBox="0 0 24 24"><path d="m8 12 5.5-5.5a3 3 0 1 1 4.2 4.2L10 18.4a5 5 0 1 1-7.1-7.1l8.2-8.2"></path></svg></span><span>Attachments</span><strong data-admin-side-count="attachments">0</strong></button>
+                    <button type="button" data-admin-quick-filter="failed"><span class="mail-admin-quick-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 17h.01"></path></svg></span><span>Failed sends</span><strong data-admin-side-count="failed">0</strong></button>
                 </div>
                 <div class="mail-admin-sidebar-divider"></div>
                 <div class="mail-admin-storage-card">

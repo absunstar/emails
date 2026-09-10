@@ -92,6 +92,7 @@ class EmailFileStore {
         this.vipEntries = [];
         this.adminFolders = [];
         this._mutationQueue = Promise.resolve();
+        this._metaRevision = '';
 
         ensureDir(this.messagesDir);
         ensureDir(this.attachmentsDir);
@@ -108,6 +109,32 @@ class EmailFileStore {
         this._loadVip();
         this._loadAdminFolders();
         this._syncMeta();
+    }
+
+    _readMetaRevision() {
+        try {
+            const stat = fs.statSync(this.metaPath);
+            const meta = readJson(this.metaPath, {});
+            return [stat.mtimeMs, stat.size, meta.updatedAt || '', meta.nextId || '', meta.messageCount || ''].join('|');
+        } catch (_) {
+            return '';
+        }
+    }
+
+    _rememberMetaRevision() {
+        this._metaRevision = this._readMetaRevision();
+        return this._metaRevision;
+    }
+
+    refreshFromDiskIfChanged(force) {
+        const revision = this._readMetaRevision();
+        if (!force && revision && revision === this._metaRevision) return false;
+        if (!force && !revision && !this._metaRevision) return false;
+        this._loadMessages();
+        this._loadVip();
+        this._loadAdminFolders();
+        this._rememberMetaRevision();
+        return true;
     }
 
 
@@ -192,6 +219,7 @@ class EmailFileStore {
     }
 
     messageValues() {
+        this.refreshFromDiskIfChanged(false);
         return this.messages.values();
     }
 
@@ -214,7 +242,14 @@ class EmailFileStore {
     }
 
     _queueMutation(fn) {
-        const next = this._mutationQueue.then(fn, fn);
+        const run = async () => {
+            // The JSON store can be shared by the HTTP/Admin, SMTP and MCP
+            // processes. Pull in changes written by another process before any
+            // mutation so this process never operates on a stale snapshot.
+            this.refreshFromDiskIfChanged(false);
+            return fn();
+        };
+        const next = this._mutationQueue.then(run, run);
         this._mutationQueue = next.catch(() => {});
         return next;
     }
@@ -239,6 +274,7 @@ class EmailFileStore {
         });
         if (!next.createdAt) next.createdAt = now;
         atomicWriteJson(this.metaPath, next);
+        this._rememberMetaRevision();
     }
 
     async saveMessage(doc) {
@@ -266,10 +302,12 @@ class EmailFileStore {
     }
 
     async getMessage(guid) {
+        this.refreshFromDiskIfChanged(false);
         return clone(this.messages.get(String(guid)) || null);
     }
 
     async getMessagesById(id) {
+        this.refreshFromDiskIfChanged(false);
         const requested = String(id ?? '').trim();
         const exactBucket = this.messagesById.get(requested);
         if (exactBucket instanceof Map) return Array.from(exactBucket.values()).map(clone);
@@ -397,6 +435,7 @@ class EmailFileStore {
     }
 
     getMessageLimit() {
+        this.refreshFromDiskIfChanged(false);
         return {
             maxMessages: this.maxMessages,
             configuredMaxMessages: this.configuredMaxMessages,

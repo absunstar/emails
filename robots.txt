@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://emails.social-browser.com/sitemap.xml

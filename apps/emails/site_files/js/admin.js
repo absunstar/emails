@@ -10,7 +10,7 @@
         offset: 0,
         limit: 50,
         selected: new Set(),
-        stats: { total: 0, unread: 0, favorite: 0, attachments: 0, failed: 0, folders: {}, maxMessages: 100000 },
+        stats: { total: 0, read: 0, unread: 0, favorite: 0, attachments: 0, failed: 0, folders: {}, maxMessages: 100000 },
         folders: [],
         customFolders: [],
         current: null,
@@ -188,7 +188,7 @@
 
     function renderStats() {
         const stats = state.stats || {};
-        ['total', 'unread', 'favorite', 'attachments', 'failed'].forEach((key) => {
+        ['total', 'read', 'unread', 'favorite', 'attachments', 'failed'].forEach((key) => {
             const value = Math.max(0, Number(stats[key] || 0));
             qa('[data-admin-stat="' + key + '"]').forEach((el) => { el.textContent = value.toLocaleString(); });
             qa('[data-admin-side-count="' + key + '"]').forEach((el) => { el.textContent = value.toLocaleString(); });
@@ -227,8 +227,18 @@
         const entries = folderEntries();
         state.folders = entries.map((item) => item.name);
         const labels = { inbox: 'Inbox', send: 'Sent', sending: 'Sending', failed: 'Failed' };
-        const icons = { inbox: '↓', send: '↑', sending: '↻', failed: '!' };
-        host.innerHTML = '<button type="button" class="mail-admin-folder' + (selected === 'all' ? ' is-active' : '') + '" data-admin-folder="all"><span class="mail-admin-folder-icon">▣</span><span>All mail</span><strong>' + Number(state.stats.total || 0).toLocaleString() + '</strong></button>' + entries.map((item) => '<button type="button" class="mail-admin-folder' + (selected === item.name ? ' is-active' : '') + '" data-admin-folder="' + escape(item.name) + '"><span class="mail-admin-folder-icon">' + escape(icons[item.name] || '□') + '</span><span>' + escape(labels[item.name] || item.name) + '</span><strong>' + item.count.toLocaleString() + '</strong></button>').join('');
+        const folderIcon = (name) => {
+            const icons = {
+                all: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg>',
+                inbox: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 11h8M12 7v8M9 12l3 3 3-3"></path></svg>',
+                send: '<svg viewBox="0 0 24 24"><path d="m4 11 16-7-7 16-2-7-7-2Z"></path><path d="m11 13 9-9"></path></svg>',
+                sending: '<svg viewBox="0 0 24 24"><path d="M20 6v6h-6"></path><path d="M19 12a7 7 0 1 0-2 5"></path></svg>',
+                failed: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 17h.01"></path></svg>',
+                custom: '<svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v10H3z"></path></svg>',
+            };
+            return icons[name] || icons.custom;
+        };
+        host.innerHTML = '<button type="button" class="mail-admin-folder folder-all' + (selected === 'all' ? ' is-active' : '') + '" data-admin-folder="all"><span class="mail-admin-folder-icon">' + folderIcon('all') + '</span><span>All mail</span><strong>' + Number(state.stats.total || 0).toLocaleString() + '</strong></button>' + entries.map((item) => '<button type="button" class="mail-admin-folder folder-' + escape(item.name.replace(/[^a-z0-9_-]/gi, '-').toLowerCase()) + (selected === item.name ? ' is-active' : '') + '" data-admin-folder="' + escape(item.name) + '"><span class="mail-admin-folder-icon">' + folderIcon(item.name) + '</span><span>' + escape(labels[item.name] || item.name) + '</span><strong>' + item.count.toLocaleString() + '</strong></button>').join('');
         const select = q('[data-admin-filter="folder"]');
         if (select) {
             const current = select.value || 'all';
@@ -667,6 +677,7 @@
         if (name === 'favorite' && favorite) favorite.checked = true;
         if (name === 'attachments' && attachments) attachments.checked = true;
         if (name === 'unread' && read) read.value = 'unread';
+        if (name === 'read' && read) read.value = 'read';
         if (name === 'failed' && status) status.value = 'failed';
         state.offset = 0;
         updateFilterBadge();

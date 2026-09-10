@@ -326,6 +326,76 @@
         }
     }
 
+
+    function hashString(value) {
+        const input = String(value || '');
+        let hash = 0;
+        for (let index = 0; index < input.length; index += 1) {
+            hash = ((hash << 5) - hash) + input.charCodeAt(index);
+            hash |= 0;
+        }
+        return Math.abs(hash);
+    }
+
+    function parseMailbox(value, fallbackLabel) {
+        const raw = String(value || '').trim();
+        const fallback = fallbackLabel || '—';
+        if (!raw) {
+            return { raw: '', name: fallback, email: '', domain: '', initial: fallback.charAt(0).toUpperCase() || '•' };
+        }
+        let name = '';
+        let email = raw;
+        const angleMatch = raw.match(/^\s*"?([^"<>]+?)"?\s*<\s*([^>]+)\s*>\s*$/);
+        if (angleMatch) {
+            name = angleMatch[1].trim();
+            email = angleMatch[2].trim();
+        } else {
+            const inlineMatch = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+            if (inlineMatch) {
+                email = inlineMatch[0].trim();
+                const before = raw.slice(0, inlineMatch.index).replace(/["'()<>]/g, ' ').trim();
+                const after = raw.slice((inlineMatch.index || 0) + email.length).replace(/["'()<>]/g, ' ').trim();
+                name = (before || after || '').trim();
+            }
+        }
+        const emailParts = email.includes('@') ? email.split('@') : [];
+        const localPart = emailParts[0] || '';
+        const domain = emailParts[1] || '';
+        const derivedName = name || localPart || raw || fallback;
+        const source = domain || localPart || derivedName;
+        const initialMatch = String(source || '').match(/[A-Za-z0-9؀-ۿ]/);
+        const initial = initialMatch ? initialMatch[0].toUpperCase() : '•';
+        return { raw, name: derivedName, email: email !== derivedName ? email : (domain ? email : ''), domain, localPart, initial };
+    }
+
+    function avatarStyle(domain, role) {
+        const seed = domain || role || 'mail';
+        const base = hashString(seed) % 360;
+        const hue = role === 'to' ? (base + 32) % 360 : base;
+        return '--mail-avatar-h:' + hue + ';';
+    }
+
+    function renderAddressCard(value, role, fallbackLabel) {
+        const info = parseMailbox(value, fallbackLabel);
+        const labelRole = role === 'to' ? 'to' : 'from';
+        const domainLabel = info.domain ? '@' + info.domain : '';
+        const emailLabel = info.email || (info.domain ? (info.localPart + '@' + info.domain) : '');
+        return {
+            info,
+            html:
+                '<div class="mail-admin-address-card is-' + labelRole + '">' +
+                    '<span class="mail-admin-address-avatar is-' + labelRole + '" style="' + avatarStyle(info.domain, labelRole) + '" aria-hidden="true">' + escape(info.initial) + '</span>' +
+                    '<div class="mail-admin-address-copy">' +
+                        '<div class="mail-admin-address-line">' +
+                            '<span class="mail-admin-address-name">' + escape(info.name || fallbackLabel || '—') + '</span>' +
+                            (domainLabel ? '<span class="mail-admin-address-domain">' + escape(domainLabel) + '</span>' : '') +
+                        '</div>' +
+                        (emailLabel ? '<div class="mail-admin-address-email">' + escape(emailLabel) + '</div>' : '') +
+                    '</div>' +
+                '</div>'
+        };
+    }
+
     function rowStatus(doc) {
         if (doc.status === 'failed') return '<span class="mail-admin-badge danger">Failed</span>';
         if (doc.folder === 'send' || doc.status === 'sent') return '<span class="mail-admin-badge info">Sent</span>';
@@ -349,12 +419,16 @@
                 const selected = state.selected.has(String(doc.guid));
                 const attachments = Array.isArray(doc.attachments) ? doc.attachments.length : 0;
                 const vip = isVipEmail(doc.to) || isVipEmail(doc.cc);
+                const fromCard = renderAddressCard(doc.from, 'from', 'Unknown sender');
+                const toCard = renderAddressCard(doc.to, 'to', 'Recipient');
+                const subjectLabel = doc.subject || '(No subject)';
+                const fromMeta = fromCard.info.domain ? '<span class="mail-admin-subject-source">' + escape(fromCard.info.domain) + '</span>' : '';
                 return '<tr class="' + (!doc.read ? 'is-unread ' : '') + (selected ? 'is-selected' : '') + '" data-admin-row="' + escape(doc.guid) + '">' +
                     '<td class="select-col"><input type="checkbox" data-admin-select="' + escape(doc.guid) + '" ' + (selected ? 'checked' : '') + ' aria-label="Select message"></td>' +
                     '<td class="star-col"><button type="button" class="mail-admin-star' + (doc.favorite ? ' is-active' : '') + '" data-admin-action="toggle-favorite" data-guid="' + escape(doc.guid) + '" aria-label="Toggle favorite">' + svg('star') + '</button></td>' +
-                    '<td data-admin-col="from"><div class="mail-admin-cell-primary">' + escape(doc.from || 'Unknown sender') + '</div><div class="mail-admin-cell-secondary">' + rowStatus(doc) + (vip ? '<span class="mail-admin-badge vip">VIP</span>' : '') + '</div></td>' +
-                    '<td data-admin-col="to"><div class="mail-admin-cell-primary">' + escape(doc.to || '—') + '</div><div class="mail-admin-cell-secondary">' + (doc.cc ? 'Cc: ' + escape(doc.cc) : '') + '</div></td>' +
-                    '<td data-admin-col="subject"><button type="button" class="mail-admin-subject" data-admin-action="open-message" data-guid="' + escape(doc.guid) + '">' + escape(doc.subject || '(No subject)') + '</button><div class="mail-admin-cell-secondary">' + (attachments ? '<span class="mail-admin-attachment-chip">' + svg('paperclip') + attachments + '</span>' : '') + '</div></td>' +
+                    '<td data-admin-col="from"><div class="mail-admin-cell-primary">' + fromCard.html + '</div><div class="mail-admin-cell-secondary">' + rowStatus(doc) + (vip ? '<span class="mail-admin-badge vip">VIP</span>' : '') + '</div></td>' +
+                    '<td data-admin-col="to"><div class="mail-admin-cell-primary">' + toCard.html + '</div><div class="mail-admin-cell-secondary">' + (doc.cc ? '<span class="mail-admin-cc-label">Cc</span> ' + escape(doc.cc) : '') + '</div></td>' +
+                    '<td data-admin-col="subject"><button type="button" class="mail-admin-subject" data-admin-action="open-message" data-guid="' + escape(doc.guid) + '"><span class="mail-admin-subject-text">' + escape(subjectLabel) + '</span></button><div class="mail-admin-cell-secondary">' + fromMeta + (attachments ? '<span class="mail-admin-attachment-chip">' + svg('paperclip') + attachments + '</span>' : '') + '</div></td>' +
                     '<td data-admin-col="folder"><span class="mail-admin-folder-chip">' + escape(doc.folder || 'inbox') + '</span></td>' +
                     '<td data-admin-col="date"><div class="mail-admin-date">' + escape(relativeTime(doc.date) || dateTime(doc.date)) + '</div><small>' + escape(dateTime(doc.date)) + '</small></td>' +
                     '<td class="action-col"><div class="mail-admin-row-actions"><button type="button" data-admin-action="open-message" data-guid="' + escape(doc.guid) + '" title="Open message">' + svg('view') + '</button><a href="/api/emails/eml?guid=' + encodeURIComponent(doc.guid) + '" download title="Download EML"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"></path></svg></a><button type="button" data-admin-action="delete-one" data-guid="' + escape(doc.guid) + '" class="danger" title="Delete message">' + svg('trash') + '</button></div></td>' +

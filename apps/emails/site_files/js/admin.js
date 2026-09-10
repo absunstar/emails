@@ -38,6 +38,7 @@
         operations: null,
         operationsConfig: null,
         operationsCleanupPreview: null,
+        pendingLoad: null,
     };
 
     const q = (selector, base) => (base || document).querySelector(selector);
@@ -398,7 +399,12 @@
     }
 
     async function loadMessages(options) {
-        if (state.loading) return;
+        if (state.loading) {
+            // Do not lose navigation/filter clicks while a previous request is in flight.
+            // Keep only the latest requested reload because it reflects the current UI state.
+            state.pendingLoad = Object.assign({}, options || {});
+            return;
+        }
         state.loading = true;
         const refreshButton = q('[data-admin-action="refresh"]');
         if (options?.button) setBusy(options.button, true, 'Loading…');
@@ -422,6 +428,14 @@
             state.loading = false;
             if (options?.button) setBusy(options.button, false);
             else if (!options?.silent && refreshButton) refreshButton.classList.remove('is-busy');
+
+            const pending = state.pendingLoad;
+            state.pendingLoad = null;
+            if (pending) {
+                // Run after the current event/microtask finishes so the latest folder/filter
+                // state is guaranteed to be visible to readFilters().
+                setTimeout(() => loadMessages(pending), 0);
+            }
         }
     }
 
@@ -663,9 +677,7 @@
         }
     }
 
-    function setQuickFilter(name) {
-        qa('[data-admin-quick-filter]').forEach((button) => button.classList.toggle('is-active', button.dataset.adminQuickFilter === name));
-        if (name === 'all') return clearFilters();
+    function resetQuickViewFields() {
         const favorite = q('[data-admin-filter="favorite"]');
         const attachments = q('[data-admin-filter="hasAttachments"]');
         const read = q('[data-admin-filter="read"]');
@@ -674,6 +686,16 @@
         if (attachments) attachments.checked = false;
         if (read) read.value = 'all';
         if (status) status.value = 'all';
+    }
+
+    function setQuickFilter(name) {
+        qa('[data-admin-quick-filter]').forEach((button) => button.classList.toggle('is-active', button.dataset.adminQuickFilter === name));
+        if (name === 'all') return clearFilters();
+        resetQuickViewFields();
+        const favorite = q('[data-admin-filter="favorite"]');
+        const attachments = q('[data-admin-filter="hasAttachments"]');
+        const read = q('[data-admin-filter="read"]');
+        const status = q('[data-admin-filter="status"]');
         if (name === 'favorite' && favorite) favorite.checked = true;
         if (name === 'attachments' && attachments) attachments.checked = true;
         if (name === 'unread' && read) read.value = 'unread';
@@ -681,7 +703,7 @@
         if (name === 'failed' && status) status.value = 'failed';
         state.offset = 0;
         updateFilterBadge();
-        loadMessages();
+        return loadMessages();
     }
 
 
@@ -1662,6 +1684,9 @@
         const folder = event.target.closest('[data-admin-folder]');
         if (folder) {
             qa('[data-admin-quick-filter]').forEach((item) => item.classList.remove('is-active'));
+            // Folder navigation should never inherit a hidden Quick View state such as
+            // Read/Unread/Favorites/Failed from the previous view.
+            resetQuickViewFields();
             const select = q('[data-admin-filter="folder"]');
             if (select) select.value = folder.dataset.adminFolder || 'all';
             state.offset = 0;

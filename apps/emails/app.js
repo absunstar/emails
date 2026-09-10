@@ -687,7 +687,7 @@ module.exports = function init(site) {
             res.status(403);
             return res.sendHTML('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin access required</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08111f;color:#dbeafe;font-family:Arial,sans-serif}.box{width:min(520px,calc(100% - 36px));padding:28px;border:1px solid #223a59;border-radius:18px;background:#0d1829;text-align:center}.box h1{margin:0 0 10px;color:#fff}.box p{color:#91a9c5;line-height:1.6}.box a{display:inline-block;margin-top:10px;padding:10px 14px;border-radius:10px;background:#1d4ed8;color:#fff;text-decoration:none;font-weight:700}</style></head><body><div class="box"><h1>Admin access required</h1><p>This dashboard is available only from an authorized Social Browser environment.</p><a href="/">Back to Temp Mail</a></div></body></html>');
         }
-        return res.render(__dirname + '/site_files/html/index.html', {}, { parser: 'html css js', compress: true });
+        return res.render(__dirname + '/site_files/html/index.html', {}, { parser: 'html css js', compress: false });
     });
 
     site.onGET({

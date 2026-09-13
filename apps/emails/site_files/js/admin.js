@@ -10,7 +10,7 @@
         offset: 0,
         limit: 50,
         selected: new Set(),
-        stats: { total: 0, unread: 0, favorite: 0, attachments: 0, failed: 0, folders: {}, maxMessages: 100000 },
+        stats: { total: 0, read: 0, unread: 0, favorite: 0, attachments: 0, failed: 0, folders: {}, maxMessages: 100000 },
         folders: [],
         customFolders: [],
         current: null,
@@ -66,6 +66,15 @@
             trash: '<svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>',
             check: '<svg class="ui-icon" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>',
             spinner: '<svg class="ui-icon" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66"></path><path d="M20 4v6h-6"></path></svg>',
+            all: '<svg class="ui-icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg>',
+            inbox: '<svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M4 14h5l2 3h2l2-3h5"></path></svg>',
+            sent: '<svg class="ui-icon" viewBox="0 0 24 24"><path d="m3 11 18-8-8 18-2-7-8-3Z"></path><path d="m11 14 4-4"></path></svg>',
+            sending: '<svg class="ui-icon" viewBox="0 0 24 24"><path d="M20 6v6h-6"></path><path d="M19 12a7 7 0 1 0-2 5"></path></svg>',
+            failed: '<svg class="ui-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 17h.01"></path></svg>',
+            read: '<svg class="ui-icon" viewBox="0 0 24 24"><path d="M3 8l9 6 9-6"></path><path d="M4 6h16v12H4z"></path></svg>',
+            unread: '<svg class="ui-icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg>',
+            attachments: '<svg class="ui-icon" viewBox="0 0 24 24"><path d="m8 12 5.5-5.5a3 3 0 1 1 4.2 4.2L10 18.4a5 5 0 1 1-7.1-7.1l8.2-8.2"></path></svg>',
+            favorite: '<svg class="ui-icon" viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"></path></svg>',
         };
         return icons[name] || '';
     }
@@ -111,6 +120,36 @@
         if (hours < 24) return hours + 'h ago';
         const days = Math.floor(hours / 24);
         return days + 'd ago';
+    }
+
+    function parseMailboxIdentity(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return { name: 'Unknown sender', email: '', initial: '?', tone: 0 };
+        const angle = raw.match(/^\s*["']?([^<>"']*?)["']?\s*<\s*([^<>\s]+@[^<>\s]+)\s*>\s*$/);
+        let name = '';
+        let email = '';
+        if (angle) {
+            name = String(angle[1] || '').trim().replace(/^["']|["']$/g, '').trim();
+            email = String(angle[2] || '').trim();
+        } else {
+            const match = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+            email = match ? match[0] : (raw.includes('@') ? raw : '');
+            name = email ? raw.replace(email, '').replace(/[<>"']/g, '').trim() : raw;
+        }
+        if (!name && email) name = email.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        if (!name) name = 'Unknown sender';
+        const initialSource = (email || name).trim();
+        const initial = (initialSource[0] || '?').toUpperCase();
+        const tone = initial.charCodeAt(0) % 6;
+        return { name, email, initial, tone };
+    }
+
+    function senderIdentityHtml(value, fallback) {
+        const identity = parseMailboxIdentity(value || fallback || '');
+        return '<div class="mail-admin-identity">' +
+            '<span class="mail-admin-avatar tone-' + identity.tone + '" aria-hidden="true">' + escape(identity.initial) + '</span>' +
+            '<span class="mail-admin-identity-copy"><strong class="mail-admin-identity-name">' + escape(identity.name) + '</strong>' +
+            (identity.email ? '<span class="mail-admin-identity-email">' + escape(identity.email) + '</span>' : '') + '</span></div>';
     }
 
     function formatBytes(value) {
@@ -188,7 +227,7 @@
 
     function renderStats() {
         const stats = state.stats || {};
-        ['total', 'unread', 'favorite', 'attachments', 'failed'].forEach((key) => {
+        ['total', 'read', 'unread', 'favorite', 'attachments', 'failed'].forEach((key) => {
             const value = Math.max(0, Number(stats[key] || 0));
             qa('[data-admin-stat="' + key + '"]').forEach((el) => { el.textContent = value.toLocaleString(); });
             qa('[data-admin-side-count="' + key + '"]').forEach((el) => { el.textContent = value.toLocaleString(); });
@@ -227,8 +266,8 @@
         const entries = folderEntries();
         state.folders = entries.map((item) => item.name);
         const labels = { inbox: 'Inbox', send: 'Sent', sending: 'Sending', failed: 'Failed' };
-        const icons = { inbox: '↓', send: '↑', sending: '↻', failed: '!' };
-        host.innerHTML = '<button type="button" class="mail-admin-folder' + (selected === 'all' ? ' is-active' : '') + '" data-admin-folder="all"><span class="mail-admin-folder-icon">▣</span><span>All mail</span><strong>' + Number(state.stats.total || 0).toLocaleString() + '</strong></button>' + entries.map((item) => '<button type="button" class="mail-admin-folder' + (selected === item.name ? ' is-active' : '') + '" data-admin-folder="' + escape(item.name) + '"><span class="mail-admin-folder-icon">' + escape(icons[item.name] || '□') + '</span><span>' + escape(labels[item.name] || item.name) + '</span><strong>' + item.count.toLocaleString() + '</strong></button>').join('');
+        const iconNames = { inbox: 'inbox', send: 'sent', sending: 'sending', failed: 'failed' };
+        host.innerHTML = '<button type="button" class="mail-admin-folder folder-all' + (selected === 'all' ? ' is-active' : '') + '" data-admin-folder="all"><span class="mail-admin-folder-icon">' + svg('all') + '</span><span>All mail</span><strong>' + Number(state.stats.total || 0).toLocaleString() + '</strong></button>' + entries.map((item) => '<button type="button" class="mail-admin-folder folder-' + escape(item.name.replace(/[^a-z0-9_-]/gi, '-').toLowerCase()) + (selected === item.name ? ' is-active' : '') + '" data-admin-folder="' + escape(item.name) + '"><span class="mail-admin-folder-icon">' + svg(iconNames[item.name] || 'all') + '</span><span>' + escape(labels[item.name] || item.name) + '</span><strong>' + item.count.toLocaleString() + '</strong></button>').join('');
         const select = q('[data-admin-filter="folder"]');
         if (select) {
             const current = select.value || 'all';
@@ -341,8 +380,8 @@
                 return '<tr class="' + (!doc.read ? 'is-unread ' : '') + (selected ? 'is-selected' : '') + '" data-admin-row="' + escape(doc.guid) + '">' +
                     '<td class="select-col"><input type="checkbox" data-admin-select="' + escape(doc.guid) + '" ' + (selected ? 'checked' : '') + ' aria-label="Select message"></td>' +
                     '<td class="star-col"><button type="button" class="mail-admin-star' + (doc.favorite ? ' is-active' : '') + '" data-admin-action="toggle-favorite" data-guid="' + escape(doc.guid) + '" aria-label="Toggle favorite">' + svg('star') + '</button></td>' +
-                    '<td data-admin-col="from"><div class="mail-admin-cell-primary">' + escape(doc.from || 'Unknown sender') + '</div><div class="mail-admin-cell-secondary">' + rowStatus(doc) + (vip ? '<span class="mail-admin-badge vip">VIP</span>' : '') + '</div></td>' +
-                    '<td data-admin-col="to"><div class="mail-admin-cell-primary">' + escape(doc.to || '—') + '</div><div class="mail-admin-cell-secondary">' + (doc.cc ? 'Cc: ' + escape(doc.cc) : '') + '</div></td>' +
+                    '<td data-admin-col="from"><div class="mail-admin-from-cell">' + senderIdentityHtml(doc.from, 'Unknown sender') + '<div class="mail-admin-cell-secondary">' + rowStatus(doc) + (vip ? '<span class="mail-admin-badge vip">VIP</span>' : '') + '</div></div></td>' +
+                    '<td data-admin-col="to"><div class="mail-admin-recipient">' + senderIdentityHtml(doc.to, '—') + '</div><div class="mail-admin-cell-secondary">' + (doc.cc ? 'Cc: ' + escape(doc.cc) : '') + '</div></td>' +
                     '<td data-admin-col="subject"><button type="button" class="mail-admin-subject" data-admin-action="open-message" data-guid="' + escape(doc.guid) + '">' + escape(doc.subject || '(No subject)') + '</button><div class="mail-admin-cell-secondary">' + (attachments ? '<span class="mail-admin-attachment-chip">' + svg('paperclip') + attachments + '</span>' : '') + '</div></td>' +
                     '<td data-admin-col="folder"><span class="mail-admin-folder-chip">' + escape(doc.folder || 'inbox') + '</span></td>' +
                     '<td data-admin-col="date"><div class="mail-admin-date">' + escape(relativeTime(doc.date) || dateTime(doc.date)) + '</div><small>' + escape(dateTime(doc.date)) + '</small></td>' +
@@ -667,6 +706,7 @@
         if (name === 'favorite' && favorite) favorite.checked = true;
         if (name === 'attachments' && attachments) attachments.checked = true;
         if (name === 'unread' && read) read.value = 'unread';
+        if (name === 'read' && read) read.value = 'read';
         if (name === 'failed' && status) status.value = 'failed';
         state.offset = 0;
         updateFilterBadge();

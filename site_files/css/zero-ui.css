@@ -212,3 +212,59 @@ h1,h2,h3,h4,h5,h6 { color: #f8fbff; }
 @media(max-width:1400px){.mail-admin-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:1200px){.mail-admin-identity{grid-template-columns:34px minmax(0,1fr)}.mail-admin-avatar{width:34px;height:34px;border-radius:10px;font-size:14px}.mail-admin-cell-secondary{padding-left:44px}}
 @media(max-width:900px){.mail-admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* Admin readability scale v3.0.6 — larger typography across the full admin surface */
+.mail-admin-body{font-size:16px;line-height:1.45}
+.mail-admin-body .sb-navbar-brand strong{font-size:18px}
+.mail-admin-body .sb-navbar-brand small{font-size:12px}
+.mail-admin-body .sb-browser-account-main{font-size:14px}
+.mail-admin-body .sb-browser-account-meta{font-size:11px}
+.mail-admin-body .sb-browser-signout{font-size:13px!important}
+.mail-admin-body .mail-admin-panel-head small{font-size:11px}
+.mail-admin-body .mail-admin-panel-head h2{font-size:18px}
+.mail-admin-body .mail-admin-folder,.mail-admin-body .mail-admin-quick-list button{font-size:13px;min-height:44px}
+.mail-admin-body .mail-admin-folder strong,.mail-admin-body .mail-admin-quick-list strong{font-size:12px}
+.mail-admin-body .mail-admin-storage-head{font-size:12px}
+.mail-admin-body .mail-admin-storage-card small{font-size:11px}
+.mail-admin-body .mail-admin-searchbox input{font-size:14px}
+.mail-admin-body .mail-admin-searchbar>.sb-btn,.mail-admin-body .mail-admin-page-size{font-size:13px}
+.mail-admin-body .mail-admin-filters .sb-input,.mail-admin-body .mail-admin-filters .sb-select{font-size:13px}
+.mail-admin-body .mail-admin-filters .sb-field label{font-size:12px}
+.mail-admin-body .mail-admin-check{font-size:13px}
+.mail-admin-body .mail-admin-bulkbar{font-size:13px}
+.mail-admin-body .mail-admin-bulk-action{font-size:12px}
+.mail-admin-body .mail-admin-list-head h2{font-size:19px}
+.mail-admin-body .mail-admin-list-head p{font-size:12px}
+.mail-admin-body .mail-admin-list-meta{font-size:11px}
+.mail-admin-body .mail-admin-table{font-size:13px}
+.mail-admin-body .mail-admin-table th{font-size:11.5px}
+.mail-admin-body .mail-admin-table th,.mail-admin-body .mail-admin-table td{padding-top:13px;padding-bottom:13px}
+.mail-admin-body .mail-admin-cell-primary{font-size:15px}
+.mail-admin-body .mail-admin-table td[data-admin-col="from"] .mail-admin-cell-primary,.mail-admin-body .mail-admin-table td[data-admin-col="to"] .mail-admin-cell-primary{font-size:15px}
+.mail-admin-body .mail-admin-subject{font-size:14px}
+.mail-admin-body .mail-admin-cell-secondary{font-size:11px}
+.mail-admin-body .mail-admin-date{font-size:12px}
+.mail-admin-body .mail-admin-table td small{font-size:10.5px}
+.mail-admin-body .mail-admin-badge{font-size:10px;min-height:20px;padding:3px 7px}
+.mail-admin-body .mail-admin-folder-chip{font-size:11px;padding:5px 8px}
+.mail-admin-body .mail-admin-identity-name{font-size:14px}
+.mail-admin-body .mail-admin-identity-email{font-size:11px}
+.mail-admin-body .mail-admin-recipient .mail-admin-identity-name{font-size:12.5px}
+.mail-admin-body .mail-admin-recipient .mail-admin-identity-email{font-size:10px}
+.mail-admin-body .mail-admin-pagination{font-size:12px}
+.mail-admin-body .mail-admin-message-header small{font-size:11px}
+.mail-admin-body .mail-admin-message-header h2{font-size:22px}
+.mail-admin-body .mail-admin-message-meta small{font-size:10px}
+.mail-admin-body .mail-admin-message-meta strong{font-size:12.5px}
+.mail-admin-body .mail-admin-message-actions .sb-btn{font-size:12px;min-height:38px}
+.mail-admin-body .mail-admin-privacy-chip{font-size:11px}
+.mail-admin-body .mail-admin-folder-edit label span{font-size:11px}
+.mail-admin-body .mail-admin-folder-edit .sb-input,.mail-admin-body .mail-admin-folder-edit .sb-btn{font-size:12px}
+.mail-admin-body .mail-admin-section-title h3{font-size:15px}
+.mail-admin-body .mail-admin-section-title span{font-size:11px}
+.mail-admin-body .mail-admin-attachment-row strong{font-size:12px}
+.mail-admin-body .mail-admin-attachment-row small{font-size:10px}
+.mail-admin-body .mail-admin-compose-inline .sb-textarea,.mail-admin-body .mail-admin-compose-inline .sb-input{font-size:12px}
+@media(max-width:1200px){.mail-admin-body{font-size:15px}.mail-admin-body .mail-admin-table{font-size:12.5px}.mail-admin-body .mail-admin-identity-name{font-size:13.5px}}
+@media(max-width:620px){.mail-admin-body{font-size:15px}.mail-admin-body .mail-admin-panel-head h2{font-size:17px}.mail-admin-body .mail-admin-searchbox input{font-size:16px}}

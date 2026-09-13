@@ -1,0 +1,16 @@
+'use strict';
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const source = fs.readFileSync(path.join(__dirname, '..', 'apps', 'emails', 'app.js'), 'utf8');
+const routeStart = source.indexOf("site.onGET({ name: '/viewEmail' }");
+assert(routeStart >= 0, '/viewEmail route missing');
+const routeEnd = source.indexOf("site.onGET({ name: '/api/emails/attachment' }", routeStart);
+assert(routeEnd > routeStart, '/viewEmail route boundary missing');
+const route = source.slice(routeStart, routeEnd);
+assert(/X-Frame-Options['"]\s*,\s*['"]SAMEORIGIN/i.test(route), '/viewEmail must explicitly override Core DENY with SAMEORIGIN');
+assert(/Content-Security-Policy['"]\s*,\s*["']frame-ancestors 'self'["']/i.test(route), '/viewEmail must restrict framing to same origin');
+assert(/Cache-Control['"]\s*,\s*['"]private, no-store/i.test(route), '/viewEmail should not be cached');
+const coreShield = fs.readFileSync(path.join(__dirname, '..', 'vendor', 'social-browser-core', 'lib', 'security-shield.js'), 'utf8');
+assert(/X-Frame-Options['"]\s*:\s*['"]DENY/i.test(coreShield), 'Global Core frame protection must remain DENY');
+console.log('view-email-frame-policy: PASS');

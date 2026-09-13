@@ -863,6 +863,13 @@ module.exports = function init(site) {
     });
 
     site.onGET({ name: '/viewEmail' }, async (req, res) => {
+        // Message bodies are intentionally rendered inside a same-origin sandboxed iframe
+        // by both the public inbox and the admin viewer. Native Core's global security
+        // shield defaults to X-Frame-Options: DENY, so override that header only for this
+        // dedicated rendering endpoint. Keep all other application pages non-frameable.
+        res.set('X-Frame-Options', 'SAMEORIGIN');
+        res.set('Content-Security-Policy', "frame-ancestors 'self'");
+        res.set('Cache-Control', 'private, no-store');
         if (!guardHttp(req, res, ['inbox'])) return;
         try {
             const guid = String(req.query?.guid || '');

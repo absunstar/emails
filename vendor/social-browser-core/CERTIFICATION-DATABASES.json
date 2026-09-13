@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-09-07T11:36:36.519Z",
+  "coreVersion": "6.10.2",
+  "rule": "Optional database drivers are application dependencies; Core itself remains zero-runtime-dependency.",
+  "providers": {
+    "core": {
+      "status": "PASS",
+      "realEngine": true,
+      "driver": "builtin",
+      "rows": 2,
+      "updatedAge": 21,
+      "activeCount": 1,
+      "left": 1
+    },
+    "sqlite": {
+      "status": "PASS",
+      "realEngine": true,
+      "engine": "SQLite via node:sqlite",
+      "optionalDriverPackage": "better-sqlite3",
+      "driverPackageInstalled": false,
+      "testAdapter": "test-only better-sqlite3 compatibility shim",
+      "rows": 2,
+      "updatedAge": 21,
+      "activeCount": 1,
+      "activeAfterTx": 2,
+      "left": 1
+    },
+    "mongodb": {
+      "status": "UNAVAILABLE",
+      "reason": "optional driver mongodb is not installed",
+      "driverStatus": {
+        "name": "mongodb",
+        "builtin": true,
+        "driver": "mongodb",
+        "optional": true,
+        "document": true,
+        "driverInstalled": false,
+        "driverPath": null
+      }
+    },
+    "postgres": {
+      "status": "UNAVAILABLE",
+      "reason": "optional driver pg is not installed",
+      "driverStatus": {
+        "name": "postgres",
+        "builtin": true,
+        "driver": "pg",
+        "optional": true,
+        "document": true,
+        "sql": true,
+        "driverInstalled": false,
+        "driverPath": null
+      }
+    },
+    "mysql": {
+      "status": "UNAVAILABLE",
+      "reason": "optional driver mysql2 is not installed",
+      "driverStatus": {
+        "name": "mysql",
+        "builtin": true,
+        "driver": "mysql2",
+        "optional": true,
+        "document": true,
+        "sql": true,
+        "driverInstalled": false,
+        "driverPath": null
+      }
+    }
+  },
+  "summary": {
+    "pass": 2,
+    "unavailable": 3,
+    "driverOnly": 0,
+    "serverUnavailable": 0
+  }
+}

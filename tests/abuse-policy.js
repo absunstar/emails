@@ -96,7 +96,7 @@ const { createEmailService } = require('../apps/emails/core/email-service');
     assert(server.includes('maxMessageBytes'), 'SMTP message size limit is missing');
     assert(server.includes('maxAttachmentBytes'), 'attachment size limit is missing');
     assert(app.includes('/api/emails/admin/policy/update'), 'admin policy update endpoint is missing');
-    assert(app.includes("postBuckets(name)"), 'HTTP API rate-limit wrapper is missing');
+    assert(app.includes("postBuckets(name, req)"), 'HTTP API rate-limit wrapper is missing');
     assert(adminHtml.includes('Security &amp; Policies'), 'admin Security & Policies UI is missing');
     assert(adminHtml.includes('data-policy-list-groups'), 'admin policy-list manager is missing');
     assert(adminHtml.includes('limits.outbound.mcpPerHour'), 'Admin MCP outbound limit control is missing');

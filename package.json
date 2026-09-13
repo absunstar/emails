@@ -1,7 +1,7 @@
 {
   "name": "social-browser-email-server",
-  "version": "2.0.0",
-  "description": "JSON-file based SMTP, temporary-mail website, and MCP email service for Social Browser sites.",
+  "version": "3.0.2",
+  "description": "Native @social-browser/core based SMTP, temporary-mail website, and MCP email service with bounded-memory JSON storage.",
   "main": "server.js",
   "dependencies": {
     "mailparser": "^3.9.9",
@@ -9,8 +9,8 @@
     "nodemailer": "8.0.10"
   },
   "scripts": {
-    "start": "node --max-old-space-size=8192 server.js",
-    "test": "node tests/frontend-zero-deps.js && node tests/runtime-domain.js && node tests/client-local-addresses.js && node tests/browser-auth.js && node tests/file-store-service.js && node tests/competitive-features.js && node tests/action-feedback.js && node tests/ui-polish.js && node tests/message-view-contract.js && node tests/duplicate-message-id-index.js && node tests/sidebar-email-list-layout.js && node tests/admin-dashboard.js && node tests/abuse-policy.js && node tests/mcp-smoke.js && node tests/mcp-transport-compat.js && node tests/mcp-stdio-smoke.js && node tests/mcp-manager-service.js && node tests/email-scheduler.js && node tests/mcp-send-limits.js && node tests/deliverability-engine.js && node tests/ops-features.js && node tests/seo-expansion.js && node tests/storage-message-limit.js && node tests/backup-storage-manager.js && node tests/admin-gmail-interactions.js && node tests/smtp-outbound-multidomain.js && node tests/env-loader-smtp-config.js",
+    "start": "node server.js",
+    "test": "node tests/native-core-runtime.js && node tests/native-core-template-assets.js && node tests/bounded-memory-store.js && node tests/frontend-zero-deps.js && node tests/runtime-domain.js && node tests/client-local-addresses.js && node tests/browser-auth.js && node tests/file-store-service.js && node tests/competitive-features.js && node tests/action-feedback.js && node tests/ui-polish.js && node tests/message-view-contract.js && node tests/duplicate-message-id-index.js && node tests/sidebar-email-list-layout.js && node tests/admin-dashboard.js && node tests/abuse-policy.js && node tests/mcp-smoke.js && node tests/mcp-transport-compat.js && node tests/mcp-stdio-smoke.js && node tests/mcp-manager-service.js && node tests/email-scheduler.js && node tests/mcp-send-limits.js && node tests/deliverability-engine.js && node tests/ops-features.js && node tests/seo-expansion.js && node tests/storage-message-limit.js && node tests/backup-storage-manager.js && node tests/admin-gmail-interactions.js && node tests/smtp-outbound-multidomain.js && node tests/env-loader-smtp-config.js",
     "mcp:stdio": "node apps/emails/mcp-stdio.js",
     "test:ops": "node tests/ops-features.js",
     "test:load": "node tests/production-load.js",

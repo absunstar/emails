@@ -1,0 +1,29 @@
+{
+  "name": "isite",
+  "version": "2026.08.31",
+  "criticalApis": {
+    "security.setSessionUser": {
+      "signatures": ["setSessionUser(req,user,options)", "setSessionUser(session,user,source)"],
+      "effects": ["session.user", "session.user_id", "session.user_source", "session.identityRef", "session.$userLoadedAt"],
+      "conditionalEffects": ["session.user_auth_method"],
+      "persistence": "session.$save or site.saveSession"
+    },
+    "security.clearSessionUser": {
+      "effects": ["session.user=null", "session.user_id=null", "session.user_source=null", "session.identityRef=null"]
+    },
+    "security.registerUserProvider": {
+      "signatures": ["registerUserProvider(name,provider)"],
+      "providerSignatures": ["provider({id,user_id,user_source,context},done)", "provider(id,done)"]
+    },
+    "request.browserIdentity": {
+      "headers": ["X-Browser", "X-Browser-Token"],
+      "effects": ["req.browserHeader", "req.browserName", "req.browserID", "req.browserUUID", "req.browserIDShort", "req.browserDetected", "req.browserToken"]
+    }
+  },
+  "goldenFlows": [
+    "browser-login-session-persist-reload-logout",
+    "password-login-session-persist-reload-logout",
+    "user-provider-rehydrate",
+    "guest-account-redirect"
+  ]
+}

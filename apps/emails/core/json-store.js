@@ -68,6 +68,42 @@ function idLike(leftValue, rightValue) {
     return left.toLowerCase() === right.toLowerCase();
 }
 
+function messageMetadata(doc) {
+    if (!doc || !doc.guid) return null;
+    const attachments = Array.isArray(doc.attachments) ? doc.attachments.map((item) => ({
+        id: item?.id,
+        filename: item?.filename || '',
+        contentType: item?.contentType || 'application/octet-stream',
+        contentDisposition: item?.contentDisposition || 'attachment',
+        contentId: item?.contentId || '',
+        size: Number(item?.size || 0),
+        checksum: item?.checksum || '',
+        related: !!item?.related,
+    })) : [];
+    return {
+        id: doc.id,
+        guid: String(doc.guid),
+        messageId: doc.messageId || '',
+        from: doc.from || '',
+        to: doc.to || '',
+        cc: doc.cc || '',
+        subject: doc.subject || '',
+        date: doc.date || null,
+        folder: doc.folder || '',
+        status: doc.status || '',
+        read: !!doc.read,
+        favorite: !!doc.favorite,
+        replyTo: doc.replyTo || '',
+        inReplyTo: doc.inReplyTo || '',
+        attachments,
+        _fileStore: doc._fileStore ? {
+            version: doc._fileStore.version,
+            createdAt: doc._fileStore.createdAt,
+            updatedAt: doc._fileStore.updatedAt,
+        } : undefined,
+    };
+}
+
 class EmailFileStore {
     constructor(options) {
         options = options || {};
@@ -92,7 +128,6 @@ class EmailFileStore {
         this.vipEntries = [];
         this.adminFolders = [];
         this._mutationQueue = Promise.resolve();
-        this._metaRevision = '';
 
         ensureDir(this.messagesDir);
         ensureDir(this.attachmentsDir);
@@ -109,32 +144,6 @@ class EmailFileStore {
         this._loadVip();
         this._loadAdminFolders();
         this._syncMeta();
-    }
-
-    _readMetaRevision() {
-        try {
-            const stat = fs.statSync(this.metaPath);
-            const meta = readJson(this.metaPath, {});
-            return [stat.mtimeMs, stat.size, meta.updatedAt || '', meta.nextId || '', meta.messageCount || ''].join('|');
-        } catch (_) {
-            return '';
-        }
-    }
-
-    _rememberMetaRevision() {
-        this._metaRevision = this._readMetaRevision();
-        return this._metaRevision;
-    }
-
-    refreshFromDiskIfChanged(force) {
-        const revision = this._readMetaRevision();
-        if (!force && revision && revision === this._metaRevision) return false;
-        if (!force && !revision && !this._metaRevision) return false;
-        this._loadMessages();
-        this._loadVip();
-        this._loadAdminFolders();
-        this._rememberMetaRevision();
-        return true;
     }
 
 
@@ -192,10 +201,11 @@ class EmailFileStore {
             try {
                 const doc = JSON.parse(fs.readFileSync(filePath, 'utf8'));
                 if (!doc || !doc.guid) continue;
-                this.messages.set(String(doc.guid), doc);
+                const metaDoc = messageMetadata(doc);
+                this.messages.set(String(doc.guid), metaDoc);
                 const id = Number(doc.id || 0);
                 if (Number.isFinite(id) && id > 0) {
-                    this._indexMessageById(doc);
+                    this._indexMessageById(metaDoc);
                     if (id > maxId) maxId = id;
                 }
             } catch (error) {
@@ -219,7 +229,6 @@ class EmailFileStore {
     }
 
     messageValues() {
-        this.refreshFromDiskIfChanged(false);
         return this.messages.values();
     }
 
@@ -242,14 +251,7 @@ class EmailFileStore {
     }
 
     _queueMutation(fn) {
-        const run = async () => {
-            // The JSON store can be shared by the HTTP/Admin, SMTP and MCP
-            // processes. Pull in changes written by another process before any
-            // mutation so this process never operates on a stale snapshot.
-            this.refreshFromDiskIfChanged(false);
-            return fn();
-        };
-        const next = this._mutationQueue.then(run, run);
+        const next = this._mutationQueue.then(fn, fn);
         this._mutationQueue = next.catch(() => {});
         return next;
     }
@@ -274,7 +276,6 @@ class EmailFileStore {
         });
         if (!next.createdAt) next.createdAt = now;
         atomicWriteJson(this.metaPath, next);
-        this._rememberMetaRevision();
     }
 
     async saveMessage(doc) {
@@ -292,9 +293,10 @@ class EmailFileStore {
                 updatedAt: now,
             });
             atomicWriteJson(this._messagePath(key), copy);
-            this.messages.set(key, copy);
+            const metaDoc = messageMetadata(copy);
+            this.messages.set(key, metaDoc);
             if (previous) this._unindexMessageById(previous);
-            this._indexMessageById(copy);
+            this._indexMessageById(metaDoc);
             const cleanup = await this._cleanupUnlocked();
             this._syncMeta(cleanup.deleted.length ? { lastCleanupAt: now, lastCleanupDeleted: cleanup.deleted.length } : {});
             return { message: clone(copy), cleanup };
@@ -302,16 +304,27 @@ class EmailFileStore {
     }
 
     async getMessage(guid) {
-        this.refreshFromDiskIfChanged(false);
-        return clone(this.messages.get(String(guid)) || null);
+        const key = String(guid);
+        if (!this.messages.has(key)) return null;
+        const doc = readJson(this._messagePath(key), null);
+        return doc && doc.guid ? doc : null;
     }
 
     async getMessagesById(id) {
-        this.refreshFromDiskIfChanged(false);
         const requested = String(id ?? '').trim();
         const exactBucket = this.messagesById.get(requested);
-        if (exactBucket instanceof Map) return Array.from(exactBucket.values()).map(clone);
-        if (exactBucket) return [clone(exactBucket)];
+        if (exactBucket instanceof Map) {
+            const docs = [];
+            for (const meta of exactBucket.values()) {
+                const doc = await this.getMessage(meta.guid);
+                if (doc) docs.push(doc);
+            }
+            return docs;
+        }
+        if (exactBucket) {
+            const doc = await this.getMessage(exactBucket.guid);
+            return doc ? [doc] : [];
+        }
 
         // Legacy compatibility: ids may have crossed API/storage boundaries as
         // Number/String or with harmless numeric formatting. Resolve buckets using
@@ -320,9 +333,9 @@ class EmailFileStore {
         for (const [storedId, bucket] of this.messagesById.entries()) {
             if (!idLike(storedId, requested)) continue;
             if (bucket instanceof Map) {
-                for (const doc of bucket.values()) matches.push(clone(doc));
+                for (const meta of bucket.values()) { const doc = await this.getMessage(meta.guid); if (doc) matches.push(doc); }
             } else if (bucket) {
-                matches.push(clone(bucket));
+                { const doc = await this.getMessage(bucket.guid); if (doc) matches.push(doc); }
             }
         }
         return matches;
@@ -375,7 +388,9 @@ class EmailFileStore {
     async updateMessage(guid, patch) {
         return this._queueMutation(async () => {
             const key = String(guid);
-            const previous = this.messages.get(key);
+            const previousMeta = this.messages.get(key);
+            if (!previousMeta) return null;
+            const previous = readJson(this._messagePath(key), null);
             if (!previous) return null;
             const now = new Date().toISOString();
             const next = Object.assign({}, previous, clone(patch || {}));
@@ -387,9 +402,10 @@ class EmailFileStore {
                 updatedAt: now,
             });
             atomicWriteJson(this._messagePath(key), next);
-            this.messages.set(key, next);
-            this._unindexMessageById(previous);
-            this._indexMessageById(next);
+            const nextMeta = messageMetadata(next);
+            this.messages.set(key, nextMeta);
+            this._unindexMessageById(previousMeta);
+            this._indexMessageById(nextMeta);
             this._syncMeta();
             return clone(next);
         });
@@ -435,7 +451,6 @@ class EmailFileStore {
     }
 
     getMessageLimit() {
-        this.refreshFromDiskIfChanged(false);
         return {
             maxMessages: this.maxMessages,
             configuredMaxMessages: this.configuredMaxMessages,
@@ -574,4 +589,5 @@ module.exports = {
     atomicWriteJson,
     readJson,
     hash,
+    messageMetadata,
 };

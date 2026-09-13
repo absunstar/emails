@@ -1,0 +1,18 @@
+'use strict';
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const project = path.resolve(__dirname, '..');
+const corePkg = require(path.join(project, 'vendor', 'social-browser-core', 'package.json'));
+const core = require(path.join(project, 'vendor', 'social-browser-core'));
+const serverSource = fs.readFileSync(path.join(project, 'server.js'), 'utf8');
+assert.equal(corePkg.name, '@social-browser/core');
+assert.ok(/^6\./.test(corePkg.version), 'Bundled Core v6 expected');
+assert.equal(typeof core, 'function');
+assert.ok(serverSource.includes("require('./vendor/social-browser-core')"));
+assert.ok(!serverSource.includes("require('../isite')"), 'External iSite runtime must not be loaded');
+assert.ok(serverSource.includes("require('./apps/emails/app')(site)"), 'Email app must be explicitly registered');
+const site = core({ port: 0, cwd: project });
+assert.equal(typeof site.onGET, 'function');
+assert.equal(typeof site.static, 'function');
+console.log('Native bundled @social-browser/core runtime test passed:', corePkg.version);

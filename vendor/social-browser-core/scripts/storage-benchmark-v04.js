@@ -1,0 +1,24 @@
+'use strict';
+const fs=require('fs'),os=require('os'),path=require('path');
+const aisite=require('..');
+(async()=>{
+  const cwd=fs.mkdtempSync(path.join(os.tmpdir(),'aisite-bench-v04-'));
+  const site=aisite({cwd});
+  const c=site.connectCollection('bench');
+  const N=50000;
+  const t0=performance.now();
+  await c.insertMany(Array.from({length:N},(_,i)=>({country:['EG','US','DE','IN','BR'][i%5],score:i,email:`u${i}@x.test`})));
+  const insertMs=performance.now()-t0;
+  c.createIndex('score');
+  c.createCompoundIndex(['country','email'],{unique:true});
+  const t1=performance.now();
+  for(let i=0;i<1000;i++) await c.findOne({where:{country:'EG',email:`u${(i*5)%N}@x.test`}});
+  const compound1000Ms=performance.now()-t1;
+  const t2=performance.now();
+  for(let i=0;i<200;i++) await c.findMany({where:{score:{$gte:i*100,$lt:i*100+100}},limit:100});
+  const range200Ms=performance.now()-t2;
+  const t3=performance.now();
+  for(let p=1;p<=100;p++) await c.findPageFast({page:p,limit:50,sort:{score:1}});
+  const pages100Ms=performance.now()-t3;
+  console.log(JSON.stringify({rows:N,insertMs:+insertMs.toFixed(2),compound1000Ms:+compound1000Ms.toFixed(2),range200Ms:+range200Ms.toFixed(2),pages100Ms:+pages100Ms.toFixed(2),stats:c.stats()},null,2));
+})();

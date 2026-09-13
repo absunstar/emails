@@ -1,0 +1,27 @@
+'use strict';
+const assert = require('assert');
+const path = require('path');
+const core = require('../vendor/social-browser-core');
+const { createNativeTemplateRenderer } = require('../apps/emails/core/native-template');
+
+const root = path.resolve(__dirname, '..');
+const site = core({ cwd: root, port: 0 });
+site.cwd = root;
+site.dir = path.join(root, 'site_files');
+site.apps = [{ name: 'emails', name2: 'emails', path: path.join(root, 'apps', 'emails') }];
+site.options = site.options || {};
+site.options.lang = 'En';
+const renderer = createNativeTemplateRenderer(site);
+const req = { headers: { host: 'emails.egytag.com' }, query: {}, queryRaw: {}, session: {} };
+const html = renderer.render(path.join(root, 'apps', 'emails', 'site_files', 'html', 'free.html'), req);
+assert(html.includes('SBUI.post = async function'), 'global app.js x-import was not expanded');
+assert(html.includes('window.SBBrowserAuth'), 'browser-auth.js x-import was not expanded');
+assert(html.includes('data-browser-signin'), 'project navbar/index.html nested x-import was not expanded');
+assert(html.includes('Sign in with Social Browser'), 'browser login entry is missing from the rendered navbar');
+assert(!html.includes('<nav class="sitebar"></nav>'), 'navbar x-import resolved to an empty nav');
+assert(html.includes('data-view-error'), 'app-local emails/view_modal.html nested x-import was not expanded');
+assert(html.includes('data-email-app="free"'), 'email page body missing');
+assert(html.includes("const ui = window.SBUI"), 'emails/index.js app import was not expanded');
+assert(html.includes('.sb-btn'), 'zero-ui.css x-import was not expanded');
+assert(!html.includes('x-import="app.js"'), 'unresolved app.js x-import remained in output');
+console.log('native-core-template-assets: PASS');

@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const { PassThrough } = require('stream');
 const SMTPServer = require('smtp-server').SMTPServer;
@@ -16,23 +17,77 @@ const { createEmailBackupStorageManager } = require('./apps/emails/core/backup-s
 const { createEmailUnsubscribeService } = require('./apps/emails/core/unsubscribe-service');
 const { startEmailMcpServer } = require('./apps/emails/mcp-server');
 
-const site = require('../isite')({
-    port: 60025,
-    language: { id: 'En', dir: 'ltr', text: 'left' },
-    lang: 'En',
-    version: new Date().getTime(),
-    log: true,
-    require: {
-        features: [],
-        permissions: [],
+const core = require('./vendor/social-browser-core');
+const site = core({
+    port: Number(process.env.EMAIL_HTTP_PORT || 60025),
+    host: process.env.EMAIL_HTTP_HOST || '0.0.0.0',
+    cwd: __dirname,
+    request: {
+        maxBodyBytes: Number(process.env.EMAIL_HTTP_MAX_BODY_BYTES || 5 * 1024 * 1024),
+        maxFileBytes: Number(process.env.EMAIL_HTTP_MAX_FILE_BYTES || 25 * 1024 * 1024),
+        uploadDir: path.join(__dirname, 'localStorage', 'uploads'),
     },
-    security: {
-        keys: [process.env.EMAIL_SESSION_SECRET || 'a2797cd0076d385e86663865dc4d855b'],
+    observability: {
+        endpoints: true,
+        prefix: '/_core',
+        tracing: { enabled: true, max: 1000 },
     },
-    session: {
-        save: false,
-    },
+    gracefulShutdown: { signals: true, forceAfterMs: 10000 },
 });
+
+// Native Core is the runtime authority. The legacy iSite runtime is not loaded.
+site.cwd = __dirname;
+site.dir = path.join(__dirname, 'site_files');
+site.apps = [{ name: 'emails', name2: 'emails', path: path.join(__dirname, 'apps', 'emails') }];
+site.options = site.options || {};
+site.options.lang = 'En';
+site.log = typeof site.log === 'function' ? site.log.bind(site) : console.log.bind(console);
+site.use((req, res, next) => {
+    // Small response-name bridge used by the existing email app. These aliases
+    // map directly to Native Core response primitives; no iSite runtime is loaded.
+    if (typeof res.sendHTML !== 'function') res.sendHTML = res.send.bind(res);
+    if (typeof res.htmlContent !== 'function') res.htmlContent = res.send.bind(res);
+    next();
+});
+
+const { createNativeTemplateRenderer } = require('./apps/emails/core/native-template');
+site.emailTemplateRenderer = createNativeTemplateRenderer(site);
+
+// Keep the existing app route descriptors, but render their HTML through the
+// parser bundled inside @social-browser/core instead of loading iSite runtime.
+const nativeOnGET = site.onGET.bind(site);
+function normalizedRouteName(name) {
+    name = String(name ?? '').trim();
+    if (!name) return '/';
+    return name.startsWith('/') ? name : '/' + name;
+}
+site.onGET = function onGETNativeBridge(route, callback) {
+    if (route && typeof route === 'object' && !Array.isArray(route)) {
+        const copy = { ...route };
+        const names = Array.isArray(copy.name) ? copy.name.map(normalizedRouteName) : normalizedRouteName(copy.name);
+        copy.name = names;
+        if (copy.path && typeof callback !== 'function') {
+            const file = path.resolve(copy.path);
+            const parserEnabled = String(copy.parser || '').toLowerCase().includes('html');
+            const register = (name) => nativeOnGET({ name, overwrite: copy.overwrite === true }, (req, res) => {
+                if (!fs.existsSync(file)) {
+                    if (typeof res.status === 'function') res.status(404);
+                    return res.end('Not Found');
+                }
+                if (parserEnabled) return site.emailTemplateRenderer.renderResponse(req, res, file);
+                const content = fs.readFileSync(file);
+                if (typeof res.set === 'function') res.set('Content-Type', 'text/html; charset=utf-8');
+                return res.end(content);
+            });
+            if (Array.isArray(names)) { let result; for (const name of names) result = register(name); return result; }
+            return register(names);
+        }
+        return nativeOnGET(copy, callback);
+    }
+    if (typeof route === 'string') route = normalizedRouteName(route);
+    return nativeOnGET(route, callback);
+};
+
 
 site.emailRuntimeMonitor = createEmailRuntimeMonitor();
 site.emailRuntimeMonitor.component('site', 'starting');
@@ -96,9 +151,14 @@ site.emailOperationsManager = createEmailBackupStorageManager({
     logger: (message) => site.log(message),
 });
 
-site.get('robots.txt', (req, res) => res.txt('robots.txt'));
-site.get('sitemap.xml', (req, res) => res.txt('sitemap.xml'));
-site.get('app-ads.txt', (req, res) => res.txt('app-ads.txt'));
+for (const publicFile of ['robots.txt', 'sitemap.xml', 'app-ads.txt']) {
+    site.get('/' + publicFile, (req, res) => {
+        const filePath = path.join(site.cwd, 'site_files', publicFile);
+        if (!fs.existsSync(filePath)) { res.status(404); return res.end('Not Found'); }
+        if (typeof res.set === 'function') res.set('Content-Type', publicFile.endsWith('.xml') ? 'application/xml; charset=utf-8' : 'text/plain; charset=utf-8');
+        res.end(fs.readFileSync(filePath));
+    });
+}
 
 function smtpError(message, responseCode) {
     const error = new Error(String(message || 'Request rejected'));
@@ -282,7 +342,7 @@ smtpServer.on('listening', () => {
 });
 smtpServer.listen(Number(process.env.EMAIL_SMTP_PORT || 25), process.env.EMAIL_SMTP_HOST || undefined);
 
-const mcpSecret = 'SOCIALBROWERMANAGER';
+const mcpSecret = String(process.env.EMAIL_MCP_SECRET || '').trim();
 site.emailScheduler = site.emailScheduler || createEmailScheduler({
     emailService: site.emailService,
     abusePolicy: site.emailAbusePolicy,
@@ -314,13 +374,22 @@ site.emailMcpServer = startEmailMcpServer({
     },
 });
 
-site.onGET({ name: '/js', path: site.dir + '/js' });
-site.onGET({ name: '/css', path: site.dir + '/css' });
-site.onGET({ name: '/fonts', path: site.dir + '/fonts' });
-site.onGET({ name: '/images', path: site.dir + '/images' });
-site.onGET({ name: '/json', path: site.dir + '/json' });
-site.onGET({ name: '/html', path: site.dir + '/html' });
+site.static('/js', path.join(site.dir, 'js'));
+site.static('/css', path.join(site.dir, 'css'));
+site.static('/fonts', path.join(site.dir, 'fonts'));
+site.static('/images', path.join(site.dir, 'images'));
+site.static('/json', path.join(site.dir, 'json'));
+site.static('/html', path.join(site.dir, 'html'));
 
-site.loadLocalApp('client-side');
+// Explicit app registration removes the old iSite auto-loader as an authority.
+require('./apps/emails/app')(site);
+
+site.onShutdown(async () => {
+    try { await site.emailMcpServer?.close?.(); } catch (_) {}
+    try { await site.emailScheduler?.stop?.(); } catch (_) {}
+    try { await site.emailOperationsManager?.stop?.(); } catch (_) {}
+    try { await new Promise((resolve) => smtpServer.close(() => resolve())); } catch (_) {}
+});
+
 site.start();
-site.emailRuntimeMonitor.component('site', 'ready', { httpPort: 60025 });
+site.emailRuntimeMonitor.component('site', 'ready', { httpPort: Number(process.env.EMAIL_HTTP_PORT || 60025), runtime: '@social-browser/core', coreVersion: require('./vendor/social-browser-core/package.json').version });

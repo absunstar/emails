@@ -2,7 +2,6 @@
 
 const http = require('http');
 const crypto = require('crypto');
-const emailHostAdmin = require('./mcp-host-admin');
 
 const MODERN_PROTOCOL = '2026-07-28';
 const LEGACY_PROTOCOLS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05', '2024-10-07'];
@@ -12,7 +11,7 @@ const DEFAULT_MCP_SECRET = 'SOCIALBROWERMANAGER';
 const SERVER_INFO = {
     name: 'social-browser-email',
     title: 'Social Browser Email Manager',
-    version: '4.3.0-host-admin',
+    version: '4.3.0',
 };
 
 const SERVER_INSTRUCTIONS = [
@@ -238,9 +237,6 @@ const TOOLS = [
     tool('email_policy_list_set_enabled', 'Enable policy list', 'Enable or disable a named security allow/block/ignore list without deleting its values.', { list: { type: 'string', minLength: 1 }, enabled: { type: 'boolean' } }, ['list', 'enabled'], { readOnlyHint: false }),
     tool('email_policy_limit_set', 'Set abuse limit', 'Change one numeric or boolean SMTP/HTTP/outbound protection limit.', { group: { type: 'string', enum: ['smtp', 'http', 'outbound'] }, key: { type: 'string', minLength: 1 }, value: {} }, ['group', 'key', 'value'], { readOnlyHint: false }),
 ];
-
-// Restricted host-level mail administration tools.
-TOOLS.push(...emailHostAdmin.tools);
 
 function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -648,10 +644,6 @@ function validateToolArguments(name, raw) {
         if (args.value === undefined) return fail('value is required');
         return { ok: true, args: { group: args.group, key: args.key.trim(), value: args.value } };
     }
-    // Host-admin tools perform their own strict schema/domain/path validation.
-    if (emailHostAdmin.tools.some((entry) => entry.name === name)) {
-        return { ok: true, args: args && typeof args === 'object' && !Array.isArray(args) ? args : {} };
-    }
     return fail('Unknown tool');
 }
 
@@ -1034,7 +1026,6 @@ async function executeTool(name, args, service, scope) {
     else if (name === 'email_policy_rule_remove') output = await service.policyRuleRemove(args, scope);
     else if (name === 'email_policy_list_set_enabled') output = await service.policyListSetEnabled(args, scope);
     else if (name === 'email_policy_limit_set') output = await service.policyLimitSet(args, scope);
-    else if (emailHostAdmin.tools.some((entry) => entry.name === name)) output = await emailHostAdmin.call(name, args || {});
     else throw new Error('Unknown tool: ' + name);
     return output;
 }

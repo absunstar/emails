@@ -1,0 +1,12 @@
+'use strict';
+const fs=require('fs');
+const path=require('path');
+const { StorageEngine }=require('../lib/storage-engine');
+const dir=process.argv[2];
+const e=new StorageEngine('crash',{dir});
+const txid='manual-crash-tx';
+const doc={_id:'manual1',id:1,name:'recovered'};
+e._appendWal({type:'begin',txid});
+e._appendWal({type:'op',txid,op:{type:'add',doc}});
+e._appendWal({type:'commit',txid});
+process.exit(0);

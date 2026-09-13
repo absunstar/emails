@@ -182,10 +182,23 @@ function createEmailService(options) {
         args = args || {};
         const domain = context && context.domain;
         const matches = [];
-        for (const doc of store.messageValues()) {
-            if (domain && !messageBelongsToDomain(doc, domain)) continue;
-            if (!matchesSearch(doc, args)) continue;
-            matches.push(doc);
+        const bodySearch = !!(args.text || args.html || args.query || args.search);
+        const metadataArgs = bodySearch ? Object.assign({}, args, { text: undefined, html: undefined, query: undefined, search: undefined }) : args;
+        for (const meta of store.messageValues()) {
+            if (domain && !messageBelongsToDomain(meta, domain)) continue;
+            if (!matchesSearch(meta, metadataArgs)) continue;
+            if (bodySearch) {
+                // Fast path: subject/from/to/cc can satisfy a generic query without
+                // touching the message body. Explicit body filters always hydrate.
+                const genericOnly = !(args.text || args.html) && (args.query || args.search);
+                if (genericOnly && matchesSearch(meta, args)) {
+                    matches.push(meta);
+                    continue;
+                }
+                const full = await store.getMessage(meta.guid);
+                if (!full || !matchesSearch(full, args)) continue;
+            }
+            matches.push(meta);
         }
         const allowedSortFields = new Set(['date', 'id', 'from', 'to', 'subject', 'folder', 'status']);
         const sortBy = allowedSortFields.has(String(args.sortBy || '')) ? String(args.sortBy) : 'date';
@@ -359,7 +372,14 @@ function createEmailService(options) {
             const blockedVip = context.allowVip ? [] : matches.filter((doc) => isVipMessage(doc));
             if (!context.allowVip) matches = matches.filter((doc) => !isVipMessage(doc));
             const offset = Math.max(0, Number(args.offset || 0));
-            const list = matches.slice(offset, offset + limit).map((doc) => safeMessage(doc, !!args.includeBody));
+            const page = matches.slice(offset, offset + limit);
+            let list;
+            if (args.includeBody) {
+                const hydrated = await Promise.all(page.map((meta) => store.getMessage(meta.guid)));
+                list = hydrated.filter(Boolean).map((doc) => safeMessage(doc, true));
+            } else {
+                list = page.map((doc) => safeMessage(doc, false));
+            }
             return {
                 count: list.length,
                 totalMatches: matches.length,

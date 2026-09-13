@@ -1,0 +1,12 @@
+{
+  "name": "@social-browser/core",
+  "version": "6.10.3",
+  "description": "Zero-external-runtime-dependency Node.js application platform used by Social Browser.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.18"
+  }
+}

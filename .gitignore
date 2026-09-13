@@ -1,4 +1,6 @@
 node_modules/
-test/
-Social_Site_sessions.json
+*.db
+*.dbz
 localStorage/
+server.*.log
+

@@ -10,7 +10,7 @@
         offset: 0,
         limit: 50,
         selected: new Set(),
-        stats: { total: 0, read: 0, unread: 0, favorite: 0, attachments: 0, failed: 0, folders: {}, maxMessages: 100000 },
+        stats: { total: 0, unread: 0, favorite: 0, attachments: 0, failed: 0, folders: {}, maxMessages: 100000 },
         folders: [],
         customFolders: [],
         current: null,
@@ -38,7 +38,6 @@
         operations: null,
         operationsConfig: null,
         operationsCleanupPreview: null,
-        pendingLoad: null,
     };
 
     const q = (selector, base) => (base || document).querySelector(selector);
@@ -189,7 +188,7 @@
 
     function renderStats() {
         const stats = state.stats || {};
-        ['total', 'read', 'unread', 'favorite', 'attachments', 'failed'].forEach((key) => {
+        ['total', 'unread', 'favorite', 'attachments', 'failed'].forEach((key) => {
             const value = Math.max(0, Number(stats[key] || 0));
             qa('[data-admin-stat="' + key + '"]').forEach((el) => { el.textContent = value.toLocaleString(); });
             qa('[data-admin-side-count="' + key + '"]').forEach((el) => { el.textContent = value.toLocaleString(); });
@@ -228,18 +227,8 @@
         const entries = folderEntries();
         state.folders = entries.map((item) => item.name);
         const labels = { inbox: 'Inbox', send: 'Sent', sending: 'Sending', failed: 'Failed' };
-        const folderIcon = (name) => {
-            const icons = {
-                all: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg>',
-                inbox: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"></path><path d="M8 11h8M12 7v8M9 12l3 3 3-3"></path></svg>',
-                send: '<svg viewBox="0 0 24 24"><path d="m4 11 16-7-7 16-2-7-7-2Z"></path><path d="m11 13 9-9"></path></svg>',
-                sending: '<svg viewBox="0 0 24 24"><path d="M20 6v6h-6"></path><path d="M19 12a7 7 0 1 0-2 5"></path></svg>',
-                failed: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 17h.01"></path></svg>',
-                custom: '<svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v10H3z"></path></svg>',
-            };
-            return icons[name] || icons.custom;
-        };
-        host.innerHTML = '<button type="button" class="mail-admin-folder folder-all' + (selected === 'all' ? ' is-active' : '') + '" data-admin-folder="all"><span class="mail-admin-folder-icon">' + folderIcon('all') + '</span><span>All mail</span><strong>' + Number(state.stats.total || 0).toLocaleString() + '</strong></button>' + entries.map((item) => '<button type="button" class="mail-admin-folder folder-' + escape(item.name.replace(/[^a-z0-9_-]/gi, '-').toLowerCase()) + (selected === item.name ? ' is-active' : '') + '" data-admin-folder="' + escape(item.name) + '"><span class="mail-admin-folder-icon">' + folderIcon(item.name) + '</span><span>' + escape(labels[item.name] || item.name) + '</span><strong>' + item.count.toLocaleString() + '</strong></button>').join('');
+        const icons = { inbox: '↓', send: '↑', sending: '↻', failed: '!' };
+        host.innerHTML = '<button type="button" class="mail-admin-folder' + (selected === 'all' ? ' is-active' : '') + '" data-admin-folder="all"><span class="mail-admin-folder-icon">▣</span><span>All mail</span><strong>' + Number(state.stats.total || 0).toLocaleString() + '</strong></button>' + entries.map((item) => '<button type="button" class="mail-admin-folder' + (selected === item.name ? ' is-active' : '') + '" data-admin-folder="' + escape(item.name) + '"><span class="mail-admin-folder-icon">' + escape(icons[item.name] || '□') + '</span><span>' + escape(labels[item.name] || item.name) + '</span><strong>' + item.count.toLocaleString() + '</strong></button>').join('');
         const select = q('[data-admin-filter="folder"]');
         if (select) {
             const current = select.value || 'all';
@@ -326,76 +315,6 @@
         }
     }
 
-
-    function hashString(value) {
-        const input = String(value || '');
-        let hash = 0;
-        for (let index = 0; index < input.length; index += 1) {
-            hash = ((hash << 5) - hash) + input.charCodeAt(index);
-            hash |= 0;
-        }
-        return Math.abs(hash);
-    }
-
-    function parseMailbox(value, fallbackLabel) {
-        const raw = String(value || '').trim();
-        const fallback = fallbackLabel || '—';
-        if (!raw) {
-            return { raw: '', name: fallback, email: '', domain: '', initial: fallback.charAt(0).toUpperCase() || '•' };
-        }
-        let name = '';
-        let email = raw;
-        const angleMatch = raw.match(/^\s*"?([^"<>]+?)"?\s*<\s*([^>]+)\s*>\s*$/);
-        if (angleMatch) {
-            name = angleMatch[1].trim();
-            email = angleMatch[2].trim();
-        } else {
-            const inlineMatch = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-            if (inlineMatch) {
-                email = inlineMatch[0].trim();
-                const before = raw.slice(0, inlineMatch.index).replace(/["'()<>]/g, ' ').trim();
-                const after = raw.slice((inlineMatch.index || 0) + email.length).replace(/["'()<>]/g, ' ').trim();
-                name = (before || after || '').trim();
-            }
-        }
-        const emailParts = email.includes('@') ? email.split('@') : [];
-        const localPart = emailParts[0] || '';
-        const domain = emailParts[1] || '';
-        const derivedName = name || localPart || raw || fallback;
-        const source = domain || localPart || derivedName;
-        const initialMatch = String(source || '').match(/[A-Za-z0-9؀-ۿ]/);
-        const initial = initialMatch ? initialMatch[0].toUpperCase() : '•';
-        return { raw, name: derivedName, email: email !== derivedName ? email : (domain ? email : ''), domain, localPart, initial };
-    }
-
-    function avatarStyle(domain, role) {
-        const seed = domain || role || 'mail';
-        const base = hashString(seed) % 360;
-        const hue = role === 'to' ? (base + 32) % 360 : base;
-        return '--mail-avatar-h:' + hue + ';';
-    }
-
-    function renderAddressCard(value, role, fallbackLabel) {
-        const info = parseMailbox(value, fallbackLabel);
-        const labelRole = role === 'to' ? 'to' : 'from';
-        const domainLabel = info.domain ? '@' + info.domain : '';
-        const emailLabel = info.email || (info.domain ? (info.localPart + '@' + info.domain) : '');
-        return {
-            info,
-            html:
-                '<div class="mail-admin-address-card is-' + labelRole + '">' +
-                    '<span class="mail-admin-address-avatar is-' + labelRole + '" style="' + avatarStyle(info.domain, labelRole) + '" aria-hidden="true">' + escape(info.initial) + '</span>' +
-                    '<div class="mail-admin-address-copy">' +
-                        '<div class="mail-admin-address-line">' +
-                            '<span class="mail-admin-address-name">' + escape(info.name || fallbackLabel || '—') + '</span>' +
-                            (domainLabel ? '<span class="mail-admin-address-domain">' + escape(domainLabel) + '</span>' : '') +
-                        '</div>' +
-                        (emailLabel ? '<div class="mail-admin-address-email">' + escape(emailLabel) + '</div>' : '') +
-                    '</div>' +
-                '</div>'
-        };
-    }
-
     function rowStatus(doc) {
         if (doc.status === 'failed') return '<span class="mail-admin-badge danger">Failed</span>';
         if (doc.folder === 'send' || doc.status === 'sent') return '<span class="mail-admin-badge info">Sent</span>';
@@ -419,16 +338,12 @@
                 const selected = state.selected.has(String(doc.guid));
                 const attachments = Array.isArray(doc.attachments) ? doc.attachments.length : 0;
                 const vip = isVipEmail(doc.to) || isVipEmail(doc.cc);
-                const fromCard = renderAddressCard(doc.from, 'from', 'Unknown sender');
-                const toCard = renderAddressCard(doc.to, 'to', 'Recipient');
-                const subjectLabel = doc.subject || '(No subject)';
-                const fromMeta = fromCard.info.domain ? '<span class="mail-admin-subject-source">' + escape(fromCard.info.domain) + '</span>' : '';
                 return '<tr class="' + (!doc.read ? 'is-unread ' : '') + (selected ? 'is-selected' : '') + '" data-admin-row="' + escape(doc.guid) + '">' +
                     '<td class="select-col"><input type="checkbox" data-admin-select="' + escape(doc.guid) + '" ' + (selected ? 'checked' : '') + ' aria-label="Select message"></td>' +
                     '<td class="star-col"><button type="button" class="mail-admin-star' + (doc.favorite ? ' is-active' : '') + '" data-admin-action="toggle-favorite" data-guid="' + escape(doc.guid) + '" aria-label="Toggle favorite">' + svg('star') + '</button></td>' +
-                    '<td data-admin-col="from"><div class="mail-admin-cell-primary">' + fromCard.html + '</div><div class="mail-admin-cell-secondary">' + rowStatus(doc) + (vip ? '<span class="mail-admin-badge vip">VIP</span>' : '') + '</div></td>' +
-                    '<td data-admin-col="to"><div class="mail-admin-cell-primary">' + toCard.html + '</div><div class="mail-admin-cell-secondary">' + (doc.cc ? '<span class="mail-admin-cc-label">Cc</span> ' + escape(doc.cc) : '') + '</div></td>' +
-                    '<td data-admin-col="subject"><button type="button" class="mail-admin-subject" data-admin-action="open-message" data-guid="' + escape(doc.guid) + '"><span class="mail-admin-subject-text">' + escape(subjectLabel) + '</span></button><div class="mail-admin-cell-secondary">' + fromMeta + (attachments ? '<span class="mail-admin-attachment-chip">' + svg('paperclip') + attachments + '</span>' : '') + '</div></td>' +
+                    '<td data-admin-col="from"><div class="mail-admin-cell-primary">' + escape(doc.from || 'Unknown sender') + '</div><div class="mail-admin-cell-secondary">' + rowStatus(doc) + (vip ? '<span class="mail-admin-badge vip">VIP</span>' : '') + '</div></td>' +
+                    '<td data-admin-col="to"><div class="mail-admin-cell-primary">' + escape(doc.to || '—') + '</div><div class="mail-admin-cell-secondary">' + (doc.cc ? 'Cc: ' + escape(doc.cc) : '') + '</div></td>' +
+                    '<td data-admin-col="subject"><button type="button" class="mail-admin-subject" data-admin-action="open-message" data-guid="' + escape(doc.guid) + '">' + escape(doc.subject || '(No subject)') + '</button><div class="mail-admin-cell-secondary">' + (attachments ? '<span class="mail-admin-attachment-chip">' + svg('paperclip') + attachments + '</span>' : '') + '</div></td>' +
                     '<td data-admin-col="folder"><span class="mail-admin-folder-chip">' + escape(doc.folder || 'inbox') + '</span></td>' +
                     '<td data-admin-col="date"><div class="mail-admin-date">' + escape(relativeTime(doc.date) || dateTime(doc.date)) + '</div><small>' + escape(dateTime(doc.date)) + '</small></td>' +
                     '<td class="action-col"><div class="mail-admin-row-actions"><button type="button" data-admin-action="open-message" data-guid="' + escape(doc.guid) + '" title="Open message">' + svg('view') + '</button><a href="/api/emails/eml?guid=' + encodeURIComponent(doc.guid) + '" download title="Download EML"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"></path></svg></a><button type="button" data-admin-action="delete-one" data-guid="' + escape(doc.guid) + '" class="danger" title="Delete message">' + svg('trash') + '</button></div></td>' +
@@ -473,12 +388,7 @@
     }
 
     async function loadMessages(options) {
-        if (state.loading) {
-            // Do not lose navigation/filter clicks while a previous request is in flight.
-            // Keep only the latest requested reload because it reflects the current UI state.
-            state.pendingLoad = Object.assign({}, options || {});
-            return;
-        }
+        if (state.loading) return;
         state.loading = true;
         const refreshButton = q('[data-admin-action="refresh"]');
         if (options?.button) setBusy(options.button, true, 'Loading…');
@@ -502,14 +412,6 @@
             state.loading = false;
             if (options?.button) setBusy(options.button, false);
             else if (!options?.silent && refreshButton) refreshButton.classList.remove('is-busy');
-
-            const pending = state.pendingLoad;
-            state.pendingLoad = null;
-            if (pending) {
-                // Run after the current event/microtask finishes so the latest folder/filter
-                // state is guaranteed to be visible to readFilters().
-                setTimeout(() => loadMessages(pending), 0);
-            }
         }
     }
 
@@ -751,7 +653,9 @@
         }
     }
 
-    function resetQuickViewFields() {
+    function setQuickFilter(name) {
+        qa('[data-admin-quick-filter]').forEach((button) => button.classList.toggle('is-active', button.dataset.adminQuickFilter === name));
+        if (name === 'all') return clearFilters();
         const favorite = q('[data-admin-filter="favorite"]');
         const attachments = q('[data-admin-filter="hasAttachments"]');
         const read = q('[data-admin-filter="read"]');
@@ -760,33 +664,13 @@
         if (attachments) attachments.checked = false;
         if (read) read.value = 'all';
         if (status) status.value = 'all';
-    }
-
-    function setQuickFilter(name) {
-        qa('[data-admin-quick-filter]').forEach((button) => button.classList.toggle('is-active', button.dataset.adminQuickFilter === name));
-        if (name === 'all') return clearFilters();
-        resetQuickViewFields();
-
-        // Quick Views are global mailbox views, not refinements of the currently
-        // selected folder. Without this reset, clicking e.g. Attachments while
-        // Sent is selected becomes `folder=send AND hasAttachments=true`, which
-        // can incorrectly show 0 even though the global attachment counter is > 0.
-        const folder = q('[data-admin-filter="folder"]');
-        if (folder) folder.value = 'all';
-
-        const favorite = q('[data-admin-filter="favorite"]');
-        const attachments = q('[data-admin-filter="hasAttachments"]');
-        const read = q('[data-admin-filter="read"]');
-        const status = q('[data-admin-filter="status"]');
         if (name === 'favorite' && favorite) favorite.checked = true;
         if (name === 'attachments' && attachments) attachments.checked = true;
         if (name === 'unread' && read) read.value = 'unread';
-        if (name === 'read' && read) read.value = 'read';
         if (name === 'failed' && status) status.value = 'failed';
         state.offset = 0;
-        renderFolders();
         updateFilterBadge();
-        return loadMessages();
+        loadMessages();
     }
 
 
@@ -1767,9 +1651,6 @@
         const folder = event.target.closest('[data-admin-folder]');
         if (folder) {
             qa('[data-admin-quick-filter]').forEach((item) => item.classList.remove('is-active'));
-            // Folder navigation should never inherit a hidden Quick View state such as
-            // Read/Unread/Favorites/Failed from the previous view.
-            resetQuickViewFields();
             const select = q('[data-admin-filter="folder"]');
             if (select) select.value = folder.dataset.adminFolder || 'all';
             state.offset = 0;

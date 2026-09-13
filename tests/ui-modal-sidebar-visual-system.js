@@ -1,0 +1,11 @@
+const fs=require('fs');const path=require('path');const assert=require('assert');
+const root=path.resolve(__dirname,'..');
+const free=fs.readFileSync(path.join(root,'apps/emails/site_files/html/free.html'),'utf8');
+const modal=fs.readFileSync(path.join(root,'apps/emails/site_files/html/view_modal.html'),'utf8');
+assert(free.indexOf('<div x-import="emails/view_modal.html"></div>') < free.indexOf('<div class="mail-tool">'),'view modal must live outside transformed/clipped mail-tool stacking context');
+assert(free.includes('#viewEmailModal,#mailQrModal,#mailDataModal{z-index:12000'), 'global modal layer must sit above navbar');
+assert(free.includes('@keyframes mailModalIn'), 'quick modal animation missing');
+assert(free.includes('.mailbox-sidebar-head:before'), 'My Emails visual accent missing');
+assert(free.includes('.mailbox-addresses-head>div:first-child strong:before'), 'Saved inboxes icon treatment missing');
+assert(modal.includes('mail-modal-title-icon'), 'message modal icon header missing');
+console.log('ui-modal-sidebar-visual-system: PASS');

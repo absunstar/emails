@@ -51,16 +51,65 @@ body{margin-top:72px;margin-bottom:0;font-family:Tahoma,Verdana,Arial,sans-serif
 .mailbox-secondary-manage{font-size:10px}
 .mailbox-transfer-btn{font-size:11px}
 </style>
+<style>
+/* 2026-09-13 visual hierarchy: global modal layer + quick motion + semantic My Emails color system */
+#viewEmailModal,#mailQrModal,#mailDataModal{z-index:12000!important;padding:14px!important;box-sizing:border-box;align-items:flex-start;justify-content:center;background:rgba(1,6,16,.76)!important;backdrop-filter:blur(5px)}
+#viewEmailModal[style*="display: block"],#mailQrModal[style*="display: block"],#mailDataModal[style*="display: block"]{display:flex!important}
+#viewEmailModal .modal-content,#mailQrModal .modal-content,#mailDataModal .modal-content{margin:0 auto!important;max-height:calc(100vh - 28px);transform-origin:50% 12%;animation:mailModalIn .16s cubic-bezier(.2,.8,.2,1) both!important;-webkit-animation:mailModalIn .16s cubic-bezier(.2,.8,.2,1) both!important}
+#viewEmailModal .mail-view-modal{width:min(1040px,calc(100vw - 28px));overflow:auto;border:1px solid rgba(56,189,248,.28);border-radius:18px;background:linear-gradient(180deg,#091525,#06101d);box-shadow:0 24px 80px rgba(0,0,0,.55),0 0 0 1px rgba(125,211,252,.04)}
+#viewEmailModal .modal-header{position:sticky;top:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px!important;border-bottom:1px solid rgba(56,189,248,.16);background:rgba(7,17,31,.96)!important;backdrop-filter:blur(12px)}
+#viewEmailModal .mail-modal-title{display:flex;align-items:center;gap:10px;min-width:0}
+#viewEmailModal .mail-modal-title-icon{display:grid;place-items:center;width:36px;height:36px;flex:0 0 auto;border:1px solid rgba(56,189,248,.28);border-radius:11px;background:linear-gradient(135deg,rgba(14,165,233,.2),rgba(37,99,235,.12));color:#7dd3fc;box-shadow:0 8px 22px rgba(14,165,233,.08)}
+#viewEmailModal .mail-modal-title-icon .ui-icon{width:18px;height:18px}
+#viewEmailModal .mail-modal-title-copy{display:grid;gap:2px;min-width:0}
+#viewEmailModal .mail-modal-title-copy small{color:#38bdf8;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+#viewEmailModal .mail-modal-title-copy h2{margin:0!important;color:#f4f9ff!important;font-size:18px!important;line-height:1.25}
+#viewEmailModal .sb-modal-close{display:grid;place-items:center;width:36px;height:36px;border:1px solid rgba(251,113,133,.42)!important;border-radius:11px!important;background:rgba(190,18,60,.14)!important;color:#fb7185!important;font-size:22px;cursor:pointer;transition:transform .14s ease,background .14s ease,border-color .14s ease}
+#viewEmailModal .sb-modal-close:hover{transform:scale(1.05);background:rgba(225,29,72,.22)!important;border-color:rgba(251,113,133,.68)!important}
+#viewEmailModal .modal-body{padding:16px!important}
+#viewEmailModal .mail-privacy-bar{border-color:rgba(16,185,129,.28);background:linear-gradient(135deg,rgba(16,185,129,.09),rgba(6,78,59,.07))}
+#viewEmailModal .mail-privacy-bar strong{display:flex;align-items:center;gap:7px;color:#6ee7b7}
+#viewEmailModal .mail-privacy-bar strong:before{content:"";width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.12)}
+#viewEmailModal .sb-field label{color:#8fc9ff!important;font-weight:900!important}
+#viewEmailModal .sb-input{border-color:rgba(96,165,250,.22)!important;background:#071321!important}
+#viewEmailModal .sb-email-frame{border:1px solid rgba(148,163,184,.18);border-radius:12px;background:#fff}
+#viewEmailModal .modal-footer{position:sticky;bottom:0;z-index:3;padding:10px 16px!important;border-top:1px solid rgba(56,189,248,.12);background:rgba(7,17,31,.96)!important;backdrop-filter:blur(12px)}
+.mailbox-sidebar-head{position:relative;overflow:hidden;border-color:rgba(56,189,248,.38)!important;background:linear-gradient(135deg,rgba(14,165,233,.16),rgba(37,99,235,.08))!important;box-shadow:0 10px 28px rgba(0,0,0,.15),inset 0 1px 0 rgba(255,255,255,.035)}
+.mailbox-sidebar-head:before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(180deg,#38bdf8,#22c55e)}
+.mailbox-title-icon{width:42px!important;height:42px!important;border-color:rgba(56,189,248,.38)!important;background:linear-gradient(135deg,rgba(14,165,233,.22),rgba(37,99,235,.13))!important;color:#7dd3fc!important;box-shadow:0 8px 20px rgba(14,165,233,.1)}
+.mailbox-title-icon .ui-icon{width:20px;height:20px}
+.mailbox-sidebar-title{color:#f7fbff!important;font-size:23px!important;text-shadow:0 1px 12px rgba(56,189,248,.08)}
+.mailbox-sidebar-subtitle{color:#9fc1dd!important}
+.mailbox-tier{border-color:rgba(167,139,250,.3)!important;background:rgba(124,58,237,.11)!important;color:#c4b5fd!important}
+.mailbox-usage{border-color:rgba(245,158,11,.16)!important;background:linear-gradient(135deg,rgba(245,158,11,.045),rgba(255,255,255,.018))!important}
+.mailbox-usage-row:before{content:"◷";margin-inline-end:5px;color:#fbbf24;font-weight:900}
+.mailbox-addresses-panel{border-color:rgba(56,189,248,.3)!important;background:linear-gradient(180deg,rgba(8,29,50,.86),rgba(3,13,28,.9))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 14px 34px rgba(0,0,0,.16)!important}
+.mailbox-addresses-head>div:first-child span{color:#22d3ee!important}
+.mailbox-addresses-head>div:first-child strong{display:flex;align-items:center;gap:7px;color:#f4f9ff!important;font-size:15px!important}
+.mailbox-addresses-head>div:first-child strong:before{content:"✉";display:grid;place-items:center;width:21px;height:21px;border-radius:7px;background:rgba(34,211,238,.1);color:#67e8f9;font-size:12px}
+.mailbox-address-item{border-color:rgba(96,165,250,.18)!important;background:linear-gradient(135deg,rgba(8,19,36,.98),rgba(7,24,42,.9))!important}
+.mailbox-address-item:hover{border-color:rgba(56,189,248,.42)!important;background:linear-gradient(135deg,rgba(9,29,50,.98),rgba(8,34,56,.92))!important}
+.mailbox-address-item.is-active{border-color:#38bdf8!important;background:linear-gradient(135deg,rgba(14,165,233,.2),rgba(37,99,235,.12))!important;box-shadow:0 0 0 2px rgba(56,189,248,.08),0 10px 26px rgba(0,0,0,.2)!important}
+.mailbox-address-item.has-unread{border-inline-start-color:#22c55e!important}
+.mailbox-address-index{background:rgba(59,130,246,.18)!important;color:#bfdbfe!important;border:1px solid rgba(96,165,250,.18)}
+.mailbox-address-item.is-active .mailbox-address-index{background:rgba(14,165,233,.24)!important;color:#e0f2fe!important;border-color:rgba(125,211,252,.32)}
+.mailbox-unread{background:#16a34a!important;box-shadow:0 0 0 3px rgba(34,197,94,.09),0 0 15px rgba(34,197,94,.15)!important}
+.mailbox-search-icon{color:#60a5fa!important}.mailbox-search:focus,.mailbox-sort:focus{border-color:#38bdf8!important}
+.mailbox-secondary-tools{border-color:rgba(167,139,250,.16)!important;background:linear-gradient(135deg,rgba(124,58,237,.035),rgba(59,130,246,.025))!important}
+@keyframes mailModalIn{from{opacity:0;transform:translateY(-8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:620px){#viewEmailModal,#mailQrModal,#mailDataModal{padding:6px!important}#viewEmailModal .mail-view-modal{width:100%;max-height:calc(100vh - 12px);border-radius:14px}#viewEmailModal .modal-body{padding:12px!important}.mailbox-sidebar-title{font-size:21px!important}}
+@media(prefers-reduced-motion:reduce){#viewEmailModal .modal-content,#mailQrModal .modal-content,#mailDataModal .modal-content{animation-duration:.001ms!important}}
+</style>
 </head>
 <body>
 <nav x-import="navbar/index.html" class="sitebar"></nav>
 <main id="main-layout" class="temp-mail-page loaded" data-email-app="free">
 <section class="hero-grid"><div class="hero-copy">
 <span class="eyebrow"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.4c0 4.8 3.1 8.1 7.5 9.6 4.4-1.5 7.5-4.8 7.5-9.6V6L12 3Z"></path><path d="m9 12 2 2 4-4"></path></svg>Free privacy tool by Social Browser</span>
-<div class="mail-tool">
 <div x-import="emails/view_modal.html"></div>
 <div id="mailQrModal" class="modal" hidden><div class="modal-content qr-modal-card"><div class="modal-header"><h2>Open this email on another device</h2><button class="sb-modal-close" type="button" data-modal-close="#mailQrModal">×</button></div><div class="modal-body"><img class="qr-image" data-qr-image alt="Email QR code" /><p class="qr-email" data-qr-email></p><div class="sb-actions center"><button class="sb-btn sb-btn-ghost" type="button" data-action="copy-qr-email"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path></svg><span data-button-label>Copy Email</span></button></div></div></div></div>
 <div id="mailDataModal" class="modal" hidden><div class="modal-content data-modal-card"><div class="modal-header"><div><h2>Backup &amp; Restore My Emails</h2></div><button class="sb-modal-close" type="button" data-modal-close="#mailDataModal">×</button></div><div class="modal-body"><div class="data-tools-intro"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m8 11 4 4 4-4"></path><path d="M5 19h14"></path></svg><div><strong>Your saved email list stays in this browser.</strong><br />Use a backup when you want to keep the list before clearing browser data, or restore it in another browser. Your current 10/100 address limit still applies.</div></div><div class="data-tools-grid"><section class="data-tool-card"><div class="data-tool-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m8 11 4 4 4-4"></path><path d="M5 19h14"></path></svg></div><h3>Export a backup</h3><p>Download a JSON backup containing your saved addresses, active address and local inbox state. Nothing is uploaded.</p><button class="sb-btn sb-btn-ghost" type="button" data-action="export-addresses"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m8 11 4 4 4-4"></path><path d="M5 19h14"></path></svg>Export Backup</button></section><section class="data-tool-card"><div class="data-tool-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V9"></path><path d="m8 13 4-4 4 4"></path><path d="M5 5h14"></path></svg></div><h3>Import saved emails</h3><p>Restore a JSON backup or import a simple text list. Existing addresses are kept and duplicates are skipped.</p><button class="sb-btn" type="button" data-action="import-addresses"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V9"></path><path d="m8 13 4-4 4 4"></path><path d="M5 5h14"></path></svg>Choose File</button></section></div><div class="data-tool-status" data-data-tool-status></div><input type="file" data-address-import-file accept=".json,.txt,text/plain,application/json" hidden /></div></div></div>
+<div class="mail-tool">
 <div class="mail-workspace">
 <aside class="mailbox-sidebar" aria-label="Saved temporary email addresses">
 <div class="mailbox-sidebar-head"><div class="mailbox-title-wrap"><span class="mailbox-title-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><div><h2 class="mailbox-sidebar-title">My Emails</h2><div class="mailbox-sidebar-subtitle">Switch between your saved inboxes</div></div></div><span class="mailbox-tier" data-browser-tier>Guest</span></div>

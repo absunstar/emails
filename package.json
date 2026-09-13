@@ -1,6 +1,6 @@
 {
   "name": "social-browser-email-server",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "description": "Native @social-browser/core based SMTP, temporary-mail website, and MCP email service with bounded-memory JSON storage.",
   "main": "server.js",
   "dependencies": {

@@ -622,6 +622,17 @@ function createEmailService(options) {
         listVip() {
             return store.listVip();
         },
+        listMailboxTiers() {
+            return store.listMailboxTiers();
+        },
+
+        getMailboxTier(email) {
+            return store.getMailboxTier(email);
+        },
+
+        async setMailboxTier(email, tier, source) {
+            return store.setMailboxTier(email, tier, source);
+        },
 
         listAdminFolders() {
             return store.listAdminFolders();

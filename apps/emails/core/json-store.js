@@ -115,6 +115,7 @@ class EmailFileStore {
         this.metaPath = path.join(this.baseDir, 'meta.json');
         this.adminFoldersPath = path.join(this.baseDir, 'admin-folders.json');
         this.vipPath = path.resolve(options.vipPath || path.join(process.cwd(), 'localStorage', 'vip-email-list.json'));
+        this.mailboxTiersPath = path.resolve(options.mailboxTiersPath || path.join(process.cwd(), 'localStorage', 'mailbox-tier-list.json'));
         this.configuredMaxMessages = Math.max(1, Number(options.maxMessages || 100000));
         this.maxMessages = this.configuredMaxMessages;
         this.maxMessagesManaged = false;
@@ -126,6 +127,7 @@ class EmailFileStore {
         // id must be allowed to resolve to more than one stored message.
         this.messagesById = new Map();
         this.vipEntries = [];
+        this.mailboxTierEntries = [];
         this.adminFolders = [];
         this._mutationQueue = Promise.resolve();
 
@@ -134,6 +136,7 @@ class EmailFileStore {
         ensureDir(this.trackingDir);
         ensureDir(this.auditDir);
         ensureDir(path.dirname(this.vipPath));
+        ensureDir(path.dirname(this.mailboxTiersPath));
         const persistedMeta = readJson(this.metaPath, {});
         const persistedLimit = Number(persistedMeta?.maxMessages);
         if (persistedMeta?.maxMessagesManaged === true && Number.isFinite(persistedLimit) && persistedLimit >= 1) {
@@ -142,6 +145,7 @@ class EmailFileStore {
         }
         this._loadMessages();
         this._loadVip();
+        this._loadMailboxTiers();
         this._loadAdminFolders();
         this._syncMeta();
     }
@@ -220,6 +224,12 @@ class EmailFileStore {
         const list = readJson(this.vipPath, []);
         this.vipEntries = Array.isArray(list) ? list.filter((item) => item && item.email) : [];
         if (!fs.existsSync(this.vipPath)) atomicWriteJson(this.vipPath, this.vipEntries);
+    }
+
+    _loadMailboxTiers() {
+        const list = readJson(this.mailboxTiersPath, []);
+        this.mailboxTierEntries = Array.isArray(list) ? list.filter((item) => item && item.email) : [];
+        if (!fs.existsSync(this.mailboxTiersPath)) atomicWriteJson(this.mailboxTiersPath, this.mailboxTierEntries);
     }
 
     _loadAdminFolders() {
@@ -546,6 +556,32 @@ class EmailFileStore {
             this.vipEntries = this.vipEntries.filter((item) => String(item.email || '').toLowerCase() !== normalized);
             atomicWriteJson(this.vipPath, this.vipEntries);
             return { removed: before !== this.vipEntries.length, email: normalized };
+        });
+    }
+
+    listMailboxTiers() {
+        return clone(this.mailboxTierEntries);
+    }
+
+    getMailboxTier(email) {
+        const normalized = String(email || '').trim().toLowerCase();
+        if (!normalized) return 'normal';
+        const found = this.mailboxTierEntries.find((item) => String(item.email || '').toLowerCase() === normalized);
+        return found && ['pro', 'vip'].includes(String(found.tier || '').toLowerCase()) ? String(found.tier).toLowerCase() : 'normal';
+    }
+
+    async setMailboxTier(email, tier, source) {
+        return this._queueMutation(async () => {
+            const normalized = String(email || '').trim().toLowerCase();
+            const normalizedTier = String(tier || 'normal').trim().toLowerCase();
+            if (!normalized) throw new Error('Mailbox email is required');
+            if (!['normal', 'pro', 'vip'].includes(normalizedTier)) throw new Error('Invalid mailbox tier');
+            this.mailboxTierEntries = this.mailboxTierEntries.filter((item) => String(item.email || '').toLowerCase() !== normalized);
+            if (normalizedTier !== 'normal') {
+                this.mailboxTierEntries.push({ email: normalized, tier: normalizedTier, source: source || 'admin-dashboard', updatedAt: new Date().toISOString() });
+            }
+            atomicWriteJson(this.mailboxTiersPath, this.mailboxTierEntries);
+            return { email: normalized, tier: normalizedTier };
         });
     }
 

@@ -247,6 +247,7 @@ class EmailBackupStorageManager {
             'email-unsubscribe',
             'email-abuse-policy.json',
             'vip-email-list.json',
+            'mailbox-tier-list.json',
             path.join('email-storage', 'config.json'),
         ];
         return values.filter((relative) => fs.existsSync(path.join(this.rootDir, relative)));

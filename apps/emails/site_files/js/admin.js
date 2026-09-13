@@ -16,6 +16,7 @@
         current: null,
         remoteImages: false,
         vipEmails: new Set(),
+        mailboxTiers: new Map(),
         loading: false,
         filterTimer: null,
         sortBy: 'date',
@@ -23,7 +24,7 @@
         autoRefresh: false,
         autoTimer: null,
         autoTick: 0,
-        columns: { from: true, to: true, subject: true, folder: true, date: true },
+        columns: { from: true, to: true, subject: true, date: true },
         policy: null,
         policyDefaults: null,
         policyStatus: null,
@@ -138,18 +139,37 @@
         }
         if (!name && email) name = email.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
         if (!name) name = 'Unknown sender';
-        const initialSource = (email || name).trim();
+        const host = email.includes('@') ? email.split('@').pop().toLowerCase().replace(/[^a-z0-9.-]/g, '') : '';
+        const parts = host.split('.').filter(Boolean);
+        const commonSecondLevel = new Set(['co', 'com', 'net', 'org', 'gov', 'ac']);
+        let domainLabel = '';
+        if (parts.length >= 3 && parts[parts.length - 1].length === 2 && commonSecondLevel.has(parts[parts.length - 2])) domainLabel = parts[parts.length - 3];
+        else if (parts.length >= 2) domainLabel = parts[parts.length - 2];
+        else domainLabel = parts[0] || '';
+        const initialSource = (domainLabel || email || name).trim();
         const initial = (initialSource[0] || '?').toUpperCase();
         const tone = initial.charCodeAt(0) % 6;
-        return { name, email, initial, tone };
+        return { name, email, initial, tone, domainLabel };
     }
 
     function senderIdentityHtml(value, fallback) {
         const identity = parseMailboxIdentity(value || fallback || '');
-        return '<div class="mail-admin-identity">' +
+        return '<div class="mail-admin-identity mail-admin-sender-identity">' +
             '<span class="mail-admin-avatar tone-' + identity.tone + '" aria-hidden="true">' + escape(identity.initial) + '</span>' +
             '<span class="mail-admin-identity-copy"><strong class="mail-admin-identity-name">' + escape(identity.name) + '</strong>' +
             (identity.email ? '<span class="mail-admin-identity-email">' + escape(identity.email) + '</span>' : '') + '</span></div>';
+    }
+
+    function recipientIdentityHtml(value, fallback) {
+        const identity = parseMailboxIdentity(value || fallback || '');
+        const email = identity.email || firstEmail(value);
+        const localInitial = email ? (email.split('@')[0][0] || '?').toUpperCase() : identity.initial;
+        const tier = email ? (state.mailboxTiers.get(email.toLowerCase()) || (state.vipEmails.has(email.toLowerCase()) ? 'vip' : 'normal')) : 'normal';
+        const tierHtml = tier !== 'normal' ? '<span class="mail-admin-mailbox-tier tier-' + tier + '">' + tier.toUpperCase() + '</span>' : '';
+        return '<div class="mail-admin-identity mail-admin-recipient-identity" data-admin-recipient-email="' + escape(email) + '" title="Right-click to change mailbox access">' +
+            '<span class="mail-admin-recipient-avatar tone-' + identity.tone + '" aria-hidden="true">' + escape(localInitial) + '</span>' +
+            '<span class="mail-admin-identity-copy"><strong class="mail-admin-recipient-name">' + escape(identity.name) + '</strong>' +
+            (email ? '<span class="mail-admin-recipient-email">' + escape(email) + '</span>' : '') + tierHtml + '</span></div>';
     }
 
     function formatBytes(value) {
@@ -281,6 +301,8 @@
         state.stats = response.stats || state.stats;
         state.customFolders = Array.isArray(response.folders) ? response.folders : state.customFolders;
         state.vipEmails = new Set((response.vip || []).map((item) => String(item.email || '').toLowerCase()).filter(Boolean));
+        state.mailboxTiers = new Map((response.mailboxTiers || []).map((item) => [String(item.email || '').toLowerCase(), String(item.tier || 'normal').toLowerCase()]).filter((item) => item[0]));
+        state.vipEmails.forEach((email) => state.mailboxTiers.set(email, 'vip'));
         renderStats();
         renderFolders();
         return response;
@@ -380,10 +402,9 @@
                 return '<tr class="' + (!doc.read ? 'is-unread ' : '') + (selected ? 'is-selected' : '') + '" data-admin-row="' + escape(doc.guid) + '">' +
                     '<td class="select-col"><input type="checkbox" data-admin-select="' + escape(doc.guid) + '" ' + (selected ? 'checked' : '') + ' aria-label="Select message"></td>' +
                     '<td class="star-col"><button type="button" class="mail-admin-star' + (doc.favorite ? ' is-active' : '') + '" data-admin-action="toggle-favorite" data-guid="' + escape(doc.guid) + '" aria-label="Toggle favorite">' + svg('star') + '</button></td>' +
-                    '<td data-admin-col="from"><div class="mail-admin-from-cell">' + senderIdentityHtml(doc.from, 'Unknown sender') + '<div class="mail-admin-cell-secondary">' + rowStatus(doc) + (vip ? '<span class="mail-admin-badge vip">VIP</span>' : '') + '</div></div></td>' +
-                    '<td data-admin-col="to"><div class="mail-admin-recipient">' + senderIdentityHtml(doc.to, '—') + '</div><div class="mail-admin-cell-secondary">' + (doc.cc ? 'Cc: ' + escape(doc.cc) : '') + '</div></td>' +
+                    '<td data-admin-col="from"><div class="mail-admin-from-cell">' + senderIdentityHtml(doc.from, 'Unknown sender') + '<div class="mail-admin-sender-meta"><div class="mail-admin-cell-secondary">' + rowStatus(doc) + (vip ? '<span class="mail-admin-badge vip">VIP</span>' : '') + '</div><span class="mail-admin-folder-chip">' + escape(doc.folder || 'inbox') + '</span></div></div></td>' +
+                    '<td data-admin-col="to"><div class="mail-admin-recipient">' + recipientIdentityHtml(doc.to, '—') + '</div><div class="mail-admin-cell-secondary">' + (doc.cc ? 'Cc: ' + escape(doc.cc) : '') + '</div></td>' +
                     '<td data-admin-col="subject"><button type="button" class="mail-admin-subject" data-admin-action="open-message" data-guid="' + escape(doc.guid) + '">' + escape(doc.subject || '(No subject)') + '</button><div class="mail-admin-cell-secondary">' + (attachments ? '<span class="mail-admin-attachment-chip">' + svg('paperclip') + attachments + '</span>' : '') + '</div></td>' +
-                    '<td data-admin-col="folder"><span class="mail-admin-folder-chip">' + escape(doc.folder || 'inbox') + '</span></td>' +
                     '<td data-admin-col="date"><div class="mail-admin-date">' + escape(relativeTime(doc.date) || dateTime(doc.date)) + '</div><small>' + escape(dateTime(doc.date)) + '</small></td>' +
                     '<td class="action-col"><div class="mail-admin-row-actions"><button type="button" data-admin-action="open-message" data-guid="' + escape(doc.guid) + '" title="Open message">' + svg('view') + '</button><a href="/api/emails/eml?guid=' + encodeURIComponent(doc.guid) + '" download title="Download EML"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"></path></svg></a><button type="button" data-admin-action="delete-one" data-guid="' + escape(doc.guid) + '" class="danger" title="Delete message">' + svg('trash') + '</button></div></td>' +
                     '</tr>';
@@ -1549,10 +1570,12 @@
 
     let contextMenu = null;
     let contextMenuGuid = '';
+    let contextMailboxEmail = '';
 
     function closeContextMenu() {
         if (contextMenu) contextMenu.hidden = true;
         contextMenuGuid = '';
+        contextMailboxEmail = '';
     }
 
     function contextMenuIcon(name) {
@@ -1576,6 +1599,52 @@
         contextMenu.setAttribute('role', 'menu');
         document.body.appendChild(contextMenu);
         return contextMenu;
+    }
+
+    function renderMailboxContextMenu(email) {
+        const menu = ensureContextMenu();
+        const normalized = String(email || '').toLowerCase();
+        const currentTier = state.mailboxTiers.get(normalized) || (state.vipEmails.has(normalized) ? 'vip' : 'normal');
+        const mark = (tier) => currentTier === tier ? '<span class="mail-admin-context-current">✓</span>' : '<span class="mail-admin-context-current"></span>';
+        menu.innerHTML =
+            '<div class="mail-admin-context-title"><strong>' + escape(email) + '</strong><span>Mailbox access</span></div>' +
+            '<button type="button" data-admin-mailbox-tier="vip">' + mark('vip') + '<span>Set VIP</span><em>Protected</em></button>' +
+            '<button type="button" data-admin-mailbox-tier="pro">' + mark('pro') + '<span>Set Pro</span><em>Pro access</em></button>' +
+            '<div class="mail-admin-context-separator"></div>' +
+            '<button type="button" data-admin-mailbox-tier="normal">' + mark('normal') + '<span>Set Normal</span><em>Remove VIP / Pro</em></button>';
+        return menu;
+    }
+
+    function openMailboxContextMenu(event, email) {
+        const normalized = String(email || '').trim().toLowerCase();
+        if (!normalized) return;
+        event.preventDefault();
+        event.stopPropagation();
+        contextMenuGuid = '';
+        contextMailboxEmail = normalized;
+        const menu = renderMailboxContextMenu(normalized);
+        menu.hidden = false;
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+        const rect = menu.getBoundingClientRect();
+        const gap = 8;
+        menu.style.left = Math.max(gap, Math.min(event.clientX, window.innerWidth - rect.width - gap)) + 'px';
+        menu.style.top = Math.max(gap, Math.min(event.clientY, window.innerHeight - rect.height - gap)) + 'px';
+    }
+
+    async function setMailboxTier(tier) {
+        const email = contextMailboxEmail;
+        if (!email) return closeContextMenu();
+        const normalizedTier = String(tier || 'normal').toLowerCase();
+        closeContextMenu();
+        const response = await post('/api/emails/admin/mailbox-tier', { email, tier: normalizedTier });
+        state.mailboxTiers.set(email, normalizedTier);
+        if (normalizedTier === 'vip') state.vipEmails.add(email);
+        else state.vipEmails.delete(email);
+        if (normalizedTier === 'normal') state.mailboxTiers.delete(email);
+        renderRows();
+        toast(email + ' is now ' + normalizedTier.toUpperCase() + '.', 'success', 'Mailbox access updated', { duration: 1700 });
+        return response;
     }
 
     function renderContextMenu(doc) {
@@ -1830,12 +1899,20 @@
     });
 
     document.addEventListener('contextmenu', function (event) {
+        const recipient = event.target.closest('[data-admin-recipient-email]');
+        if (recipient && recipient.dataset.adminRecipientEmail) return openMailboxContextMenu(event, recipient.dataset.adminRecipientEmail);
         const row = event.target.closest('[data-admin-row]');
         if (!row) return;
         openContextMenu(event, row);
     });
 
     document.addEventListener('click', function (event) {
+        const mailboxTier = event.target.closest('[data-admin-mailbox-tier]');
+        if (mailboxTier) {
+            event.preventDefault();
+            event.stopPropagation();
+            return setMailboxTier(mailboxTier.dataset.adminMailboxTier).catch((error) => toast(error.message || 'Unable to update mailbox access.', 'error', 'Mailbox update failed'));
+        }
         const folder = event.target.closest('[data-admin-context-folder]');
         if (folder) {
             event.preventDefault();

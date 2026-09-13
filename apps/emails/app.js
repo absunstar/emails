@@ -967,6 +967,7 @@ module.exports = function init(site) {
                 browserID: browserRequestID(req),
                 stats,
                 vip: service.listVip(),
+                mailboxTiers: service.listMailboxTiers(),
                 folders: service.listAdminFolders(),
                 storage: 'json-files-only',
             });
@@ -1160,6 +1161,24 @@ module.exports = function init(site) {
             if (!from) return res.json({ done: false, error: 'A valid From address is required' });
             const result = await service.forward({ guid: String(data.guid), from, to: data.to, text: data.text || '', html: data.html || '' }, adminGlobalContext());
             res.json({ done: true, result });
+        } catch (error) {
+            res.json({ done: false, error: error?.message || String(error) });
+        }
+    });
+
+    onPost('/api/emails/admin/mailbox-tier', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data = body(req);
+        const email = normalizeEmail(data.email || '');
+        const tier = String(data.tier || 'normal').trim().toLowerCase();
+        if (!email) return res.json({ done: false, error: 'Email address is required' });
+        if (!['normal', 'pro', 'vip'].includes(tier)) return res.json({ done: false, error: 'Invalid mailbox tier' });
+        try {
+            const result = await service.setMailboxTier(email, tier, 'admin-dashboard');
+            // VIP tier remains the authoritative protection switch. Pro is an access label only.
+            if (tier === 'vip') await service.setVip({ email, vip: true, source: 'admin-dashboard-tier' });
+            else if (service.isVipAddress(email)) await service.removeVip(email);
+            res.json({ done: true, tier, result });
         } catch (error) {
             res.json({ done: false, error: error?.message || String(error) });
         }

@@ -1,0 +1,18 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const root = path.join(__dirname, '..');
+const js = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/admin.js'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/index.html'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'site_files/css/zero-ui.css'), 'utf8');
+const store = fs.readFileSync(path.join(root, 'apps/emails/core/json-store.js'), 'utf8');
+const app = fs.readFileSync(path.join(root, 'apps/emails/app.js'), 'utf8');
+assert(!html.includes('data-admin-col="folder"'), 'Folder must not have a standalone table column');
+assert(js.includes('mail-admin-sender-meta') && js.includes('mail-admin-folder-chip'), 'Folder must render under sender');
+assert(js.includes('domainLabel') && js.includes('commonSecondLevel'), 'Sender avatar must derive from sender domain');
+assert(js.includes('mail-admin-recipient-avatar') && js.includes('mail-admin-recipient-email'), 'Recipient must use a distinct visual identity');
+assert(css.includes('-webkit-line-clamp:2') && css.includes('color:#f8c86a'), 'Subject must be max two lines with distinct color');
+assert(js.includes('data-admin-mailbox-tier="vip"') && js.includes('data-admin-mailbox-tier="pro"') && js.includes('data-admin-mailbox-tier="normal"'), 'Recipient context menu must support VIP, Pro and Normal');
+assert(app.includes('/api/emails/admin/mailbox-tier'), 'Mailbox tier endpoint must exist');
+assert(store.includes('mailbox-tier-list.json'), 'Mailbox tier state must be persistent');
+console.log('admin-message-layout-tier: PASS');

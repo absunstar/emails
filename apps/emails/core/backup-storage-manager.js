@@ -567,6 +567,31 @@ class EmailBackupStorageManager {
         }
     }
 
+    _messageIndexStorageStats() {
+        const store = this.emailService?.store;
+        const status = store?.messageIndexStatus?.() || {};
+        let bytes = Math.max(0, Number(status.snapshotBytes || 0)) + Math.max(0, Number(status.journalBytes || 0));
+        let files = (status.snapshotBytes ? 1 : 0) + Math.max(0, Number(status.journalEntries || 0));
+        for (const filePath of [store?.metaPath, store?.adminFoldersPath, store?.messageIndexDirtyPath]) {
+            if (!filePath) continue;
+            try {
+                const stat = fs.statSync(filePath);
+                if (!stat.isFile()) continue;
+                bytes += stat.size;
+                files += 1;
+            } catch (_) {}
+        }
+        return {
+            bytes,
+            files,
+            snapshotBytes: Math.max(0, Number(status.snapshotBytes || 0)),
+            journalBytes: Math.max(0, Number(status.journalBytes || 0)),
+            journalEntries: Math.max(0, Number(status.journalEntries || 0)),
+            loadMode: String(status.loadMode || 'unknown'),
+            dirty: status.dirty === true,
+        };
+    }
+
     _storageCategoryPaths() {
         return {
             messages: path.join(this.rootDir, 'email-files', 'messages'),
@@ -676,6 +701,7 @@ class EmailBackupStorageManager {
         const categories = {};
         for (const [name, dir] of Object.entries(this._storageCategoryPaths())) categories[name] = directoryStats(dir);
         categories.backups = this._backupStorageStats();
+        categories.messageIndex = this._messageIndexStorageStats();
         return this._finalizeStorageReport(categories);
     }
 
@@ -689,6 +715,7 @@ class EmailBackupStorageManager {
         const resolved = await Promise.all(entries.map(async ([name, dir]) => [name, await directoryStatsAsync(dir, 32)]));
         const categories = Object.fromEntries(resolved);
         categories.backups = this._backupStorageStats();
+        categories.messageIndex = this._messageIndexStorageStats();
         return this._finalizeStorageReport(categories);
     }
 

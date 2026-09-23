@@ -35,6 +35,8 @@ async function main() {
         const report = manager.storageReport();
         assert.ok(report.managedBytes > 0);
         assert.ok(report.categories.messages.files >= 3);
+        assert.ok(report.categories.messageIndex.bytes > 0);
+        assert.ok(report.categories.messageIndex.files >= 2);
         assert.ok(report.domains['example.com'].messages >= 2);
         const asyncReport = await manager.storageReportAsync({ force: true });
         assert.ok(asyncReport.managedBytes > 0);

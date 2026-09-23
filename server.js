@@ -170,7 +170,27 @@ function remoteIp(session) {
     return String(session?.remoteAddress || '').trim();
 }
 
+function loadInboundSmtpTls() {
+    const keyPath = String(process.env.EMAIL_SMTP_TLS_KEY_PATH || '').trim();
+    const certPath = String(process.env.EMAIL_SMTP_TLS_CERT_PATH || '').trim();
+    if (!keyPath && !certPath) return {};
+    if (!keyPath || !certPath) throw new Error('Both EMAIL_SMTP_TLS_KEY_PATH and EMAIL_SMTP_TLS_CERT_PATH are required');
+    for (const [label, filePath] of [['key', keyPath], ['certificate', certPath]]) {
+        if (!fs.existsSync(filePath)) throw new Error('SMTP TLS ' + label + ' file not found: ' + filePath);
+        fs.accessSync(filePath, fs.constants.R_OK);
+    }
+    return {
+        key: fs.readFileSync(keyPath),
+        cert: fs.readFileSync(certPath),
+        minVersion: 'TLSv1.2',
+    };
+}
+
+const inboundSmtpTls = loadInboundSmtpTls();
+
 const smtpServer = new SMTPServer({
+    ...inboundSmtpTls,
+    name: String(process.env.SMTP_HOSTNAME || 'emails.egytag.com').trim(),
     onAuth(auth, session, callback) {
         callback(null, { user: auth.username });
     },

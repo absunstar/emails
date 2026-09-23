@@ -184,7 +184,11 @@ function createEmailService(options) {
         const matches = [];
         const bodySearch = !!(args.text || args.html || args.query || args.search);
         const metadataArgs = bodySearch ? Object.assign({}, args, { text: undefined, html: undefined, query: undefined, search: undefined }) : args;
-        for (const meta of store.messageValues()) {
+        const exactRecipient = args.toExact ? normalizeEmail(args.toExact) : '';
+        const source = exactRecipient && typeof store.messageValuesForRecipient === 'function'
+            ? store.messageValuesForRecipient(exactRecipient)
+            : store.messageValues();
+        for (const meta of source) {
             if (domain && !messageBelongsToDomain(meta, domain)) continue;
             if (!matchesSearch(meta, metadataArgs)) continue;
             if (bodySearch) {
@@ -436,15 +440,16 @@ function createEmailService(options) {
         async mailboxStatuses(addresses, context) {
             context = context || {};
             const normalized = Array.from(new Set(normalizeAddressList(addresses))).slice(0, Math.max(1, Math.min(Number(context.maxAddresses || 100), 100)));
-            const wanted = new Set(normalized);
             const map = new Map(normalized.map((email) => [email, { email, count: 0, protected: false, latest: null }]));
-            for (const doc of store.messageValues()) {
-                const recipients = normalizeAddressList([doc.to, doc.cc]).filter((email) => wanted.has(email));
-                if (!recipients.length) continue;
-                const protectedMessage = isVipMessage(doc) && !context.allowVip;
-                for (const email of recipients) {
-                    const item = map.get(email);
-                    if (!item) continue;
+            for (const email of normalized) {
+                const item = map.get(email);
+                if (!item) continue;
+                const source = typeof store.messageValuesForRecipient === 'function'
+                    ? store.messageValuesForRecipient(email)
+                    : store.messageValues();
+                for (const doc of source) {
+                    if (typeof store.messageValuesForRecipient !== 'function' && !normalizeAddressList([doc.to, doc.cc]).includes(email)) continue;
+                    const protectedMessage = isVipMessage(doc) && !context.allowVip;
                     if (protectedMessage) {
                         item.protected = true;
                         continue;

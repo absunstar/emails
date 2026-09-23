@@ -71,7 +71,9 @@ function verifySignedMessage(raw, publicKey) {
         signingData += relaxedHeaderCanonicalize(parsed.headers[picked].name, parsed.headers[picked].value);
     }
     const emptyB = unfolded.replace(/((?:^|;\s*)b=)[^;]*/i, '$1');
-    signingData += relaxedHeaderCanonicalize('DKIM-Signature', emptyB);
+    // Nodemailer signs the canonicalized DKIM-Signature field through the empty
+    // b= tag without appending a trailing CRLF after that final field.
+    signingData += relaxedHeaderCanonicalize('DKIM-Signature', emptyB).replace(/\r\n$/, '');
     const verifier = crypto.createVerify('RSA-SHA256');
     verifier.update(signingData, 'utf8');
     verifier.end();

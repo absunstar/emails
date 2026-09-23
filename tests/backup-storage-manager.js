@@ -36,6 +36,11 @@ async function main() {
         assert.ok(report.managedBytes > 0);
         assert.ok(report.categories.messages.files >= 3);
         assert.ok(report.domains['example.com'].messages >= 2);
+        const asyncReport = await manager.storageReportAsync({ force: true });
+        assert.ok(asyncReport.managedBytes > 0);
+        assert.ok(asyncReport.categories.messages.files >= 3);
+        const quickReport = manager.quickStorageReport();
+        assert.equal(quickReport.managedBytes, asyncReport.managedBytes);
 
         const created = await manager.createBackup({ reason: 'test-backup' });
         assert.equal(created.validation.valid, true);

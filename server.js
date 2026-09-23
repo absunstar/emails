@@ -333,14 +333,26 @@ const smtpServer = new SMTPServer({
 
 smtpServer.on('error', (err) => {
     console.error('SMTP Error %s', err.message);
-    site.emailRuntimeMonitor.component('smtp', 'error', { error: err.message });
-    site.emailRuntimeMonitor.error('smtp', err);
+    const listening = smtpServer.server?.listening === true;
+    // smtp-server can emit connection/TLS errors while the listening socket is
+    // completely healthy. Do not turn a client-session failure into a permanent
+    // service-down health state.
+    site.emailRuntimeMonitor.component('smtp', listening ? 'listening' : 'error', {
+        address: listening ? (smtpServer.server?.address?.() || null) : null,
+        lastError: err.message,
+    });
+    site.emailRuntimeMonitor.error('smtp', err, { listening });
 });
 smtpServer.on('listening', () => {
     const address = smtpServer.server?.address?.() || null;
     site.emailRuntimeMonitor.component('smtp', 'listening', { address });
 });
-smtpServer.listen(Number(process.env.EMAIL_SMTP_PORT || 25), process.env.EMAIL_SMTP_HOST || undefined);
+smtpServer.listen(Number(process.env.EMAIL_SMTP_PORT || 25), process.env.EMAIL_SMTP_HOST || undefined, () => {
+    // smtp-server does not consistently re-emit the underlying net.Server
+    // "listening" event across versions. The listen callback is authoritative.
+    const address = smtpServer.server?.address?.() || null;
+    site.emailRuntimeMonitor.component('smtp', 'listening', { address });
+});
 
 const mcpSecret = String(process.env.EMAIL_MCP_SECRET || '').trim();
 site.emailScheduler = site.emailScheduler || createEmailScheduler({

@@ -54,6 +54,16 @@ function walkJsonFiles(dir, out) {
     return out;
 }
 
+function recipientAddresses(values) {
+    const source = Array.isArray(values) ? values : [values];
+    const result = new Set();
+    for (const value of source) {
+        const matches = String(value || '').match(/[A-Z0-9._%+-]+@(?:[A-Z0-9.-]+\.[A-Z]{2,}|localhost)/gi) || [];
+        for (const email of matches) result.add(String(email).toLowerCase());
+    }
+    return Array.from(result);
+}
+
 function idLike(leftValue, rightValue) {
     const left = String(leftValue ?? '').trim();
     const right = String(rightValue ?? '').trim();
@@ -126,6 +136,9 @@ class EmailFileStore {
         // ids after migrations/imports or multi-domain consolidation, so a single
         // id must be allowed to resolve to more than one stored message.
         this.messagesById = new Map();
+        // recipient -> Map<guid, metadata>. This keeps mailbox reads bounded to
+        // the selected inbox instead of scanning every stored message.
+        this.messagesByRecipient = new Map();
         this.vipEntries = [];
         this.mailboxTierEntries = [];
         this.adminFolders = [];
@@ -177,6 +190,30 @@ class EmailFileStore {
         if (!bucket.size) this.messagesById.delete(id);
     }
 
+    _indexMessageRecipients(doc) {
+        if (!doc || !doc.guid) return;
+        const guid = String(doc.guid);
+        for (const email of recipientAddresses([doc.to, doc.cc])) {
+            let bucket = this.messagesByRecipient.get(email);
+            if (!(bucket instanceof Map)) {
+                bucket = new Map();
+                this.messagesByRecipient.set(email, bucket);
+            }
+            bucket.set(guid, doc);
+        }
+    }
+
+    _unindexMessageRecipients(doc) {
+        if (!doc || !doc.guid) return;
+        const guid = String(doc.guid);
+        for (const email of recipientAddresses([doc.to, doc.cc])) {
+            const bucket = this.messagesByRecipient.get(email);
+            if (!(bucket instanceof Map)) continue;
+            bucket.delete(guid);
+            if (!bucket.size) this.messagesByRecipient.delete(email);
+        }
+    }
+
     _messagePath(guid) {
         const key = hash(guid);
         return path.join(this.messagesDir, key.slice(0, 2), key + '.json');
@@ -199,6 +236,7 @@ class EmailFileStore {
     _loadMessages() {
         this.messages.clear();
         this.messagesById.clear();
+        this.messagesByRecipient.clear();
         let maxId = 0;
         const files = walkJsonFiles(this.messagesDir, []);
         for (const filePath of files) {
@@ -207,6 +245,7 @@ class EmailFileStore {
                 if (!doc || !doc.guid) continue;
                 const metaDoc = messageMetadata(doc);
                 this.messages.set(String(doc.guid), metaDoc);
+                this._indexMessageRecipients(metaDoc);
                 const id = Number(doc.id || 0);
                 if (Number.isFinite(id) && id > 0) {
                     this._indexMessageById(metaDoc);
@@ -240,6 +279,18 @@ class EmailFileStore {
 
     messageValues() {
         return this.messages.values();
+    }
+
+    messageValuesForRecipient(value) {
+        const email = recipientAddresses(value)[0] || '';
+        const bucket = email ? this.messagesByRecipient.get(email) : null;
+        return bucket instanceof Map ? bucket.values() : [][Symbol.iterator]();
+    }
+
+    recipientIndexStats() {
+        let references = 0;
+        for (const bucket of this.messagesByRecipient.values()) references += bucket.size;
+        return { recipients: this.messagesByRecipient.size, references };
     }
 
     listAdminFolders() {
@@ -305,8 +356,12 @@ class EmailFileStore {
             atomicWriteJson(this._messagePath(key), copy);
             const metaDoc = messageMetadata(copy);
             this.messages.set(key, metaDoc);
-            if (previous) this._unindexMessageById(previous);
+            if (previous) {
+                this._unindexMessageById(previous);
+                this._unindexMessageRecipients(previous);
+            }
             this._indexMessageById(metaDoc);
+            this._indexMessageRecipients(metaDoc);
             const cleanup = await this._cleanupUnlocked();
             this._syncMeta(cleanup.deleted.length ? { lastCleanupAt: now, lastCleanupDeleted: cleanup.deleted.length } : {});
             return { message: clone(copy), cleanup };
@@ -415,7 +470,9 @@ class EmailFileStore {
             const nextMeta = messageMetadata(next);
             this.messages.set(key, nextMeta);
             this._unindexMessageById(previousMeta);
+            this._unindexMessageRecipients(previousMeta);
             this._indexMessageById(nextMeta);
+            this._indexMessageRecipients(nextMeta);
             this._syncMeta();
             return clone(next);
         });
@@ -433,6 +490,7 @@ class EmailFileStore {
         try { fs.rmSync(this._attachmentDir(key), { recursive: true, force: true }); } catch (_) {}
         this.messages.delete(key);
         this._unindexMessageById(existing);
+        this._unindexMessageRecipients(existing);
         if (syncMeta) this._syncMeta();
         return { deleted: true, guid: key, message: clone(existing) };
     }

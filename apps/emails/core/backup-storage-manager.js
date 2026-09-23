@@ -77,12 +77,57 @@ function walkFiles(root, out) {
 
 function directoryStats(root) {
     const result = { bytes: 0, files: 0 };
-    for (const filePath of walkFiles(root, [])) {
-        try {
-            const stat = fs.statSync(filePath);
-            result.bytes += stat.size;
-            result.files += 1;
-        } catch (_) {}
+    if (!fs.existsSync(root)) return result;
+    const stack = [root];
+    while (stack.length) {
+        const current = stack.pop();
+        let entries = [];
+        try { entries = fs.readdirSync(current, { withFileTypes: true }); } catch (_) { continue; }
+        for (const entry of entries) {
+            const full = path.join(current, entry.name);
+            if (entry.isDirectory()) {
+                stack.push(full);
+                continue;
+            }
+            if (!entry.isFile()) continue;
+            try {
+                const stat = fs.statSync(full);
+                result.bytes += stat.size;
+                result.files += 1;
+            } catch (_) {}
+        }
+    }
+    return result;
+}
+
+async function directoryStatsAsync(root, concurrency) {
+    const result = { bytes: 0, files: 0 };
+    if (!fs.existsSync(root)) return result;
+    const batchSize = Math.max(4, Math.min(Number(concurrency || 32), 128));
+    const stack = [root];
+    while (stack.length) {
+        const current = stack.pop();
+        let entries = [];
+        try { entries = await fs.promises.readdir(current, { withFileTypes: true }); } catch (_) { continue; }
+        const files = [];
+        for (const entry of entries) {
+            const full = path.join(current, entry.name);
+            if (entry.isDirectory()) stack.push(full);
+            else if (entry.isFile()) files.push(full);
+        }
+        for (let offset = 0; offset < files.length; offset += batchSize) {
+            const batch = files.slice(offset, offset + batchSize);
+            const stats = await Promise.all(batch.map(async (filePath) => {
+                try { return await fs.promises.stat(filePath); } catch (_) { return null; }
+            }));
+            for (const stat of stats) {
+                if (!stat) continue;
+                result.bytes += stat.size;
+                result.files += 1;
+            }
+            // Yield between batches even when the filesystem resolves from cache.
+            await new Promise((resolve) => setImmediate(resolve));
+        }
     }
     return result;
 }
@@ -163,6 +208,7 @@ class EmailBackupStorageManager {
         this.configPath = path.join(this.controlDir, 'config.json');
         this.statePath = path.join(this.controlDir, 'state.json');
         this.historyPath = path.join(this.controlDir, 'history.json');
+        this.reportPath = path.join(this.controlDir, 'report.json');
         this.logger = typeof options.logger === 'function' ? options.logger : () => {};
         this.alertWebhook = String(options.alertWebhook || process.env.EMAIL_OPS_ALERT_WEBHOOK || '').trim();
         ensureDir(this.rootDir);
@@ -185,8 +231,8 @@ class EmailBackupStorageManager {
         this.history = Array.isArray(readJson(this.historyPath, [])) ? readJson(this.historyPath, []).slice(-576) : [];
         this.timer = null;
         this.running = false;
-        this._lastStorageReport = null;
-        this._lastStorageReportAt = 0;
+        this._lastStorageReport = readJson(this.reportPath, null);
+        this._lastStorageReportAt = Date.parse(this._lastStorageReport?.timestamp || 0) || 0;
         this._persistConfig();
         this._persistState();
     }
@@ -307,6 +353,15 @@ class EmailBackupStorageManager {
                 files,
             };
             atomicWriteJson(path.join(staging, 'manifest.json'), manifest);
+            atomicWriteJson(path.join(staging, 'summary.json'), {
+                format: 'social-browser-email-backup-summary-v1',
+                id: manifest.id,
+                createdAt: manifest.createdAt,
+                reason: manifest.reason || '',
+                label: manifest.label || '',
+                fileCount: Number(manifest.fileCount || 0),
+                totalBytes: Number(manifest.totalBytes || 0),
+            });
             fs.renameSync(staging, finalDir);
             this.state.lastBackupAt = createdAt;
             this.state.lastBackupId = id;
@@ -347,11 +402,43 @@ class EmailBackupStorageManager {
         for (const entry of fs.readdirSync(this.backupDir, { withFileTypes: true })) {
             if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
             const dir = path.join(this.backupDir, entry.name);
-            const manifest = readJson(path.join(dir, 'manifest.json'), null);
-            if (manifest && manifest.id) items.push(this._backupSummary(manifest, dir));
+            // Backup manifests contain one record for every copied file and can be
+            // tens of MB each. Never parse those manifests merely to render a
+            // backup list or storage report.
+            let summary = readJson(path.join(dir, 'summary.json'), null);
+            if (!summary || !summary.id) {
+                // Backward-compatible fallback for an older backup that does not
+                // have a sidecar yet. It is intentionally used only as recovery.
+                const manifest = readJson(path.join(dir, 'manifest.json'), null);
+                if (manifest && manifest.id) {
+                    summary = this._backupSummary(manifest, dir);
+                    try {
+                        atomicWriteJson(path.join(dir, 'summary.json'), {
+                            format: 'social-browser-email-backup-summary-v1',
+                            id: summary.id,
+                            createdAt: summary.createdAt,
+                            reason: summary.reason || '',
+                            label: summary.label || '',
+                            fileCount: Number(summary.fileCount || 0),
+                            totalBytes: Number(summary.totalBytes || 0),
+                        });
+                    } catch (_) {}
+                }
+            }
+            if (summary && summary.id) items.push(this._backupSummary(summary, dir));
         }
         items.sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
         return { count: items.length, backups: items };
+    }
+
+    _backupStorageStats() {
+        const backups = this.listBackups().backups;
+        return {
+            bytes: backups.reduce((sum, item) => sum + Math.max(0, Number(item.totalBytes || 0)), 0),
+            files: backups.reduce((sum, item) => sum + Math.max(0, Number(item.fileCount || 0)), 0),
+            count: backups.length,
+            source: 'manifest-summary',
+        };
     }
 
     async validateBackup(id) {
@@ -476,11 +563,8 @@ class EmailBackupStorageManager {
         }
     }
 
-    storageReport(options) {
-        options = options || {};
-        if (options.force !== true && this._lastStorageReport && Date.now() - this._lastStorageReportAt < 30000) return clone(this._lastStorageReport);
-        const categories = {};
-        const categoryPaths = {
+    _storageCategoryPaths() {
+        return {
             messages: path.join(this.rootDir, 'email-files', 'messages'),
             attachments: path.join(this.rootDir, 'email-files', 'attachments'),
             tracking: path.join(this.rootDir, 'email-files', 'tracking'),
@@ -488,19 +572,30 @@ class EmailBackupStorageManager {
             schedules: path.join(this.rootDir, 'email-schedules'),
             deliverability: path.join(this.rootDir, 'email-deliverability'),
             unsubscribe: path.join(this.rootDir, 'email-unsubscribe'),
-            backups: this.backupDir,
             operations: this.controlDir,
         };
+    }
+
+    _storageLevel(managedBytes, disk) {
+        const maxBytes = Math.max(1, Number(this.config.storage.maxBytes || DEFAULT_CONFIG.storage.maxBytes));
+        const quotaPercent = Number(managedBytes || 0) / maxBytes * 100;
+        let level = 'healthy';
+        if (quotaPercent >= this.config.storage.hardStopPercent || (disk && disk.freeBytes <= this.config.storage.minFreeBytes / 2)) level = 'blocked';
+        else if (quotaPercent >= this.config.storage.emergencyPercent || (disk && disk.freeBytes <= this.config.storage.minFreeBytes)) level = 'emergency';
+        else if (quotaPercent >= this.config.storage.criticalPercent) level = 'critical';
+        else if (quotaPercent >= this.config.storage.warningPercent) level = 'warning';
+        return { maxBytes, quotaPercent: Math.round(quotaPercent * 100) / 100, level };
+    }
+
+    _finalizeStorageReport(categories) {
         let managedBytes = 0;
         let managedFiles = 0;
-        for (const [name, dir] of Object.entries(categoryPaths)) {
-            const stats = directoryStats(dir);
-            categories[name] = stats;
-            if (name !== 'backups') {
-                managedBytes += stats.bytes;
-                managedFiles += stats.files;
-            }
+        for (const [name, stats] of Object.entries(categories || {})) {
+            if (name === 'backups') continue;
+            managedBytes += Math.max(0, Number(stats?.bytes || 0));
+            managedFiles += Math.max(0, Number(stats?.files || 0));
         }
+
         const domains = {};
         for (const doc of this.emailService.store.messageValues()) {
             const found = emailDomains([doc.to, doc.cc].join(','));
@@ -513,20 +608,15 @@ class EmailBackupStorageManager {
                 domains[domain].attachmentBytes += attachmentBytes;
             }
         }
-        const maxBytes = Math.max(1, Number(this.config.storage.maxBytes || DEFAULT_CONFIG.storage.maxBytes));
-        const quotaPercent = managedBytes / maxBytes * 100;
+
         const disk = this._diskInfo();
-        let level = 'healthy';
-        if (quotaPercent >= this.config.storage.hardStopPercent || (disk && disk.freeBytes <= this.config.storage.minFreeBytes / 2)) level = 'blocked';
-        else if (quotaPercent >= this.config.storage.emergencyPercent || (disk && disk.freeBytes <= this.config.storage.minFreeBytes)) level = 'emergency';
-        else if (quotaPercent >= this.config.storage.criticalPercent) level = 'critical';
-        else if (quotaPercent >= this.config.storage.warningPercent) level = 'warning';
+        const levelInfo = this._storageLevel(managedBytes, disk);
         const report = {
-            level,
+            level: levelInfo.level,
             managedBytes,
             managedFiles,
-            maxBytes,
-            quotaPercent: Math.round(quotaPercent * 100) / 100,
+            maxBytes: levelInfo.maxBytes,
+            quotaPercent: levelInfo.quotaPercent,
             disk,
             categories,
             domains,
@@ -536,7 +626,66 @@ class EmailBackupStorageManager {
         };
         this._lastStorageReport = clone(report);
         this._lastStorageReportAt = Date.now();
+        try { atomicWriteJson(this.reportPath, report); } catch (_) {}
         return report;
+    }
+
+    quickStorageReport() {
+        let report = this._lastStorageReport ? clone(this._lastStorageReport) : null;
+        if (!report) {
+            const sample = this.history.length ? this.history[this.history.length - 1] : null;
+            const managedBytes = Math.max(0, Number(sample?.managedBytes || 0));
+            const disk = this._diskInfo();
+            const levelInfo = this._storageLevel(managedBytes, disk);
+            report = {
+                level: levelInfo.level,
+                managedBytes,
+                managedFiles: 0,
+                maxBytes: levelInfo.maxBytes,
+                quotaPercent: levelInfo.quotaPercent,
+                disk,
+                categories: { backups: this._backupStorageStats() },
+                domains: {},
+                writeBlocked: this.state.writeBlocked === true,
+                config: clone(this.config.storage),
+                approximate: true,
+                timestamp: iso(),
+            };
+            return report;
+        }
+
+        report.disk = this._diskInfo() || report.disk;
+        const levelInfo = this._storageLevel(report.managedBytes, report.disk);
+        report.level = levelInfo.level;
+        report.maxBytes = levelInfo.maxBytes;
+        report.quotaPercent = levelInfo.quotaPercent;
+        report.writeBlocked = this.state.writeBlocked === true;
+        report.timestamp = iso();
+        return report;
+    }
+
+    storageReport(options) {
+        options = options || {};
+        if (options.quick === true) return this.quickStorageReport();
+        const cacheMs = Math.max(60000, Number(this.config.maintenance.intervalMinutes || 15) * 60000);
+        if (options.force !== true && this._lastStorageReport && Date.now() - this._lastStorageReportAt < cacheMs) return clone(this._lastStorageReport);
+        const categories = {};
+        for (const [name, dir] of Object.entries(this._storageCategoryPaths())) categories[name] = directoryStats(dir);
+        categories.backups = this._backupStorageStats();
+        return this._finalizeStorageReport(categories);
+    }
+
+    async storageReportAsync(options) {
+        options = options || {};
+        if (options.quick === true) return this.quickStorageReport();
+        const cacheMs = Math.max(60000, Number(this.config.maintenance.intervalMinutes || 15) * 60000);
+        if (options.force !== true && this._lastStorageReport && Date.now() - this._lastStorageReportAt < cacheMs) return clone(this._lastStorageReport);
+
+        const entries = Object.entries(this._storageCategoryPaths());
+        const resolved = await Promise.all(entries.map(async ([name, dir]) => [name, await directoryStatsAsync(dir, 32)]));
+        const categories = Object.fromEntries(resolved);
+        categories.backups = this._backupStorageStats();
+        return this._finalizeStorageReport(categories);
     }
 
     _oldFiles(root, days) {
@@ -638,7 +787,7 @@ class EmailBackupStorageManager {
             deletedTrackingFiles: deletedTracking,
             schedules,
             backups,
-            report: this.storageReport(),
+            report: await this.storageReportAsync({ force: true }),
         };
     }
 
@@ -670,7 +819,7 @@ class EmailBackupStorageManager {
     }
 
     canAcceptInbound() {
-        const report = this.storageReport();
+        const report = this.quickStorageReport();
         const freshDisk = this._diskInfo();
         if (freshDisk) report.disk = freshDisk;
         const blocked = report.level === 'blocked' || (freshDisk && freshDisk.freeBytes <= Math.max(64 * 1024 * 1024, Number(this.config.storage.minFreeBytes || 0) / 2));
@@ -683,7 +832,7 @@ class EmailBackupStorageManager {
 
     async runMaintenance(args) {
         args = args || {};
-        const reportBefore = this.storageReport({ force: true });
+        const reportBefore = await this.storageReportAsync({ force: true });
         this.state.lastMaintenanceAt = iso();
         let backup = null;
         let cleanup = null;
@@ -706,7 +855,17 @@ class EmailBackupStorageManager {
             try { await this.pruneBackups(); } catch (_) {}
         }
         this._lastStorageReport = null;
-        const reportAfter = this.storageReport({ force: true });
+        let reportAfter;
+        if (cleanup) {
+            reportAfter = await this.storageReportAsync({ force: true });
+        } else {
+            reportAfter = clone(reportBefore);
+            reportAfter.disk = this._diskInfo() || reportAfter.disk;
+            reportAfter.categories = Object.assign({}, reportAfter.categories, { backups: this._backupStorageStats() });
+            reportAfter.timestamp = iso();
+            this._lastStorageReport = clone(reportAfter);
+            this._lastStorageReportAt = Date.now();
+        }
         this.state.writeBlocked = reportAfter.level === 'blocked';
         this._persistState();
         if (['warning', 'critical', 'emergency', 'blocked'].includes(reportAfter.level)) this._alert(reportAfter.level === 'warning' ? 'warning' : 'error', 'storage_' + reportAfter.level, 'Email storage is ' + reportAfter.level, { quotaPercent: reportAfter.quotaPercent, managedBytes: reportAfter.managedBytes, diskFreeBytes: reportAfter.disk?.freeBytes || null });
@@ -770,7 +929,7 @@ class EmailBackupStorageManager {
     }
 
     status() {
-        const report = this.storageReport();
+        const report = this.quickStorageReport();
         const backups = this.listBackups();
         return {
             enabled: this.config.enabled !== false,

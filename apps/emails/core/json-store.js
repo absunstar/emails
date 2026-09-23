@@ -35,6 +35,23 @@ function atomicWriteJson(filePath, value) {
     }
 }
 
+function atomicWriteCompactJson(filePath, value) {
+    ensureDir(path.dirname(filePath));
+    const tmpPath = filePath + '.' + process.pid + '.' + crypto.randomBytes(6).toString('hex') + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(value) + '\n', { encoding: 'utf8', mode: 0o600 });
+    try {
+        fs.renameSync(tmpPath, filePath);
+    } catch (error) {
+        try {
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            fs.renameSync(tmpPath, filePath);
+        } catch (replaceError) {
+            try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
+            throw replaceError;
+        }
+    }
+}
+
 function readJson(filePath, fallback) {
     try {
         if (!fs.existsSync(filePath)) return clone(fallback);
@@ -123,6 +140,15 @@ class EmailFileStore {
         this.trackingDir = path.join(this.baseDir, 'tracking');
         this.auditDir = path.join(this.baseDir, 'audit');
         this.metaPath = path.join(this.baseDir, 'meta.json');
+        this.messageIndexPath = path.join(this.baseDir, 'message-index.json');
+        this.messageIndexJournalDir = path.join(this.baseDir, 'message-index-journal');
+        this.messageIndexDirtyPath = path.join(this.baseDir, 'message-index.dirty.json');
+        this.messageIndexVersion = 1;
+        this.messageIndexSequence = 0;
+        this.messageIndexSnapshotSequence = 0;
+        this.messageIndexJournalEntries = 0;
+        this.messageIndexLoadMode = 'unknown';
+        this.messageIndexLastError = '';
         this.adminFoldersPath = path.join(this.baseDir, 'admin-folders.json');
         this.vipPath = path.resolve(options.vipPath || path.join(process.cwd(), 'localStorage', 'vip-email-list.json'));
         this.mailboxTiersPath = path.resolve(options.mailboxTiersPath || path.join(process.cwd(), 'localStorage', 'mailbox-tier-list.json'));
@@ -148,6 +174,7 @@ class EmailFileStore {
         ensureDir(this.attachmentsDir);
         ensureDir(this.trackingDir);
         ensureDir(this.auditDir);
+        ensureDir(this.messageIndexJournalDir);
         ensureDir(path.dirname(this.vipPath));
         ensureDir(path.dirname(this.mailboxTiersPath));
         const persistedMeta = readJson(this.metaPath, {});
@@ -156,11 +183,15 @@ class EmailFileStore {
             this.maxMessages = Math.floor(persistedLimit);
             this.maxMessagesManaged = true;
         }
-        this._loadMessages();
+        this._loadMessages(persistedMeta);
         this._loadVip();
         this._loadMailboxTiers();
         this._loadAdminFolders();
         this._syncMeta();
+        // A dirty marker is only removed after the metadata/index state has been
+        // durably synchronized. If the process dies earlier, the next startup
+        // intentionally falls back to a full scan.
+        this._clearMessageIndexDirty();
     }
 
 
@@ -214,6 +245,195 @@ class EmailFileStore {
         }
     }
 
+    _applyIndexedMetadata(doc) {
+        const metaDoc = messageMetadata(doc);
+        if (!metaDoc) return null;
+        const key = String(metaDoc.guid);
+        const previous = this.messages.get(key);
+        if (previous) {
+            this._unindexMessageById(previous);
+            this._unindexMessageRecipients(previous);
+        }
+        this.messages.set(key, metaDoc);
+        this._indexMessageById(metaDoc);
+        this._indexMessageRecipients(metaDoc);
+        return metaDoc;
+    }
+
+    _removeIndexedMetadata(guid) {
+        const key = String(guid || '');
+        const existing = this.messages.get(key);
+        if (!existing) return null;
+        this.messages.delete(key);
+        this._unindexMessageById(existing);
+        this._unindexMessageRecipients(existing);
+        return existing;
+    }
+
+    _beginMessageIndexMutation(reason) {
+        atomicWriteJson(this.messageIndexDirtyPath, {
+            format: 'social-browser-email-message-index-dirty-v1',
+            version: this.messageIndexVersion,
+            startedAt: new Date().toISOString(),
+            reason: String(reason || 'message-mutation').slice(0, 160),
+            pid: process.pid,
+            baseSequence: this.messageIndexSequence,
+        });
+    }
+
+    _clearMessageIndexDirty() {
+        try { if (fs.existsSync(this.messageIndexDirtyPath)) fs.unlinkSync(this.messageIndexDirtyPath); } catch (_) {}
+    }
+
+    _appendMessageIndexOperation(operation) {
+        const record = Object.assign({}, operation || {});
+        record.version = this.messageIndexVersion;
+        record.sequence = ++this.messageIndexSequence;
+        record.date = new Date().toISOString();
+        const journalPath = path.join(this.messageIndexJournalDir, String(record.sequence).padStart(16, '0') + '.json');
+        atomicWriteCompactJson(journalPath, record);
+        this.messageIndexJournalEntries += 1;
+        return record.sequence;
+    }
+
+    _writeMessageIndexSnapshot() {
+        const snapshot = {
+            format: 'social-browser-email-message-index-v1',
+            version: this.messageIndexVersion,
+            generatedAt: new Date().toISOString(),
+            sequence: this.messageIndexSequence,
+            messageCount: this.messages.size,
+            nextId: this.nextId || 1,
+            messages: Array.from(this.messages.values()),
+        };
+        atomicWriteCompactJson(this.messageIndexPath, snapshot);
+        // A snapshot with sequence N supersedes all journal records <= N.
+        try { fs.rmSync(this.messageIndexJournalDir, { recursive: true, force: true }); } catch (_) {}
+        ensureDir(this.messageIndexJournalDir);
+        this.messageIndexSnapshotSequence = this.messageIndexSequence;
+        this.messageIndexJournalEntries = 0;
+        return snapshot;
+    }
+
+    _maybeCompactMessageIndex() {
+        if (this.messageIndexJournalEntries >= 5000) this._writeMessageIndexSnapshot();
+    }
+
+    _readMessageIndexSnapshot() {
+        const raw = fs.readFileSync(this.messageIndexPath, 'utf8');
+        const snapshot = JSON.parse(raw);
+        if (!snapshot || snapshot.format !== 'social-browser-email-message-index-v1' || Number(snapshot.version) !== this.messageIndexVersion) {
+            throw new Error('Unsupported message index snapshot format');
+        }
+        if (!Array.isArray(snapshot.messages)) throw new Error('Message index snapshot has no messages array');
+        if (Number(snapshot.messageCount) !== snapshot.messages.length) throw new Error('Message index snapshot count mismatch');
+        return snapshot;
+    }
+
+    _tryLoadMessageIndex(persistedMeta) {
+        if (fs.existsSync(this.messageIndexDirtyPath)) {
+            this.messageIndexLastError = 'dirty-marker';
+            return false;
+        }
+        if (!fs.existsSync(this.messageIndexPath)) {
+            this.messageIndexLastError = 'snapshot-missing';
+            return false;
+        }
+
+        try {
+            const snapshot = this._readMessageIndexSnapshot();
+            this.messages.clear();
+            this.messagesById.clear();
+            this.messagesByRecipient.clear();
+            let maxId = 0;
+            for (const doc of snapshot.messages) {
+                const metaDoc = this._applyIndexedMetadata(doc);
+                const id = Number(metaDoc?.id || 0);
+                if (Number.isFinite(id) && id > maxId) maxId = id;
+            }
+
+            this.messageIndexSnapshotSequence = Math.max(0, Number(snapshot.sequence || 0));
+            this.messageIndexSequence = this.messageIndexSnapshotSequence;
+            this.messageIndexJournalEntries = 0;
+
+            if (fs.existsSync(this.messageIndexJournalDir)) {
+                const files = fs.readdirSync(this.messageIndexJournalDir)
+                    .filter((name) => name.endsWith('.json'))
+                    .sort();
+                let expected = this.messageIndexSequence + 1;
+                for (const name of files) {
+                    const item = JSON.parse(fs.readFileSync(path.join(this.messageIndexJournalDir, name), 'utf8'));
+                    const sequence = Number(item.sequence || 0);
+                    if (sequence <= this.messageIndexSnapshotSequence) continue;
+                    if (sequence !== expected) throw new Error('Message index journal sequence gap at ' + expected + ', got ' + sequence);
+                    expected += 1;
+                    if (item.op === 'upsert' && item.meta?.guid) {
+                        const metaDoc = this._applyIndexedMetadata(item.meta);
+                        const id = Number(metaDoc?.id || 0);
+                        if (Number.isFinite(id) && id > maxId) maxId = id;
+                    } else if (item.op === 'delete' && item.guid) {
+                        this._removeIndexedMetadata(item.guid);
+                    } else {
+                        throw new Error('Invalid message index journal operation');
+                    }
+                    this.messageIndexSequence = sequence;
+                    this.messageIndexJournalEntries += 1;
+                }
+            }
+
+            const expectedSequence = Number(persistedMeta?.messageIndexSequence);
+            if (Number.isFinite(expectedSequence) && expectedSequence >= 0 && expectedSequence !== this.messageIndexSequence) {
+                throw new Error('Message index sequence mismatch');
+            }
+            const expectedCount = Number(persistedMeta?.messageCount);
+            if (Number.isFinite(expectedCount) && expectedCount >= 0 && expectedCount !== this.messages.size) {
+                throw new Error('Message index message count mismatch');
+            }
+
+            this.nextId = Math.max(maxId + 1, Number(snapshot.nextId || 1), Number(persistedMeta?.nextId || 1));
+            this.messageIndexLoadMode = 'persistent-index';
+            this.messageIndexLastError = '';
+            return true;
+        } catch (error) {
+            this.messageIndexLastError = String(error?.message || error);
+            this.logger('Persistent message index ignored: ' + this.messageIndexLastError);
+            return false;
+        }
+    }
+
+    invalidatePersistentIndex(reason) {
+        try { if (fs.existsSync(this.messageIndexPath)) fs.unlinkSync(this.messageIndexPath); } catch (_) {}
+        try { fs.rmSync(this.messageIndexJournalDir, { recursive: true, force: true }); } catch (_) {}
+        ensureDir(this.messageIndexJournalDir);
+        this._beginMessageIndexMutation(reason || 'manual-invalidation');
+        this.messageIndexLoadMode = 'invalidated';
+        return { invalidated: true, reason: String(reason || 'manual-invalidation') };
+    }
+
+    messageIndexStatus() {
+        let snapshotBytes = 0;
+        let journalBytes = 0;
+        try { snapshotBytes = fs.statSync(this.messageIndexPath).size; } catch (_) {}
+        try {
+            for (const name of fs.readdirSync(this.messageIndexJournalDir)) {
+                if (!name.endsWith('.json')) continue;
+                journalBytes += fs.statSync(path.join(this.messageIndexJournalDir, name)).size;
+            }
+        } catch (_) {}
+        return {
+            version: this.messageIndexVersion,
+            loadMode: this.messageIndexLoadMode,
+            sequence: this.messageIndexSequence,
+            snapshotSequence: this.messageIndexSnapshotSequence,
+            journalEntries: this.messageIndexJournalEntries,
+            snapshotBytes,
+            journalBytes,
+            dirty: fs.existsSync(this.messageIndexDirtyPath),
+            lastError: this.messageIndexLastError || '',
+            messageCount: this.messages.size,
+        };
+    }
+
     _messagePath(guid) {
         const key = hash(guid);
         return path.join(this.messagesDir, key.slice(0, 2), key + '.json');
@@ -233,7 +453,10 @@ class EmailFileStore {
         return path.join(this.trackingDir, key.slice(0, 2), key + '.json');
     }
 
-    _loadMessages() {
+    _loadMessages(persistedMeta) {
+        persistedMeta = persistedMeta || this.readMeta();
+        if (this._tryLoadMessageIndex(persistedMeta)) return;
+
         this.messages.clear();
         this.messagesById.clear();
         this.messagesByRecipient.clear();
@@ -243,20 +466,17 @@ class EmailFileStore {
             try {
                 const doc = JSON.parse(fs.readFileSync(filePath, 'utf8'));
                 if (!doc || !doc.guid) continue;
-                const metaDoc = messageMetadata(doc);
-                this.messages.set(String(doc.guid), metaDoc);
-                this._indexMessageRecipients(metaDoc);
-                const id = Number(doc.id || 0);
-                if (Number.isFinite(id) && id > 0) {
-                    this._indexMessageById(metaDoc);
-                    if (id > maxId) maxId = id;
-                }
+                const metaDoc = this._applyIndexedMetadata(doc);
+                const id = Number(metaDoc?.id || 0);
+                if (Number.isFinite(id) && id > maxId) maxId = id;
             } catch (error) {
                 this.logger('Skipped invalid email JSON ' + filePath + ': ' + (error.message || error));
             }
         }
-        const meta = this.readMeta();
-        this.nextId = Math.max(maxId + 1, Number(meta.nextId || 1));
+        this.messageIndexSequence = Math.max(0, Number(persistedMeta?.messageIndexSequence || 0));
+        this.nextId = Math.max(maxId + 1, Number(persistedMeta?.nextId || 1));
+        this.messageIndexLoadMode = 'full-scan';
+        this._writeMessageIndexSnapshot();
     }
 
     _loadVip() {
@@ -333,6 +553,11 @@ class EmailFileStore {
             maxMessagesManaged: this.maxMessagesManaged === true,
             maxMessagesSource: this.maxMessagesManaged === true ? 'runtime-mcp' : 'startup-config',
             nextId: this.nextId || 1,
+            messageIndexVersion: this.messageIndexVersion,
+            messageIndexSequence: this.messageIndexSequence,
+            messageIndexSnapshotSequence: this.messageIndexSnapshotSequence,
+            messageIndexJournalEntries: this.messageIndexJournalEntries,
+            messageIndexLoadMode: this.messageIndexLoadMode,
             updatedAt: now,
         });
         if (!next.createdAt) next.createdAt = now;
@@ -342,6 +567,7 @@ class EmailFileStore {
     async saveMessage(doc) {
         if (!doc || !doc.guid) throw new Error('Message guid is required');
         return this._queueMutation(async () => {
+            this._beginMessageIndexMutation('save-message');
             const key = String(doc.guid);
             const previous = this.messages.get(key);
             const now = new Date().toISOString();
@@ -354,16 +580,12 @@ class EmailFileStore {
                 updatedAt: now,
             });
             atomicWriteJson(this._messagePath(key), copy);
-            const metaDoc = messageMetadata(copy);
-            this.messages.set(key, metaDoc);
-            if (previous) {
-                this._unindexMessageById(previous);
-                this._unindexMessageRecipients(previous);
-            }
-            this._indexMessageById(metaDoc);
-            this._indexMessageRecipients(metaDoc);
+            const metaDoc = this._applyIndexedMetadata(copy);
+            this._appendMessageIndexOperation({ op: 'upsert', guid: key, meta: metaDoc });
             const cleanup = await this._cleanupUnlocked();
+            this._maybeCompactMessageIndex();
             this._syncMeta(cleanup.deleted.length ? { lastCleanupAt: now, lastCleanupDeleted: cleanup.deleted.length } : {});
+            this._clearMessageIndexDirty();
             return { message: clone(copy), cleanup };
         });
     }
@@ -452,9 +674,13 @@ class EmailFileStore {
 
     async updateMessage(guid, patch) {
         return this._queueMutation(async () => {
+            this._beginMessageIndexMutation('update-message');
             const key = String(guid);
             const previousMeta = this.messages.get(key);
-            if (!previousMeta) return null;
+            if (!previousMeta) {
+                this._clearMessageIndexDirty();
+                return null;
+            }
             const previous = readJson(this._messagePath(key), null);
             if (!previous) return null;
             const now = new Date().toISOString();
@@ -467,36 +693,40 @@ class EmailFileStore {
                 updatedAt: now,
             });
             atomicWriteJson(this._messagePath(key), next);
-            const nextMeta = messageMetadata(next);
-            this.messages.set(key, nextMeta);
-            this._unindexMessageById(previousMeta);
-            this._unindexMessageRecipients(previousMeta);
-            this._indexMessageById(nextMeta);
-            this._indexMessageRecipients(nextMeta);
+            const nextMeta = this._applyIndexedMetadata(next);
+            this._appendMessageIndexOperation({ op: 'upsert', guid: key, meta: nextMeta });
+            this._maybeCompactMessageIndex();
             this._syncMeta();
+            this._clearMessageIndexDirty();
             return clone(next);
         });
     }
 
     async deleteMessage(guid) {
-        return this._queueMutation(async () => this._deleteUnlocked(String(guid), true));
+        return this._queueMutation(async () => {
+            this._beginMessageIndexMutation('delete-message');
+            const result = this._deleteUnlocked(String(guid), true);
+            this._maybeCompactMessageIndex();
+            this._clearMessageIndexDirty();
+            return result;
+        });
     }
 
-    _deleteUnlocked(key, syncMeta) {
+    _deleteUnlocked(key, syncMeta, updatePersistentIndex = true) {
         const existing = this.messages.get(key);
         if (!existing) return { deleted: false, guid: key, notFound: true };
         const filePath = this._messagePath(key);
         try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (error) { throw error; }
         try { fs.rmSync(this._attachmentDir(key), { recursive: true, force: true }); } catch (_) {}
-        this.messages.delete(key);
-        this._unindexMessageById(existing);
-        this._unindexMessageRecipients(existing);
+        this._removeIndexedMetadata(key);
+        if (updatePersistentIndex) this._appendMessageIndexOperation({ op: 'delete', guid: key });
         if (syncMeta) this._syncMeta();
         return { deleted: true, guid: key, message: clone(existing) };
     }
 
     async deleteMessages(guids) {
         return this._queueMutation(async () => {
+            this._beginMessageIndexMutation('delete-messages');
             const unique = Array.from(new Set((guids || []).map(String)));
             const deleted = [];
             const notFound = [];
@@ -505,15 +735,22 @@ class EmailFileStore {
                 if (result.deleted) deleted.push(key);
                 else notFound.push(key);
             }
+            this._maybeCompactMessageIndex();
             this._syncMeta();
+            this._clearMessageIndexDirty();
             return { deleted, notFound };
         });
     }
 
     async cleanupIfNeeded() {
         return this._queueMutation(async () => {
+            this._beginMessageIndexMutation('cleanup-messages');
             const result = await this._cleanupUnlocked();
-            if (result.deleted.length) this._syncMeta({ lastCleanupAt: new Date().toISOString(), lastCleanupDeleted: result.deleted.length });
+            if (result.deleted.length) {
+                this._maybeCompactMessageIndex();
+                this._syncMeta({ lastCleanupAt: new Date().toISOString(), lastCleanupDeleted: result.deleted.length });
+            }
+            this._clearMessageIndexDirty();
             return result;
         });
     }
@@ -534,6 +771,7 @@ class EmailFileStore {
         const next = Math.floor(Number(value));
         if (!Number.isFinite(next) || next < 1 || next > 1000000) throw new Error('maxMessages must be between 1 and 1000000');
         return this._queueMutation(async () => {
+            if (options.cleanupNow === true) this._beginMessageIndexMutation('message-limit-cleanup');
             const previous = this.maxMessages;
             this.maxMessages = next;
             this.maxMessagesManaged = options.managed !== false;
@@ -543,7 +781,11 @@ class EmailFileStore {
             });
             let cleanup = null;
             if (options.cleanupNow === true && this.messages.size > this.maxMessages) cleanup = await this._cleanupUnlocked();
-            if (cleanup?.deleted?.length) this._syncMeta({ lastCleanupAt: new Date().toISOString(), lastCleanupDeleted: cleanup.deleted.length });
+            if (cleanup?.deleted?.length) {
+                this._maybeCompactMessageIndex();
+                this._syncMeta({ lastCleanupAt: new Date().toISOString(), lastCleanupDeleted: cleanup.deleted.length });
+            }
+            if (options.cleanupNow === true) this._clearMessageIndexDirty();
             return Object.assign({ previousMaxMessages: previous, cleanup }, this.getMessageLimit());
         });
     }

@@ -530,6 +530,10 @@ class EmailBackupStorageManager {
                 ensureDir(path.dirname(target));
                 fs.copyFileSync(source, target);
             }
+            // The restored backup may contain a message index from a different
+            // point in time. Force the required restart to rebuild from the
+            // restored message files rather than trusting stale metadata.
+            this.emailService.store.invalidatePersistentIndex?.('backup-restore:' + id);
             delete this.state.previewTokens[token];
             this.state.lastRestoreAt = iso();
             this.state.restartRequired = true;

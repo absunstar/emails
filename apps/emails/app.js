@@ -593,6 +593,7 @@ module.exports = function init(site) {
                 text: doc.text || (!doc.html ? doc.message : ''),
                 html: doc.html || doc.message || '',
                 replyTo: doc.replyTo,
+                listUnsubscribe: doc.transactional === true ? false : doc.listUnsubscribe,
             });
             response.done = true;
             response.result = result;

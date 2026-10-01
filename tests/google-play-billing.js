@@ -61,9 +61,14 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
         }
         if (String(url).endsWith('/edits/edit-test/tracks/production') && init.method === 'PUT') {
             const body = JSON.parse(String(init.body || '{}'));
-            assert.strictEqual(body.track, 'production');
-            assert.strictEqual(body.releases[0].status, 'draft');
-            assert.deepStrictEqual(body.releases[0].versionCodes, ['14']);
+            const release = body.releases?.[0] || {};
+            if (release.status === 'inProgress') {
+                assert.strictEqual(release.userFraction, 0.05);
+                assert.deepStrictEqual(release.versionCodes, ['14']);
+            } else {
+                assert.strictEqual(release.status, 'draft');
+                assert.deepStrictEqual(release.versionCodes, ['14']);
+            }
             return new Response(JSON.stringify(body), {
                 status: 200,
                 headers: { 'content-type': 'application/json' },
@@ -144,6 +149,16 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
         releaseNotes: [{ language: 'en-US', text: 'Release test' }],
     });
     assert.strictEqual(track.releases[0].status, 'draft');
+
+    const stagedTrack = await billing.updateTrackStaged(edit.id, {
+        track: 'production',
+        versionCode: 14,
+        name: '5.2.2+14',
+        userFraction: 0.05,
+        releaseNotes: [{ language: 'en-US', text: 'Release test' }],
+    });
+    assert.strictEqual(stagedTrack.releases[0].status, 'inProgress');
+    assert.strictEqual(stagedTrack.releases[0].userFraction, 0.05);
 
     const validatedEdit = await billing.validateEdit(edit.id);
     assert.strictEqual(validatedEdit.id, 'edit-test');

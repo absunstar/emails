@@ -194,6 +194,41 @@ function createGooglePlayBilling(options = {}) {
         };
     }
 
+    async function uploadBundle(editId, bundlePath) {
+        const id = String(editId || '').trim();
+        const filePath = String(bundlePath || '').trim();
+        if (!id) throw billingError('EDIT_ID_REQUIRED', 'Google Play edit ID is required.', 400);
+        if (!filePath || !fs.existsSync(filePath)) {
+            throw billingError('BUNDLE_FILE_REQUIRED', 'Android App Bundle file is required.', 400);
+        }
+
+        const payload = fs.readFileSync(filePath);
+        const url = 'https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/' +
+            encodeURIComponent(packageName) + '/edits/' + encodeURIComponent(id) +
+            '/bundles?uploadType=media';
+        const response = await googleRequest(url, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/octet-stream',
+                'content-length': String(payload.length),
+            },
+            body: payload,
+        });
+        const data = await readJson(response);
+        if (!response.ok || !data.versionCode) {
+            throw billingError(
+                'GOOGLE_PLAY_BUNDLE_UPLOAD_FAILED',
+                String(data?.error?.message || data.error || 'Google Play could not upload the Android App Bundle.'),
+                response.status
+            );
+        }
+        return {
+            versionCode: Number(data.versionCode),
+            sha1: String(data.sha1 || ''),
+            sha256: String(data.sha256 || ''),
+        };
+    }
+
     async function validateEdit(editId) {
         const id = String(editId || '').trim();
         if (!id) throw billingError('EDIT_ID_REQUIRED', 'Google Play edit ID is required.', 400);
@@ -322,6 +357,7 @@ function createGooglePlayBilling(options = {}) {
         acknowledgePurchase,
         verifyAndAcknowledge,
         createEdit,
+        uploadBundle,
         validateEdit,
         deleteEdit,
         tokenHash,

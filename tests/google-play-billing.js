@@ -32,6 +32,20 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
                 headers: { 'content-type': 'application/json' },
             });
         }
+        if (String(url).includes('/upload/androidpublisher/') &&
+            String(url).includes('/edits/edit-test/bundles?uploadType=media') &&
+            init.method === 'POST') {
+            assert(Buffer.isBuffer(init.body));
+            assert.strictEqual(init.headers['content-type'], 'application/octet-stream');
+            return new Response(JSON.stringify({
+                versionCode: 14,
+                sha1: 'bundle-sha1',
+                sha256: 'bundle-sha256',
+            }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+            });
+        }
         if (String(url).endsWith('/edits/edit-test:validate') && init.method === 'POST') {
             return new Response(JSON.stringify({
                 id: 'edit-test',
@@ -81,6 +95,9 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
 
     const edit = await billing.createEdit();
     assert.strictEqual(edit.id, 'edit-test');
+    const bundle = await billing.uploadBundle(edit.id, __filename);
+    assert.strictEqual(bundle.versionCode, 14);
+    assert.strictEqual(bundle.sha256, 'bundle-sha256');
     const validatedEdit = await billing.validateEdit(edit.id);
     assert.strictEqual(validatedEdit.id, 'edit-test');
     assert.strictEqual(await billing.deleteEdit(edit.id), true);

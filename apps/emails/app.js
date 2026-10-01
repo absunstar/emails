@@ -436,6 +436,56 @@ module.exports = function init(site) {
         });
     }
 
+    async function authorizeProtectedMailbox(req, data, email, ownerToken) {
+        const normalized = normalizeEmail(email);
+        if (!normalized || !isProOnlyMailbox(normalized)) {
+            return { allowed: true, proOnly: false, email: normalized };
+        }
+        if (!verifyOwnershipToken(normalized, ownerToken)) {
+            return {
+                allowed: false,
+                proOnly: true,
+                email: normalized,
+                reason: 'ownership',
+                status: 403,
+                code: 'MAILBOX_OWNERSHIP_REQUIRED',
+                error: 'VIP Temp Mail Pro mailbox ownership could not be verified.',
+            };
+        }
+        const purchase = await authorizeProPurchase(req, data || {});
+        if (!purchase.allowed) {
+            return {
+                ...purchase,
+                allowed: false,
+                proOnly: true,
+                email: normalized,
+                reason: 'purchase',
+            };
+        }
+        return {
+            allowed: true,
+            proOnly: true,
+            email: normalized,
+            purchase,
+        };
+    }
+
+    function sendProtectedMailboxJson(res, access, base = {}) {
+        if (access?.reason === 'ownership') {
+            return res.json(proRequiredResponse(access.email, base));
+        }
+        res.status(access?.status || 403);
+        return res.json({
+            ...base,
+            done: false,
+            proRequired: true,
+            proOnly: true,
+            error: access?.error || 'VIP Temp Mail Pro purchase verification is required.',
+            code: access?.code || 'PRO_PURCHASE_REQUIRED',
+        });
+    }
+
+
     onPost('/api/mobile/google-play/verify', async (req, res) => {
         const data = body(req);
         const purchaseToken = purchaseTokenFrom(req, data);
@@ -997,13 +1047,18 @@ module.exports = function init(site) {
         };
         const requestedMailboxForAccess = normalizeEmail(input.email || input.to || '');
         const ownerToken = String(input.ownerToken || input.ownershipToken || '').trim();
-        if (requestedMailboxForAccess && isProOnlyMailbox(requestedMailboxForAccess) &&
-            !verifyOwnershipToken(requestedMailboxForAccess, ownerToken)) {
-            return res.json(proRequiredResponse(requestedMailboxForAccess, {
+        const requestedAccess = await authorizeProtectedMailbox(
+            req,
+            input,
+            requestedMailboxForAccess,
+            ownerToken
+        );
+        if (!requestedAccess.allowed) {
+            return sendProtectedMailboxJson(res, requestedAccess, {
                 browserID: req.browserID,
                 toEmail: input.to,
                 index: input.index,
-            }));
+            });
         }
         if (input.guid && requestedMailboxForAccess && isDeletedForMailbox(requestedMailboxForAccess, input.guid)) {
             return res.json({ ...response, done: true, error: 'Not Found Any Email Message' });
@@ -1110,13 +1165,20 @@ module.exports = function init(site) {
 
             if (doc) {
                 const protectedMailbox = requestedMailboxForAccess || proOnlyMailboxFromMessage(doc);
-                if (protectedMailbox && isProOnlyMailbox(protectedMailbox) &&
-                    !verifyOwnershipToken(protectedMailbox, ownerToken)) {
-                    return res.json(proRequiredResponse(protectedMailbox, {
-                        browserID: req.browserID,
-                        toEmail: input.to,
-                        index: input.index,
-                    }));
+                if (protectedMailbox && protectedMailbox != requestedMailboxForAccess) {
+                    const docAccess = await authorizeProtectedMailbox(
+                        req,
+                        input,
+                        protectedMailbox,
+                        ownerToken
+                    );
+                    if (!docAccess.allowed) {
+                        return sendProtectedMailboxJson(res, docAccess, {
+                            browserID: req.browserID,
+                            toEmail: input.to,
+                            index: input.index,
+                        });
+                    }
                 }
                 if (protectedMailbox && doc.guid && isDeletedForMailbox(protectedMailbox, doc.guid)) {
                     doc = null;
@@ -1182,9 +1244,18 @@ module.exports = function init(site) {
         const limit = Math.max(1, Math.min(Number(data.limit || 500), 5000));
         const requestedMailbox = normalizeEmail(where.to || data.email || '');
         const ownerToken = String(data.ownerToken || data.ownershipToken || '').trim();
-        if (requestedMailbox && isProOnlyMailbox(requestedMailbox) &&
-            !verifyOwnershipToken(requestedMailbox, ownerToken)) {
-            return res.json(proRequiredResponse(requestedMailbox, { storage: 'json-files-only' }));
+        const requestedAccess = await authorizeProtectedMailbox(
+            req,
+            data,
+            requestedMailbox,
+            ownerToken
+        );
+        if (!requestedAccess.allowed) {
+            return sendProtectedMailboxJson(
+                res,
+                requestedAccess,
+                { storage: 'json-files-only' }
+            );
         }
 
         const context = readContext(req, { maxLimit: 5000 }, apiDomain(req, data.email, where.email, where.to, where.from));
@@ -1243,16 +1314,32 @@ module.exports = function init(site) {
             const normalizedMailbox = normalizeEmail(mailbox);
             const ownerToken = String(req.query?.ownerToken || req.query?.ownershipToken || '').trim();
             if (!guid) return res.sendHTML('<h1>Email Not Exists</h1>');
-            if (normalizedMailbox && isProOnlyMailbox(normalizedMailbox) && !verifyOwnershipToken(normalizedMailbox, ownerToken)) {
+            const requestedAccess = await authorizeProtectedMailbox(
+                req,
+                req.query || {},
+                normalizedMailbox,
+                ownerToken
+            );
+            if (!requestedAccess.allowed) {
                 const notice = makeProRequiredMessage(normalizedMailbox);
+                if (requestedAccess.reason === 'purchase') res.status(requestedAccess.status || 403);
                 return res.sendHTML(notice.html);
             }
             const result = await service.read(guid, admin(req) ? adminGlobalContext({ maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, req.query?.email, req.query?.to, req.query?.from)));
             const doc = result.message;
             const protectedMailbox = proOnlyMailboxFromMessage(doc);
-            if (protectedMailbox && !verifyOwnershipToken(protectedMailbox, ownerToken)) {
-                const notice = makeProRequiredMessage(protectedMailbox);
-                return res.sendHTML(notice.html);
+            if (protectedMailbox && protectedMailbox !== normalizedMailbox) {
+                const docAccess = await authorizeProtectedMailbox(
+                    req,
+                    req.query || {},
+                    protectedMailbox,
+                    ownerToken
+                );
+                if (!docAccess.allowed) {
+                    const notice = makeProRequiredMessage(protectedMailbox);
+                    if (docAccess.reason === 'purchase') res.status(docAccess.status || 403);
+                    return res.sendHTML(notice.html);
+                }
             }
             const html = doc.html || ('<pre>' + String(doc.text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>');
             res.sendHTML(sanitizeEmailHtml(html, { allowRemoteImages: String(req.query?.remote || '') === '1', attachments: doc.attachments, guid, mailbox }));
@@ -1271,8 +1358,16 @@ module.exports = function init(site) {
             const normalizedMailbox = normalizeEmail(mailbox);
             const ownerToken = String(req.query?.ownerToken || req.query?.ownershipToken || '').trim();
             if (!guid || !id) return res.status(400).send('Attachment request is incomplete');
-            if (normalizedMailbox && isProOnlyMailbox(normalizedMailbox) && !verifyOwnershipToken(normalizedMailbox, ownerToken)) {
-                return res.status(403).send('VIP Temp Mail Pro required');
+            const requestedAccess = await authorizeProtectedMailbox(
+                req,
+                req.query || {},
+                normalizedMailbox,
+                ownerToken
+            );
+            if (!requestedAccess.allowed) {
+                return res.status(requestedAccess.status || 403).send(
+                    requestedAccess.error || 'VIP Temp Mail Pro required'
+                );
             }
             const result = await service.readAttachment(guid, id, admin(req) ? adminGlobalContext({ maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, mailbox)));
             const filename = safeFilename(result.meta.filename, 'attachment.bin');
@@ -1293,8 +1388,16 @@ module.exports = function init(site) {
             const normalizedMailbox = normalizeEmail(mailbox);
             const ownerToken = String(req.query?.ownerToken || req.query?.ownershipToken || '').trim();
             if (!guid) return res.status(400).send('Email guid is required');
-            if (normalizedMailbox && isProOnlyMailbox(normalizedMailbox) && !verifyOwnershipToken(normalizedMailbox, ownerToken)) {
-                return res.status(403).send('VIP Temp Mail Pro required');
+            const requestedAccess = await authorizeProtectedMailbox(
+                req,
+                req.query || {},
+                normalizedMailbox,
+                ownerToken
+            );
+            if (!requestedAccess.allowed) {
+                return res.status(requestedAccess.status || 403).send(
+                    requestedAccess.error || 'VIP Temp Mail Pro required'
+                );
             }
             const result = await service.exportEml(guid, admin(req) ? adminGlobalContext({ maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, mailbox)));
             const subject = safeFilename(result.message.subject || 'email', 'email');

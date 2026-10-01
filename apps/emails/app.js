@@ -1873,22 +1873,22 @@ module.exports = function init(site) {
         let result = '';
         const characters = 'abcdefghijklmnopqrstuvwxyz';
         const numbers = '0123456789';
-        const length = site.random(8, 16);
+        const length = crypto.randomInt(8, 17);
         let counter = 0;
-        const first = site.random(4, 6);
+        const first = crypto.randomInt(4, 7);
         while (counter < first) {
             result += characters.charAt(Math.floor(Math.random() * characters.length));
             counter += 1;
         }
-        result += ['.', '', '_', '', '-'][site.random(0, 4)] || '';
+        result += ['.', '', '_', '', '-'][crypto.randomInt(0, 5)] || '';
         counter = 0;
-        const last = site.random(4, 6);
+        const last = crypto.randomInt(4, 7);
         while (counter < last) {
             result += characters.charAt(Math.floor(Math.random() * characters.length));
             counter += 1;
         }
         if (length > first + last) {
-            result += ['.', '', '_', '', '-'][site.random(0, 4)] || '';
+            result += ['.', '', '_', '', '-'][crypto.randomInt(0, 5)] || '';
             counter = 0;
             while (counter < length - (first + last)) {
                 result += numbers.charAt(Math.floor(Math.random() * numbers.length));

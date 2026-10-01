@@ -59,6 +59,25 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
                 headers: { 'content-type': 'application/json' },
             });
         }
+        if (String(url).endsWith('/edits/edit-test/tracks/production') && init.method === 'PUT') {
+            const body = JSON.parse(String(init.body || '{}'));
+            assert.strictEqual(body.track, 'production');
+            assert.strictEqual(body.releases[0].status, 'draft');
+            assert.deepStrictEqual(body.releases[0].versionCodes, ['14']);
+            return new Response(JSON.stringify(body), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+            });
+        }
+        if (String(url).endsWith('/edits/edit-test:commit') && init.method === 'POST') {
+            return new Response(JSON.stringify({
+                id: 'edit-test',
+                expiryTimeSeconds: '1800003600',
+            }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+            });
+        }
         if (String(url).endsWith('/edits/edit-test:validate') && init.method === 'POST') {
             return new Response(JSON.stringify({
                 id: 'edit-test',
@@ -117,8 +136,20 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
     const bundle = await billing.uploadBundle(edit.id, __filename);
     assert.strictEqual(bundle.versionCode, 14);
     assert.strictEqual(bundle.sha256, 'bundle-sha256');
+
+    const track = await billing.updateTrackDraft(edit.id, {
+        track: 'production',
+        versionCode: 14,
+        name: '5.2.2+14',
+        releaseNotes: [{ language: 'en-US', text: 'Release test' }],
+    });
+    assert.strictEqual(track.releases[0].status, 'draft');
+
     const validatedEdit = await billing.validateEdit(edit.id);
     assert.strictEqual(validatedEdit.id, 'edit-test');
+
+    const committedEdit = await billing.commitEdit(edit.id);
+    assert.strictEqual(committedEdit.id, 'edit-test');
     assert.strictEqual(await billing.deleteEdit(edit.id), true);
 
 

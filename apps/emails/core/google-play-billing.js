@@ -270,6 +270,78 @@ function createGooglePlayBilling(options = {}) {
         };
     }
 
+    async function updateTrackDraft(editId, options = {}) {
+        const id = String(editId || '').trim();
+        if (!id) throw billingError('EDIT_ID_REQUIRED', 'Google Play edit ID is required.', 400);
+
+        const track = String(options.track || 'production').trim();
+        const versionCode = String(options.versionCode || '').trim();
+        if (!versionCode) {
+            throw billingError('VERSION_CODE_REQUIRED', 'Google Play version code is required.', 400);
+        }
+
+        const release = {
+            name: String(options.name || ('Version ' + versionCode)).trim(),
+            versionCodes: [versionCode],
+            status: 'draft',
+        };
+
+        if (Array.isArray(options.releaseNotes) && options.releaseNotes.length) {
+            release.releaseNotes = options.releaseNotes
+                .filter((item) => item && item.language && item.text)
+                .map((item) => ({
+                    language: String(item.language),
+                    text: String(item.text),
+                }));
+        }
+
+        const url = editsBaseUrl() + '/' + encodeURIComponent(id) +
+            '/tracks/' + encodeURIComponent(track);
+        const response = await googleRequest(url, {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                track,
+                releases: [release],
+            }),
+        });
+        const data = await readJson(response);
+        if (!response.ok) {
+            throw billingError(
+                'GOOGLE_PLAY_TRACK_UPDATE_FAILED',
+                String(data?.error?.message || data.error || 'Google Play could not update the release track.'),
+                response.status
+            );
+        }
+        return data;
+    }
+
+    async function commitEdit(editId) {
+        const id = String(editId || '').trim();
+        if (!id) throw billingError('EDIT_ID_REQUIRED', 'Google Play edit ID is required.', 400);
+
+        const response = await googleRequest(
+            editsBaseUrl() + '/' + encodeURIComponent(id) + ':commit',
+            {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: '{}',
+            }
+        );
+        const data = await readJson(response);
+        if (!response.ok) {
+            throw billingError(
+                'GOOGLE_PLAY_EDIT_COMMIT_FAILED',
+                String(data?.error?.message || data.error || 'Google Play could not commit the app edit.'),
+                response.status
+            );
+        }
+        return {
+            id: String(data.id || id),
+            expiryTimeSeconds: String(data.expiryTimeSeconds || ''),
+        };
+    }
+
     async function deleteEdit(editId) {
         const id = String(editId || '').trim();
         if (!id) throw billingError('EDIT_ID_REQUIRED', 'Google Play edit ID is required.', 400);
@@ -375,7 +447,9 @@ function createGooglePlayBilling(options = {}) {
         listTrackReleases,
         createEdit,
         uploadBundle,
+        updateTrackDraft,
         validateEdit,
+        commitEdit,
         deleteEdit,
         tokenHash,
     };

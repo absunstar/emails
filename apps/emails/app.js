@@ -226,10 +226,7 @@ module.exports = function init(site) {
     site.googlePlayBilling = googlePlayBilling;
 
     function googlePlayBillingEnforced() {
-        const configured = googlePlayBilling.isConfigured();
-        const raw = String(process.env.GOOGLE_PLAY_BILLING_ENFORCE || '').trim().toLowerCase();
-        if (!raw) return configured;
-        return raw === 'true';
+        return String(process.env.GOOGLE_PLAY_BILLING_ENFORCE || '').trim().toLowerCase() === 'true';
     }
 
     function purchaseTokenFrom(req, data = {}) {

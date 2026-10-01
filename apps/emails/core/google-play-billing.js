@@ -169,6 +169,74 @@ function createGooglePlayBilling(options = {}) {
         return response;
     }
 
+    function editsBaseUrl() {
+        return 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/' +
+            encodeURIComponent(packageName) + '/edits';
+    }
+
+    async function createEdit() {
+        const response = await googleRequest(editsBaseUrl(), {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: '{}',
+        });
+        const data = await readJson(response);
+        if (!response.ok || !data.id) {
+            throw billingError(
+                'GOOGLE_PLAY_EDIT_CREATE_FAILED',
+                String(data?.error?.message || data.error || 'Google Play could not create an app edit.'),
+                response.status
+            );
+        }
+        return {
+            id: String(data.id),
+            expiryTimeSeconds: String(data.expiryTimeSeconds || ''),
+        };
+    }
+
+    async function validateEdit(editId) {
+        const id = String(editId || '').trim();
+        if (!id) throw billingError('EDIT_ID_REQUIRED', 'Google Play edit ID is required.', 400);
+        const response = await googleRequest(
+            editsBaseUrl() + '/' + encodeURIComponent(id) + ':validate',
+            {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: '{}',
+            }
+        );
+        const data = await readJson(response);
+        if (!response.ok) {
+            throw billingError(
+                'GOOGLE_PLAY_EDIT_VALIDATE_FAILED',
+                String(data?.error?.message || data.error || 'Google Play could not validate the app edit.'),
+                response.status
+            );
+        }
+        return {
+            id: String(data.id || id),
+            expiryTimeSeconds: String(data.expiryTimeSeconds || ''),
+        };
+    }
+
+    async function deleteEdit(editId) {
+        const id = String(editId || '').trim();
+        if (!id) throw billingError('EDIT_ID_REQUIRED', 'Google Play edit ID is required.', 400);
+        const response = await googleRequest(
+            editsBaseUrl() + '/' + encodeURIComponent(id),
+            { method: 'DELETE' }
+        );
+        if (!response.ok) {
+            const data = await readJson(response);
+            throw billingError(
+                'GOOGLE_PLAY_EDIT_DELETE_FAILED',
+                String(data?.error?.message || data.error || 'Google Play could not delete the app edit.'),
+                response.status
+            );
+        }
+        return true;
+    }
+
     async function verifyPurchase(purchaseToken, expectedProductId = productId) {
         const token = String(purchaseToken || '').trim();
         const product = String(expectedProductId || '').trim();
@@ -253,6 +321,9 @@ function createGooglePlayBilling(options = {}) {
         verifyPurchase,
         acknowledgePurchase,
         verifyAndAcknowledge,
+        createEdit,
+        validateEdit,
+        deleteEdit,
         tokenHash,
     };
 }

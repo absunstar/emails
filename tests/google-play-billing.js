@@ -22,6 +22,28 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
             assert.strictEqual(init.headers.authorization, 'Bearer oauth-test');
             return new Response('', { status: 200 });
         }
+        if (String(url).endsWith('/edits') && init.method === 'POST') {
+            assert.strictEqual(init.headers.authorization, 'Bearer oauth-test');
+            return new Response(JSON.stringify({
+                id: 'edit-test',
+                expiryTimeSeconds: '1800003600',
+            }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+            });
+        }
+        if (String(url).endsWith('/edits/edit-test:validate') && init.method === 'POST') {
+            return new Response(JSON.stringify({
+                id: 'edit-test',
+                expiryTimeSeconds: '1800003600',
+            }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+            });
+        }
+        if (String(url).endsWith('/edits/edit-test') && init.method === 'DELETE') {
+            return new Response('', { status: 200 });
+        }
         assert.strictEqual(init.method, 'GET');
         assert.strictEqual(init.headers.authorization, 'Bearer oauth-test');
         return new Response(JSON.stringify({
@@ -56,7 +78,19 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
     assert.strictEqual(cached.cached, true);
     assert.strictEqual(calls.length, 3, 'cached verification must not call Google again');
 
-    const unconfigured = createGooglePlayBilling({ fetchImpl });
+
+    const edit = await billing.createEdit();
+    assert.strictEqual(edit.id, 'edit-test');
+    const validatedEdit = await billing.validateEdit(edit.id);
+    assert.strictEqual(validatedEdit.id, 'edit-test');
+    assert.strictEqual(await billing.deleteEdit(edit.id), true);
+
+
+    const unconfigured = createGooglePlayBilling({
+        fetchImpl,
+        serviceAccountEmailFile: '/tmp/does-not-exist-email.txt',
+        privateKeyFile: '/tmp/does-not-exist-key.pem',
+    });
     await assert.rejects(
         () => unconfigured.verifyPurchase('purchase-token-test'),
         (error) => error && error.code === 'GOOGLE_PLAY_NOT_CONFIGURED'

@@ -174,6 +174,22 @@ function createGooglePlayBilling(options = {}) {
             encodeURIComponent(packageName) + '/edits';
     }
 
+    async function listTrackReleases(track = 'production') {
+        const trackName = String(track || 'production').trim();
+        const url = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/' +
+            encodeURIComponent(packageName) + '/tracks/' + encodeURIComponent(trackName) + '/releases';
+        const response = await googleRequest(url, { method: 'GET' });
+        const data = await readJson(response);
+        if (!response.ok) {
+            throw billingError(
+                'GOOGLE_PLAY_TRACK_RELEASES_FAILED',
+                String(data?.error?.message || data.error || 'Google Play could not list track releases.'),
+                response.status
+            );
+        }
+        return Array.isArray(data.releases) ? data.releases : [];
+    }
+
     async function createEdit() {
         const response = await googleRequest(editsBaseUrl(), {
             method: 'POST',
@@ -356,6 +372,7 @@ function createGooglePlayBilling(options = {}) {
         verifyPurchase,
         acknowledgePurchase,
         verifyAndAcknowledge,
+        listTrackReleases,
         createEdit,
         uploadBundle,
         validateEdit,

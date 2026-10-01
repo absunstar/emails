@@ -22,6 +22,19 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
             assert.strictEqual(init.headers.authorization, 'Bearer oauth-test');
             return new Response('', { status: 200 });
         }
+        if (String(url).endsWith('/tracks/production/releases') && init.method === 'GET') {
+            return new Response(JSON.stringify({
+                releases: [{
+                    releaseName: '5.1.5',
+                    track: 'production',
+                    activeArtifacts: [{ versionCode: 11 }],
+                    releaseLifecycleState: 'RELEASE_LIFECYCLE_STATE_PUBLISHED',
+                }],
+            }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+            });
+        }
         if (String(url).endsWith('/edits') && init.method === 'POST') {
             assert.strictEqual(init.headers.authorization, 'Bearer oauth-test');
             return new Response(JSON.stringify({
@@ -91,6 +104,12 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
     assert.strictEqual(cached.valid, true);
     assert.strictEqual(cached.cached, true);
     assert.strictEqual(calls.length, 3, 'cached verification must not call Google again');
+
+
+    const releases = await billing.listTrackReleases('production');
+    assert.strictEqual(releases.length, 1);
+    assert.strictEqual(releases[0].activeArtifacts[0].versionCode, 11);
+
 
 
     const edit = await billing.createEdit();

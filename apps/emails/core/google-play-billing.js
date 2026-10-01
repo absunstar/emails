@@ -1,12 +1,28 @@
 'use strict';
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/androidpublisher';
 
 function base64url(value) {
     return Buffer.from(value).toString('base64url');
+}
+
+
+function readOptionalText(filePath) {
+    try {
+        if (!filePath || !fs.existsSync(filePath)) return '';
+        return fs.readFileSync(filePath, 'utf8').trim();
+    } catch (_) {
+        return '';
+    }
+}
+
+function defaultCredentialPath(fileName) {
+    return path.resolve(__dirname, '..', '..', '..', fileName);
 }
 
 function normalizePrivateKey(value) {
@@ -23,8 +39,30 @@ function billingError(code, message, status) {
 function createGooglePlayBilling(options = {}) {
     const packageName = String(options.packageName || process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.egytag.mails').trim();
     const productId = String(options.productId || process.env.GOOGLE_PLAY_PRO_PRODUCT_ID || 'vip_temp_mail_pro_lifetime').trim();
-    const serviceAccountEmail = String(options.serviceAccountEmail || process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL || '').trim();
-    const privateKey = normalizePrivateKey(options.privateKey || process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY || '');
+
+    const emailFile = String(
+        options.serviceAccountEmailFile ||
+        process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL_FILE ||
+        defaultCredentialPath('google-play-service-account-email.txt')
+    ).trim();
+    const keyFile = String(
+        options.privateKeyFile ||
+        process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY_FILE ||
+        defaultCredentialPath('google-play-service-account.pem')
+    ).trim();
+
+    const serviceAccountEmail = String(
+        options.serviceAccountEmail ||
+        process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL ||
+        readOptionalText(emailFile) ||
+        ''
+    ).trim();
+    const privateKey = normalizePrivateKey(
+        options.privateKey ||
+        process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY ||
+        readOptionalText(keyFile) ||
+        ''
+    );
     const fetchImpl = options.fetchImpl || global.fetch;
     const now = options.now || (() => Date.now());
     const cacheTtlMs = Number(options.cacheTtlMs || process.env.GOOGLE_PLAY_VERIFY_CACHE_MS || 6 * 60 * 60 * 1000);

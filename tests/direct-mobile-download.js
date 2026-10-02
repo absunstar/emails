@@ -19,6 +19,7 @@ assert(
   'stable direct APK download link is missing'
 );
 assert(html.includes('Download APK'), 'direct APK button label is missing');
-assert(html.includes('Latest version'), 'latest-version label is missing');
+assert(html.includes('Google Play-signed build'), 'Play-signed direct-download label is missing');
+assert(html.includes('Updates your Play install'), 'Play-install compatibility label is missing');
 
 console.log('Direct Android download CTA contract passed');

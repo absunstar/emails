@@ -174,6 +174,50 @@ function createGooglePlayBilling(options = {}) {
             encodeURIComponent(packageName) + '/edits';
     }
 
+    async function downloadGeneratedApk(versionCode, downloadId, destinationPath) {
+        const code = String(versionCode || '').trim();
+        const id = String(downloadId || '').trim();
+        const outputPath = String(destinationPath || '').trim();
+        if (!code) {
+            throw billingError('VERSION_CODE_REQUIRED', 'Google Play version code is required.', 400);
+        }
+        if (!id) {
+            throw billingError('DOWNLOAD_ID_REQUIRED', 'Google Play generated APK download ID is required.', 400);
+        }
+        if (!outputPath) {
+            throw billingError('DESTINATION_PATH_REQUIRED', 'Generated APK destination path is required.', 400);
+        }
+
+        const url = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/' +
+            encodeURIComponent(packageName) + '/generatedApks/' + encodeURIComponent(code) +
+            '/downloads/' + encodeURIComponent(id) + ':download';
+        const response = await googleRequest(url, { method: 'GET' });
+        if (!response.ok) {
+            const data = await readJson(response);
+            throw billingError(
+                'GOOGLE_PLAY_GENERATED_APK_DOWNLOAD_FAILED',
+                String(data?.error?.message || data.error || 'Google Play could not download the generated APK.'),
+                response.status
+            );
+        }
+
+        const payload = Buffer.from(await response.arrayBuffer());
+        if (!payload.length) {
+            throw billingError(
+                'GOOGLE_PLAY_GENERATED_APK_EMPTY',
+                'Google Play returned an empty generated APK.',
+                502
+            );
+        }
+
+        fs.writeFileSync(outputPath, payload);
+        return {
+            path: outputPath,
+            size: payload.length,
+            sha256: crypto.createHash('sha256').update(payload).digest('hex'),
+        };
+    }
+
     async function listGeneratedApks(versionCode) {
         const code = String(versionCode || '').trim();
         if (!code) {
@@ -520,6 +564,7 @@ function createGooglePlayBilling(options = {}) {
         verifyPurchase,
         acknowledgePurchase,
         verifyAndAcknowledge,
+        downloadGeneratedApk,
         listGeneratedApks,
         listTrackReleases,
         createEdit,

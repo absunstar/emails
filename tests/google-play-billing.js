@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+
 const assert = require('assert');
 const crypto = require('crypto');
 const { createGooglePlayBilling, GOOGLE_TOKEN_URL } = require('../apps/emails/core/google-play-billing');
@@ -21,6 +23,12 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
             assert.strictEqual(init.method, 'POST');
             assert.strictEqual(init.headers.authorization, 'Bearer oauth-test');
             return new Response('', { status: 200 });
+        }
+        if (String(url).includes('/generatedApks/14/downloads/apk-test:download') && init.method === 'GET') {
+            return new Response(Buffer.from('signed-apk-test'), {
+                status: 200,
+                headers: { 'content-type': 'application/vnd.android.package-archive' },
+            });
         }
         if (String(url).endsWith('/generatedApks/14') && init.method === 'GET') {
             return new Response(JSON.stringify({
@@ -144,6 +152,21 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
     const generatedApks = await billing.listGeneratedApks(14);
     assert.strictEqual(generatedApks.length, 1);
     assert.strictEqual(generatedApks[0].certificateSha256Hash, 'AA:BB:CC');
+
+
+    const generatedApkPath = '/tmp/google-play-generated-apk-test.apk';
+    const downloadedApk = await billing.downloadGeneratedApk(
+        14,
+        'apk-test',
+        generatedApkPath
+    );
+    assert.strictEqual(downloadedApk.size, Buffer.from('signed-apk-test').length);
+    assert.strictEqual(
+        fs.readFileSync(generatedApkPath, 'utf8'),
+        'signed-apk-test'
+    );
+    fs.rmSync(generatedApkPath, { force: true });
+
 
 
 

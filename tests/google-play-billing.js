@@ -22,6 +22,17 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
             assert.strictEqual(init.headers.authorization, 'Bearer oauth-test');
             return new Response('', { status: 200 });
         }
+        if (String(url).endsWith('/generatedApks/14') && init.method === 'GET') {
+            return new Response(JSON.stringify({
+                generatedApks: [{
+                    certificateSha256Hash: 'AA:BB:CC',
+                    generatedStandaloneApks: [{ downloadId: 'apk-test', variantId: 1 }],
+                }],
+            }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+            });
+        }
         if (String(url).endsWith('/tracks/production/releases') && init.method === 'GET') {
             return new Response(JSON.stringify({
                 releases: [{
@@ -128,6 +139,12 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
     assert.strictEqual(cached.valid, true);
     assert.strictEqual(cached.cached, true);
     assert.strictEqual(calls.length, 3, 'cached verification must not call Google again');
+
+
+    const generatedApks = await billing.listGeneratedApks(14);
+    assert.strictEqual(generatedApks.length, 1);
+    assert.strictEqual(generatedApks[0].certificateSha256Hash, 'AA:BB:CC');
+
 
 
     const releases = await billing.listTrackReleases('production');

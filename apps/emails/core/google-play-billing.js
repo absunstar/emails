@@ -174,6 +174,26 @@ function createGooglePlayBilling(options = {}) {
             encodeURIComponent(packageName) + '/edits';
     }
 
+    async function listGeneratedApks(versionCode) {
+        const code = String(versionCode || '').trim();
+        if (!code) {
+            throw billingError('VERSION_CODE_REQUIRED', 'Google Play version code is required.', 400);
+        }
+
+        const url = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/' +
+            encodeURIComponent(packageName) + '/generatedApks/' + encodeURIComponent(code);
+        const response = await googleRequest(url, { method: 'GET' });
+        const data = await readJson(response);
+        if (!response.ok) {
+            throw billingError(
+                'GOOGLE_PLAY_GENERATED_APKS_FAILED',
+                String(data?.error?.message || data.error || 'Google Play could not list generated APKs.'),
+                response.status
+            );
+        }
+        return Array.isArray(data.generatedApks) ? data.generatedApks : [];
+    }
+
     async function listTrackReleases(track = 'production') {
         const trackName = String(track || 'production').trim();
         const url = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/' +
@@ -500,6 +520,7 @@ function createGooglePlayBilling(options = {}) {
         verifyPurchase,
         acknowledgePurchase,
         verifyAndAcknowledge,
+        listGeneratedApks,
         listTrackReleases,
         createEdit,
         uploadBundle,

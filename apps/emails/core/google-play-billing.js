@@ -190,7 +190,7 @@ function createGooglePlayBilling(options = {}) {
 
         const url = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/' +
             encodeURIComponent(packageName) + '/generatedApks/' + encodeURIComponent(code) +
-            '/downloads/' + encodeURIComponent(id) + ':download';
+            '/downloads/' + encodeURIComponent(id) + ':download?alt=media';
         const response = await googleRequest(url, { method: 'GET' });
         if (!response.ok) {
             const data = await readJson(response);

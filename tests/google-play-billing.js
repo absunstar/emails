@@ -24,7 +24,7 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
             assert.strictEqual(init.headers.authorization, 'Bearer oauth-test');
             return new Response('', { status: 200 });
         }
-        if (String(url).includes('/generatedApks/14/downloads/apk-test:download') && init.method === 'GET') {
+        if (String(url).includes('/generatedApks/14/downloads/apk-test:download?alt=media') && init.method === 'GET') {
             return new Response(Buffer.from('signed-apk-test'), {
                 status: 200,
                 headers: { 'content-type': 'application/vnd.android.package-archive' },

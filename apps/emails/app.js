@@ -1735,6 +1735,14 @@ module.exports = function init(site) {
     });
 
 
+    onPost('/api/emails/admin/official-inbox/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const triage = site.officialInboxTriage;
+        if (!triage) return res.json({done:false,error:'Official inbox triage unavailable'});
+        try { res.json({done:true,result:triage.list(body(req))}); }
+        catch (error) { res.json({done:false,error:error?.message || String(error)}); }
+    });
+
     onPost('/api/emails/admin/schedules/status', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });

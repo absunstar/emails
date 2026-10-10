@@ -38,6 +38,17 @@ function readJson(filePath) {
     }
 }
 
+function classifyDeliveryError(error) {
+    const code = String(error?.code || '').toUpperCase();
+    const message = String(error?.message || error || '');
+    const responseCode = Number(error?.responseCode || 0);
+    if (error?.policyBlocked === true || /POLICY_BLOCKED|SAFETY_BLOCK|CONTENT_POLICY|SUPPRESSED/.test(code) || /blocked by .*safety checks|policy blocked/i.test(message)) return 'policy_blocked';
+    if (error?.permanent === true || (responseCode >= 500 && responseCode < 600)) return 'permanent';
+    if (error?.deliveryUnknown === true || /DELIVERY_UNKNOWN|ECONNRESET_AFTER_DATA/.test(code)) return 'delivery_unknown';
+    if (error?.retryAfterMs > 0 || (responseCode >= 400 && responseCode < 500) || /ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|RATE_LIMIT/.test(code)) return 'transient';
+    return 'delivery_unknown';
+}
+
 function makeId() {
     const value = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
     return 'schedule_' + value.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -135,7 +146,8 @@ class EmailScheduler {
             task.status = 'failed';
             task.failedAt = now;
             task.nextAttemptAt = null;
-            task.lastError = 'Scheduler process stopped while this message was sending. Delivery state is unknown; review before retrying to avoid a duplicate.';
+            task.failureCategory = 'delivery_unknown';
+            task.lastError = 'Scheduler process stopped while sending. Delivery is unconfirmed; do not retry automatically.';
             this._save(task);
         }
     }
@@ -234,6 +246,7 @@ class EmailScheduler {
                 task.sentGuid = result?.guid || '';
                 task.result = result || null;
                 task.lastError = '';
+                task.failureCategory = null;
                 task.nextAttemptAt = null;
                 this._save(task);
                 if (this.emailService.store?.audit) await this.emailService.store.audit('email_schedule_sent', { scheduleId: task.id, guid: task.sentGuid, sendAtUtc: task.sendAtUtc, attempts: task.attempts });
@@ -241,7 +254,12 @@ class EmailScheduler {
             } catch (error) {
                 task = this._read(id) || task;
                 task.lastError = error?.message || String(error);
-                if (Number(error?.retryAfterMs || 0) > 0 && error?.permanent !== true) {
+                task.failureCategory = classifyDeliveryError(error);
+                if (task.failureCategory === 'policy_blocked' || task.failureCategory === 'permanent' || task.failureCategory === 'delivery_unknown') {
+                    task.status = 'failed';
+                    task.failedAt = new Date().toISOString();
+                    task.nextAttemptAt = null;
+                } else if (Number(error?.retryAfterMs || 0) > 0 && error?.permanent !== true) {
                     task.attempts = Math.max(0, Number(task.attempts || 1) - 1);
                     task.status = 'scheduled';
                     task.nextAttemptAt = new Date(Date.now() + Math.max(1000, Number(error.retryAfterMs))).toISOString();
@@ -422,9 +440,12 @@ class EmailScheduler {
             const task = this._read(id);
             if (!task) throw new Error('Scheduled email not found');
             if (!['failed', 'cancelled'].includes(task.status)) throw new Error('Only failed or cancelled schedules can be retried');
+            if (task.failureCategory === 'policy_blocked') throw new Error('Policy-blocked messages cannot be retried through the queue');
+            if (task.failureCategory === 'delivery_unknown') throw new Error('Delivery-unconfirmed messages require independent reconciliation before retry');
             const immediate = new Date(Date.now() + 1000).toISOString();
             const when = args && (args.sendAt || args.date || args.time) ? parseWhen(args) : { input: immediate, utc: immediate, timezone: 'UTC', timezoneOffset: 'Z' };
             task.status = 'scheduled';
+            task.failureCategory = null;
             task.sendAt = when.input;
             task.sendAtUtc = when.utc;
             task.timezone = when.timezone;

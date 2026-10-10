@@ -220,6 +220,8 @@ class EmailScheduler {
             let task = this._read(id);
             if (!task) throw new Error('Scheduled email not found');
             const allowedStatuses = force ? ['scheduled', 'failed'] : ['scheduled'];
+            if (task.failureCategory === 'policy_blocked') throw new Error('Policy-blocked messages cannot be sent through the queue');
+            if (task.failureCategory === 'delivery_unknown') throw new Error('Delivery-unconfirmed messages require independent reconciliation');
             if (!allowedStatuses.includes(task.status)) return publicTask(task, true);
             if (!force && Date.parse(task.nextAttemptAt || task.sendAtUtc) > Date.now()) return publicTask(task, true);
 
@@ -377,6 +379,7 @@ class EmailScheduler {
             let task = this._read(id);
             if (!task) throw new Error('Scheduled email not found');
             if (task.status === 'sent' || task.status === 'sending') throw new Error('A sent or currently sending schedule cannot be edited');
+            if (task.failureCategory === 'policy_blocked' || task.failureCategory === 'delivery_unknown') throw new Error('Blocked or delivery-unconfirmed tasks cannot be reactivated by editing');
             if (args.message) {
                 const next = normalizeMessage(Object.assign({}, task.message, args.message));
                 if (!next.from || !(Array.isArray(next.to) ? next.to.length : next.to) || (!next.text && !next.html)) throw new Error('Updated message is incomplete');

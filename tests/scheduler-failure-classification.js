@@ -14,6 +14,8 @@ const {createEmailScheduler}=require('../apps/emails/core/email-scheduler');
     assert.equal(failed.failureCategory,'policy_blocked');
     assert.equal(failed.nextAttemptAt,null);
     await assert.rejects(scheduler.retry(task.id),/cannot be retried/);
+    await assert.rejects(scheduler.sendNow(task.id),/cannot be sent/);
+    await assert.rejects(scheduler.update(task.id,{message:{text:'changed'}}),/cannot be reactivated/);
     assert.equal(scheduler.get(task.id).attempts,1);
     console.log('Queue policy failure classification passed');
   } finally {scheduler.stop();fs.rmSync(dir,{recursive:true,force:true});}

@@ -9,8 +9,8 @@ const ROLE_MAILBOXES = new Set([
   'info@kids-browser.com', 'support@kids-browser.com',
 ]);
 const AUTOMATED_SENDER = /(?:^|[<@._-])(no-?reply|mailer-daemon|postmaster|bounce|notification|verify|security|otp)(?:[>@._-]|$)/i;
-const NONACTIONABLE_SUBJECT = /\b(verification code|one.time password|your code|welcome to|dm[ao]rc|delivery status|undeliverable)\b/i;
-const PRIORITY_SUBJECT = /\b(support|urgent|error|bug|issue|problem|billing|refund|payment|partnership|collaboration|integration)\b/i;
+const NONACTIONABLE_SUBJECT = /\b(verification code|one.time password|your code|welcome to|dm[ao]rc|delivery status|undeliverable)\b|رمز التحقق|كود التحقق|رمز التأكيد|كلمة مرور لمرة واحدة/i;
+const PRIORITY_SUBJECT = /\b(support|urgent|error|bug|issue|problem|billing|refund|payment|partnership|collaboration|integration)\b|مشكلة|خطأ|دعم|عاجل|فاتورة|اشتراك|استرداد|دفع|شراكة|تعاون|تكامل/i;
 function atomicWrite(file, value) {
   fs.mkdirSync(path.dirname(file), {recursive:true});
   const tmp=file+'.'+process.pid+'.'+crypto.randomBytes(4).toString('hex')+'.tmp';
@@ -33,7 +33,7 @@ function classify(message) {
     return {...result,category:'suspected_spam',priority:'low',reason:'spam_signal'};
   }
   if (PRIORITY_SUBJECT.test(subject)) {
-    return {...result,category:/partnership|collaboration|integration/i.test(subject)?'partnership':'support',priority:'high',reason:'actionable_subject'};
+    return {...result,category:/partnership|collaboration|integration|شراكة|تعاون|تكامل/i.test(subject)?'partnership':'support',priority:'high',reason:'actionable_subject'};
   }
   return result;
 }
@@ -76,14 +76,14 @@ class OfficialInboxTriage {
     try {
       const original=(await this.emailService.read(item.guid,{allowVip:true})).message;
       if(!String(original.text||'').trim() || String(original.text||'').trim().length<15) return;
-      if(!/\b(support|error|bug|issue|problem|refund|billing)\b/i.test(item.subject))return;
+      if(!/\b(support|error|bug|issue|problem|refund|billing)\b|مشكلة|خطأ|دعم|استرداد|فاتورة|اشتراك/i.test(item.subject))return;
       const now=Date.now();
       const recent=this.list({limit:500}).items.filter(row=>row.ackScheduledAt && now-Date.parse(row.ackScheduledAt)<86400000);
       if(recent.length>=10) return;
       if(recent.some(row=>row.sender===item.sender && now-Date.parse(row.ackScheduledAt)<7*86400000)) return;
       const originalId=String(original.messageId||'');
       const sendAt=new Date(now+15000).toISOString();
-      const text='Thank you for contacting our support team. We have received your message and will review the details. Please keep this email thread for any additional information.\n\nSupport Team';
+      const text=item.recipient.endsWith('@egytag.com') ? 'شكرًا لتواصلك مع فريق الدعم. تم استلام رسالتك وسنراجع تفاصيلها. يمكنك إضافة أي معلومات أخرى من خلال الرد على نفس المحادثة.\n\nفريق دعم إيجي تاج' : 'Thank you for contacting our support team. We have received your message and will review the details. Please keep this email thread for any additional information.\n\nSupport Team';
       const task=await this.scheduler.schedule({message:{from:item.recipient,to:item.sender,
         subject:/^re\s*:/i.test(item.subject)?item.subject:'Re: '+item.subject,text,
         inReplyTo:originalId},sendAt,maxRetries:2,retryDelaySeconds:300},{client:'official-support-auto-ack'});

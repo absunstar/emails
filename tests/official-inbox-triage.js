@@ -14,6 +14,8 @@ try {
 assert.equal(classify({to:'random@social-browser.com',from:'x@example.com',subject:'hello'}),null);
 assert.equal(classify({to:'info@social-browser.com',from:'noreply@example.com',subject:'verification code'}).category,'automated');
 assert.equal(classify({to:'support@social-browser.com',from:'client@example.com',subject:'Urgent support issue'}).priority,'high');
+assert.equal(classify({to:'support@egytag.com',from:'client@example.com',subject:'مشكلة تسجيل الدخول'}).priority,'high');
+assert.equal(classify({to:'info@egytag.com',from:'no-reply@sender.com',subject:'رمز التحقق'}).category,'automated');
 events.emit('event',{type:'incoming',message:{guid:'a',to:'support@social-browser.com',from:'client@example.com',subject:'Urgent support issue'}});
 await new Promise(resolve=>setImmediate(resolve));
 assert.equal(triage.list().total,1);

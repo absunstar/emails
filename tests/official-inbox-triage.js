@@ -26,6 +26,16 @@ await new Promise(resolve=>setImmediate(resolve));
 assert.equal(triage.list().total,2);
 assert.equal(triage.list({status:'ignored'}).total,1);
 triage.stop();
+const tasks=[];
+const scheduler={async schedule(request){tasks.push(request);return{id:'test-queued-id'};},
+get(){return{status:'scheduled',lastError:''}}};
+const auto=new OfficialInboxTriage({emailService:{subscribe:mock.subscribe,read:async()=>({message:{text:'I encountered a serious bug in login.',messageId:'<source@test>'}})},scheduler,autoAckSupport:true,baseDir:path.join(root,'auto')});
+await auto.accept({guid:'support-1',to:'support@social-browser.com',from:'customer@example.com',subject:'Support: Login bug'});
+assert.equal(tasks.length,1);
+assert.equal(tasks[0].message.from,'support@social-browser.com');
+assert.equal(auto.list().items[0].deliveryState,'scheduled');
+await auto.accept({guid:'support-2',to:'support@social-browser.com',from:'customer@example.com',subject:'Support: Login bug'});
+assert.equal(tasks.length,1,'cooldown prevents duplicate acknowledgement');
 console.log('Official inbox triage passed');
 }finally{fs.rmSync(root,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

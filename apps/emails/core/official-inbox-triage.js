@@ -38,12 +38,15 @@ function classify(message) {
   return result;
 }
 class OfficialInboxTriage {
-  constructor({emailService, baseDir,logger}={}) {
+  constructor({emailService, scheduler, autoAckSupport=false, baseDir,logger}={}) {
     if (!emailService) throw new Error('emailService required');
     this.emailService=emailService;
+    this.scheduler=scheduler||null;
+    this.autoAckSupport=!!autoAckSupport;
     this.baseDir=path.resolve(baseDir||path.join(process.cwd(),'localStorage','official-inbox-queue'));
     this.logger=logger||(()=>{});
     this.unsubscribe=null;
+    this.ackChain=Promise.resolve();
   }
   file(guid) {
     const hash=crypto.createHash('sha256').update(String(guid)).digest('hex');
@@ -61,7 +64,41 @@ class OfficialInboxTriage {
       createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
       deliveryState:'not_queued',source:'official_inbox'};
     atomicWrite(file,item);
+    if(this.autoAckSupport && this.scheduler && kind.category==='support' && kind.recipient.startsWith('support@')) {
+      const work=this.ackChain.catch(()=>{}).then(()=>this.acknowledge(item,file));
+      this.ackChain=work;
+      await work;
+    }
     return item;
+  }
+  async acknowledge(item,file) {
+    // Limited receipt acknowledgement, not an AI-generated answer or a bypass for blocked mail.
+    try {
+      const original=(await this.emailService.read(item.guid,{allowVip:true})).message;
+      if(!String(original.text||'').trim() || String(original.text||'').trim().length<15) return;
+      if(!/\b(support|error|bug|issue|problem|refund|billing)\b/i.test(item.subject))return;
+      const now=Date.now();
+      const recent=this.list({limit:500}).items.filter(row=>row.ackScheduledAt && now-Date.parse(row.ackScheduledAt)<86400000);
+      if(recent.length>=10) return;
+      if(recent.some(row=>row.sender===item.sender && now-Date.parse(row.ackScheduledAt)<7*86400000)) return;
+      const originalId=String(original.messageId||'');
+      const sendAt=new Date(now+15000).toISOString();
+      const text='Thank you for contacting our support team. We have received your message and will review the details. Please keep this email thread for any additional information.\n\nSupport Team';
+      const task=await this.scheduler.schedule({message:{from:item.recipient,to:item.sender,
+        subject:/^re\s*:/i.test(item.subject)?item.subject:'Re: '+item.subject,text,
+        inReplyTo:originalId},sendAt,maxRetries:2,retryDelaySeconds:300},{client:'official-support-auto-ack'});
+      item.status='ack_queued';
+      item.ackScheduledAt=new Date().toISOString();
+      item.scheduleId=task.id;
+      item.deliveryState='scheduled';
+      item.updatedAt=new Date().toISOString();
+      atomicWrite(file,item);
+    } catch(error) {
+      item.ackError=String(error?.message||error).slice(0,500);
+      item.updatedAt=new Date().toISOString();
+      atomicWrite(file,item);
+      this.logger('Official support acknowledgement was not queued: '+item.ackError);
+    }
   }
   start() {
     if(this.unsubscribe) return this;
@@ -80,7 +117,11 @@ class OfficialInboxTriage {
       try {const item=JSON.parse(fs.readFileSync(path.join(this.baseDir,name),'utf8'));if(!status||item.status===status)rows.push(item);}catch(_){}
     }
     rows.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-    return {total:rows.length,items:rows.slice(0,Math.max(1,Math.min(Number(limit)||100,500)))};
+    const selected=rows.slice(0,Math.max(1,Math.min(Number(limit)||100,500)));
+    for (const item of selected) if(item.scheduleId && this.scheduler) {
+      try { const task=this.scheduler.get(item.scheduleId,false); item.deliveryState=task.status; item.deliveryError=task.lastError||''; } catch(_){}
+    }
+    return {total:rows.length,items:selected};
   }
 }
 module.exports={OfficialInboxTriage,classify};

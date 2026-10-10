@@ -384,7 +384,7 @@ site.emailScheduler = site.emailScheduler || createEmailScheduler({
     intervalMs: Number(process.env.EMAIL_SCHEDULE_TICK_MS || 5000),
 }).start();
 site.emailRuntimeMonitor.component('scheduler', 'running', site.emailScheduler.status());
-site.officialInboxTriage = new OfficialInboxTriage({ emailService: site.emailService, baseDir: path.join(site.cwd, 'localStorage', 'official-inbox-queue'), logger: (message) => site.log(message) }).start();
+site.officialInboxTriage = new OfficialInboxTriage({ emailService: site.emailService, scheduler: site.emailScheduler, autoAckSupport: true, baseDir: path.join(site.cwd, 'localStorage', 'official-inbox-queue'), logger: (message) => site.log(message) }).start();
 site.emailOperationsManager.setScheduler(site.emailScheduler).start();
 site.emailRuntimeMonitor.component('storage', site.emailOperationsManager.status().storage.level, { backupCount: site.emailOperationsManager.listBackups().count });
 const mcpService = createEmailMcpService({

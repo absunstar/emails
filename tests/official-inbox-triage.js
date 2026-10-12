@@ -8,7 +8,8 @@ const {OfficialInboxTriage,classify}=require('../apps/emails/core/official-inbox
 (async()=>{
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'official-inbox-'));
 const events=new EventEmitter();
-const mock={subscribe(fn){events.on('event',fn);return()=>events.off('event',fn);}};
+const moved=[];
+const mock={subscribe(fn){events.on('event',fn);return()=>events.off('event',fn);},async update(guid,patch){moved.push({guid,...patch});}};
 const triage=new OfficialInboxTriage({emailService:mock,baseDir:root}).start();
 try {
 assert.equal(classify({to:'random@social-browser.com',from:'x@example.com',subject:'hello'}),null);
@@ -16,6 +17,10 @@ assert.equal(classify({to:'info@social-browser.com',from:'noreply@example.com',s
 assert.equal(classify({to:'support@social-browser.com',from:'client@example.com',subject:'Urgent support issue'}).priority,'high');
 assert.equal(classify({to:'support@egytag.com',from:'client@example.com',subject:'مشكلة تسجيل الدخول'}).priority,'high');
 assert.equal(classify({to:'info@egytag.com',from:'no-reply@sender.com',subject:'رمز التحقق'}).category,'automated');
+assert.equal(classify({to:'info@social-browser.com',from:'noreply-dmarc@zoho.com',subject:'Report domain: social-browser.com'}).category,'report');
+assert.equal(classify({to:'info@social-browser.com',from:'Victoria <info@example.com>',subject:'Limited Time Offer: Luxury Watches'}).category,'suspected_spam');
+assert.equal(classify({to:'info@social-browser.com',from:'sarah@runmonetize.info',subject:'Question for Scripts Now'}).category,'promotion');
+assert.equal(classify({to:'info@social-browser.com',from:'gerda@webshare.io',subject:'Re: Partnership and integration'}).category,'partnership');
 events.emit('event',{type:'incoming',message:{guid:'a',to:'support@social-browser.com',from:'client@example.com',subject:'Urgent support issue'}});
 await new Promise(resolve=>setImmediate(resolve));
 assert.equal(triage.list().total,1);
@@ -27,6 +32,14 @@ events.emit('event',{type:'incoming',message:{guid:'b',to:'info@egytag.com',from
 await new Promise(resolve=>setImmediate(resolve));
 assert.equal(triage.list().total,2);
 assert.equal(triage.list({status:'ignored'}).total,1);
+events.emit('event',{type:'incoming',message:{guid:'report',to:'info@social-browser.com',from:'noreply-dmarc@zoho.com',subject:'Report domain: social-browser.com'}});
+events.emit('event',{type:'incoming',message:{guid:'spam',to:'info@social-browser.com',from:'info@example.com',subject:'Limited Time Offer: Luxury Watches'}});
+events.emit('event',{type:'incoming',message:{guid:'promo',to:'info@social-browser.com',from:'sarah@runmonetize.info',subject:'Question for Scripts Now'}});
+await new Promise(resolve=>setImmediate(resolve));
+assert(moved.some(m=>m.guid==='report'&&m.folder==='Reports'&&m.read));
+assert(moved.some(m=>m.guid==='spam'&&m.folder==='spam'&&m.read));
+assert(moved.some(m=>m.guid==='promo'&&m.folder==='Promotions'&&m.read));
+assert.equal(triage.list({status:'ignored'}).total,4);
 triage.stop();
 const tasks=[];
 const scheduler={async schedule(request){tasks.push(request);return{id:'test-queued-id'};},

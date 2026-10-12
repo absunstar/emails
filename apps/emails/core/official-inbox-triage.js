@@ -10,6 +10,10 @@ const ROLE_MAILBOXES = new Set([
 ]);
 const AUTOMATED_SENDER = /(?:^|[<@._-])(no-?reply|mailer-daemon|postmaster|bounce|notification|verify|security|otp)(?:[>@._-]|$)/i;
 const NONACTIONABLE_SUBJECT = /\b(verification code|one.time password|your code|welcome to|dm[ao]rc|delivery status|undeliverable)\b|رمز التحقق|كود التحقق|رمز التأكيد|كلمة مرور لمرة واحدة/i;
+const REPORT_SIGNAL = /\bdmarc\b|aggregate report|report domain:|report domain\b|noreply-dmarc|dmarcreport@/i;
+const SPAM_SIGNAL = /luxury (?:watches|timepieces)|timeless luxury|custom (?:caps|lanyards)|eco-friendly custom bags|loan funding\s*\/\s*financing offer|inheritance compensation|(?:private business|my) proposal|investment and loan opportunity/i;
+const PROMOTION_SENDER = /@(?:runmonetize\.info|adhoopu-tech\.com|lotex-dev\.com|talentube\.net)$/i;
+const ROUTING_FOLDERS = Object.freeze({report:'Reports',suspected_spam:'spam',promotion:'Promotions',automated:'Automated'});
 const PRIORITY_SUBJECT = /\b(support|urgent|error|bug|issue|problem|billing|refund|payment|partnership|collaboration|integration)\b|مشكلة|خطأ|دعم|عاجل|فاتورة|اشتراك|استرداد|دفع|شراكة|تعاون|تكامل/i;
 function atomicWrite(file, value) {
   fs.mkdirSync(path.dirname(file), {recursive:true});
@@ -26,11 +30,17 @@ function classify(message) {
   const sender=emails(message.from)[0]||'';
   const subject=String(message.subject||'');
   const result={recipient:recipients[0],sender,category:'general',priority:'normal',reason:'official_mailbox'};
+  if (REPORT_SIGNAL.test(subject+' '+sender)) {
+    return {...result,category:'report',priority:'low',reason:'security_aggregate_report'};
+  }
+  if (message.folder==='spam' || SPAM_SIGNAL.test(subject) || /@photo\.vb2tr\.ru$/i.test(sender)) {
+    return {...result,category:'suspected_spam',priority:'low',reason:'spam_signal'};
+  }
+  if (PROMOTION_SENDER.test(sender)) {
+    return {...result,category:'promotion',priority:'low',reason:'unsolicited_promotion'};
+  }
   if (!sender || sender===recipients[0] || AUTOMATED_SENDER.test(message.from) || NONACTIONABLE_SUBJECT.test(subject) || /auto.submitted|out.of.office/i.test(subject)) {
     return {...result,category:'automated',priority:'low',reason:'automatic_or_nonactionable'};
-  }
-  if (message.folder==='spam' || message.hasAttachments && /inheritance|loan funding|compensation/i.test(subject)) {
-    return {...result,category:'suspected_spam',priority:'low',reason:'spam_signal'};
   }
   if (PRIORITY_SUBJECT.test(subject)) {
     return {...result,category:/partnership|collaboration|integration|شراكة|تعاون|تكامل/i.test(subject)?'partnership':'support',priority:'high',reason:'actionable_subject'};
@@ -58,12 +68,21 @@ class OfficialInboxTriage {
     if (!kind) return null;
     const file=this.file(message.guid);
     if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file,'utf8'));
-    const status=kind.category==='automated'||kind.category==='suspected_spam'?'ignored':'needs_reply';
+    const status=ROUTING_FOLDERS[kind.category]?'ignored':'needs_reply';
     const item={id:crypto.createHash('sha256').update(message.guid).digest('hex'),guid:message.guid,
       status,...kind,subject:String(message.subject||'').slice(0,500),
       createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),
       deliveryState:'not_queued',source:'official_inbox'};
     atomicWrite(file,item);
+    const targetFolder=ROUTING_FOLDERS[kind.category];
+    if (targetFolder && typeof this.emailService.update==='function' &&
+        !(typeof this.emailService.isVipMessage==='function' && this.emailService.isVipMessage(message))) {
+      try {
+        await this.emailService.update(message.guid,{folder:targetFolder,read:true},{allowVip:false});
+      } catch(error) {
+        this.logger('Official inbox routing failed: '+(error?.message||error));
+      }
+    }
     if(this.autoAckSupport && this.scheduler && kind.category==='support' && kind.recipient.startsWith('support@')) {
       const work=this.ackChain.catch(()=>{}).then(()=>this.acknowledge(item,file));
       this.ackChain=work;

@@ -779,9 +779,9 @@ class EmailBackupStorageManager {
             messageBytes += Buffer.byteLength(JSON.stringify(doc || {}), 'utf8');
             attachmentBytes += (Array.isArray(doc.attachments) ? doc.attachments : []).reduce((sum, item) => sum + Math.max(0, Number(item?.size || 0)), 0);
         }
-        const audit = this._oldFiles(path.join(this.rootDir, 'email-files', 'audit'), rules.auditDays);
-        const tracking = this._oldFiles(path.join(this.rootDir, 'email-files', 'tracking'), rules.trackingDays);
-        const schedulePreview = this.scheduler?.prunePreview?.({ completedDays: rules.completedSchedulesDays, cancelledDays: rules.cancelledSchedulesDays }) || { count: 0, ids: [], bytes: 0 };
+        const audit = args.messagesOnly === true ? [] : this._oldFiles(path.join(this.rootDir, 'email-files', 'audit'), rules.auditDays);
+        const tracking = args.messagesOnly === true ? [] : this._oldFiles(path.join(this.rootDir, 'email-files', 'tracking'), rules.trackingDays);
+        const schedulePreview = args.messagesOnly === true ? { count: 0, ids: [], bytes: 0 } : (this.scheduler?.prunePreview?.({ completedDays: rules.completedSchedulesDays, cancelledDays: rules.cancelledSchedulesDays }) || { count: 0, ids: [], bytes: 0 });
         const backupPreview = this._backupPrunePreview();
         const token = crypto.randomBytes(18).toString('hex');
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
@@ -858,7 +858,7 @@ class EmailBackupStorageManager {
             deletedTrackingFiles: deletedTracking,
             schedules,
             backups,
-            report: await this.storageReportAsync({ force: true }),
+            report: args.fastReport === true ? this.quickStorageReport() : await this.storageReportAsync({ force: true }),
         };
     }
 
@@ -903,7 +903,8 @@ class EmailBackupStorageManager {
 
     async runMaintenance(args) {
         args = args || {};
-        const reportBefore = await this.storageReportAsync({ force: true });
+        // Avoid a 100k+ per-file disk scan on the active SMTP event loop.
+        const reportBefore = this.quickStorageReport();
         this.state.lastMaintenanceAt = iso();
         let backup = null;
         let cleanup = null;
@@ -931,11 +932,11 @@ class EmailBackupStorageManager {
                     || Date.now() - previousSweep >= Number(retention.intervalHours || 24) * 3600000);
             if (due) {
                 try {
-                    const preview = this.cleanupPreview({ emergency: false, maxMessages: retention.maxMessagesPerRun || 3000 });
+                    const preview = this.cleanupPreview({ emergency: false, maxMessages: retention.maxMessagesPerRun || 3000, messagesOnly: true });
                     const counts = preview.candidates;
                     const hasWork = counts.messages || counts.auditFiles || counts.trackingFiles || counts.schedules;
                     if (hasWork) {
-                        cleanup = await this.cleanupExecute({ confirm: true, confirmToken: preview.confirmToken });
+                        cleanup = await this.cleanupExecute({ confirm: true, confirmToken: preview.confirmToken, fastReport: true });
                     } else {
                         delete this.state.previewTokens[preview.confirmToken];
                     }
@@ -952,7 +953,7 @@ class EmailBackupStorageManager {
         this._lastStorageReport = null;
         let reportAfter;
         if (cleanup) {
-            reportAfter = await this.storageReportAsync({ force: true });
+            reportAfter = cleanup.report || this.quickStorageReport();
         } else {
             reportAfter = clone(reportBefore);
             reportAfter.disk = this._diskInfo() || reportAfter.disk;

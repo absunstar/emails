@@ -910,7 +910,12 @@ class EmailBackupStorageManager {
         let cleanup = null;
         const emergencyBefore = reportBefore.level === 'emergency' || reportBefore.level === 'blocked';
         const dueBackup = this.config.backup.enabled !== false && (!this.state.lastBackupAt || Date.now() - Date.parse(this.state.lastBackupAt) >= Number(this.config.backup.intervalHours || 24) * 3600000);
-        if (dueBackup && args.skipBackup !== true && !emergencyBefore) {
+        // Catch-up retention is prioritized over slow full backups. An existing
+        // verified backup remains available; the next normal run backs up once
+        // the expired-message backlog is gone.
+        const deferBackupForRetention = this.config.retention.autoCleanup !== false
+            && (!this.state.lastRetentionSweepAt || this.state.retentionCatchupPending === true);
+        if (dueBackup && args.skipBackup !== true && !emergencyBefore && !deferBackupForRetention) {
             try { backup = await this.createBackup({ reason: 'automatic-maintenance' }); }
             catch (error) { this._alert('error', 'backup_failed', 'Automatic backup failed', { error: String(error?.message || error) }); }
         } else if (dueBackup && emergencyBefore) {

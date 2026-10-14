@@ -176,7 +176,10 @@ const DEFAULT_CONFIG = {
         minFreeBytes: 512 * 1024 * 1024,
     },
     retention: {
-        messagesDays: 30,
+        autoCleanup: true,
+        messagesDays: 7,
+        intervalHours: 24,
+        maxMessagesPerRun: 3000,
         auditDays: 30,
         trackingDays: 30,
         completedSchedulesDays: 30,
@@ -222,6 +225,8 @@ class EmailBackupStorageManager {
             lastBackupError: null,
             lastMaintenanceAt: null,
             lastCleanupAt: null,
+            lastRetentionSweepAt: null,
+            retentionCatchupPending: false,
             lastRestoreAt: null,
             restartRequired: false,
             writeBlocked: false,
@@ -276,7 +281,11 @@ class EmailBackupStorageManager {
         next.storage.emergencyPercent = Math.max(next.storage.criticalPercent, clampPercent(next.storage.emergencyPercent, 95));
         next.storage.hardStopPercent = Math.max(next.storage.emergencyPercent, clampPercent(next.storage.hardStopPercent, 98));
         next.storage.minFreeBytes = Math.max(64 * 1024 * 1024, Number(next.storage.minFreeBytes || DEFAULT_CONFIG.storage.minFreeBytes));
-        for (const key of Object.keys(DEFAULT_CONFIG.retention)) next.retention[key] = Math.max(1, Math.min(Number(next.retention[key] || DEFAULT_CONFIG.retention[key]), 3650));
+        next.retention.autoCleanup = next.retention.autoCleanup !== false;
+        next.retention.messagesDays = Math.max(1, Math.min(Number(next.retention.messagesDays || 7), 3650));
+        next.retention.intervalHours = Math.max(1, Math.min(Number(next.retention.intervalHours || 24), 168));
+        next.retention.maxMessagesPerRun = Math.max(100, Math.min(Number(next.retention.maxMessagesPerRun || 3000), 5000));
+        for (const key of ['auditDays', 'trackingDays', 'completedSchedulesDays', 'cancelledSchedulesDays']) next.retention[key] = Math.max(1, Math.min(Number(next.retention[key] || DEFAULT_CONFIG.retention[key]), 3650));
         for (const key of Object.keys(DEFAULT_CONFIG.emergency).filter((key) => key !== 'autoCleanup')) next.emergency[key] = Math.max(1, Math.min(Number(next.emergency[key] || DEFAULT_CONFIG.emergency[key]), 3650));
         next.maintenance.intervalMinutes = Math.max(5, Math.min(Number(next.maintenance.intervalMinutes || 15), 1440));
         this.config = next;
@@ -731,18 +740,41 @@ class EmailBackupStorageManager {
         return files;
     }
 
+    isProtectedFromRetention(doc) {
+        if (!doc) return false;
+        if (this.emailService.isVipMessage?.(doc) || this.emailService.store.isProtectedMessage?.(doc)) return true;
+        if (doc.favorite === true) return true;
+        const folder = String(doc.folder || '').trim().toLowerCase();
+        if (['important', 'مهم', 'reviewed', 'reports', 'send', 'sent'].includes(folder)) return true;
+        if (String(doc.status || '').toLowerCase() === 'sent') return true;
+        if (['spam', 'promotions', 'automated', 'trash'].includes(folder)) return false;
+
+        // Untriaged conversations addressed to official role mailboxes must not
+        // disappear merely because someone forgot to mark them as important.
+        const addresses = (String(doc.to || '') + ',' + String(doc.cc || '')).toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g) || [];
+        return addresses.some((address) =>
+            /^(?:info|support|contact|owner|partners|business|billing|security|developers|sales)@(?:social-browser\.com|egytag\.com|kids-browser\.com)$/.test(address)
+        );
+    }
+
     cleanupPreview(args) {
         args = args || {};
         const emergency = args.emergency === true;
         const rules = emergency ? this.config.emergency : this.config.retention;
         const cutoff = Date.now() - Number(rules.messagesDays || 30) * 86400000;
         const messageGuids = [];
+        const maxMessages = args.maxMessages == null ? Infinity : Math.max(1, Math.floor(Number(args.maxMessages) || 1));
+        let moreCandidates = false;
         let messageBytes = 0;
         let attachmentBytes = 0;
         for (const doc of this.emailService.store.messageValues()) {
             const time = Date.parse(doc?.date || doc?._fileStore?.createdAt || 0);
             if (!Number.isFinite(time) || time >= cutoff) continue;
-            if (this.emailService.isVipMessage?.(doc) || this.emailService.store.isProtectedMessage?.(doc)) continue;
+            if (this.isProtectedFromRetention(doc)) continue;
+            if (messageGuids.length >= maxMessages) {
+                moreCandidates = true;
+                break;
+            }
             messageGuids.push(String(doc.guid));
             messageBytes += Buffer.byteLength(JSON.stringify(doc || {}), 'utf8');
             attachmentBytes += (Array.isArray(doc.attachments) ? doc.attachments : []).reduce((sum, item) => sum + Math.max(0, Number(item?.size || 0)), 0);
@@ -757,6 +789,7 @@ class EmailBackupStorageManager {
             type: 'cleanup',
             expiresAt,
             emergency,
+            cutoff,
             messageGuids,
             auditFiles: audit.map((item) => item.path),
             trackingFiles: tracking.map((item) => item.path),
@@ -767,6 +800,7 @@ class EmailBackupStorageManager {
         return {
             dryRun: true,
             emergency,
+            moreCandidates,
             rules: clone(rules),
             candidates: {
                 messages: messageGuids.length,
@@ -794,7 +828,13 @@ class EmailBackupStorageManager {
         const preview = this.state.previewTokens[token];
         if (!preview || preview.type !== 'cleanup' || Date.parse(preview.expiresAt || 0) < Date.now()) throw new Error('A fresh cleanup preview and valid confirmToken are required');
         if (args.confirm !== true) throw new Error('confirm=true is required to execute cleanup');
-        const deletedMessages = preview.messageGuids.length ? await this.emailService.store.deleteMessages(preview.messageGuids) : { deleted: [], notFound: [] };
+        // Re-check protection at execution time: a message may have been starred
+        // or moved into Important between preview and the destructive operation.
+        const safeGuids = (preview.messageGuids || []).filter((guid) => {
+            const doc = this.emailService.store.messages.get(String(guid));
+            return doc && !this.isProtectedFromRetention(doc) && Date.parse(doc.date || doc._fileStore?.createdAt || 0) < (preview.cutoff || Date.now());
+        });
+        const deletedMessages = safeGuids.length ? await this.emailService.store.deleteMessages(safeGuids) : { deleted: [], notFound: [] };
         let deletedAudit = 0;
         let deletedTracking = 0;
         for (const filePath of preview.auditFiles || []) {
@@ -883,7 +923,31 @@ class EmailBackupStorageManager {
                 this._alert('error', 'emergency_cleanup_failed', 'Emergency storage cleanup failed', { error: String(error?.message || error) });
             }
         } else {
-            try { await this.pruneBackups(); } catch (_) {}
+            const retention = this.config.retention || {};
+            const previousSweep = Date.parse(this.state.lastRetentionSweepAt || 0) || 0;
+            const due = retention.autoCleanup !== false
+                && (this.state.retentionCatchupPending === true
+                    || !previousSweep
+                    || Date.now() - previousSweep >= Number(retention.intervalHours || 24) * 3600000);
+            if (due) {
+                try {
+                    const preview = this.cleanupPreview({ emergency: false, maxMessages: retention.maxMessagesPerRun || 3000 });
+                    const counts = preview.candidates;
+                    const hasWork = counts.messages || counts.auditFiles || counts.trackingFiles || counts.schedules;
+                    if (hasWork) {
+                        cleanup = await this.cleanupExecute({ confirm: true, confirmToken: preview.confirmToken });
+                    } else {
+                        delete this.state.previewTokens[preview.confirmToken];
+                    }
+                    this.state.lastRetentionSweepAt = iso();
+                    this.state.retentionCatchupPending = preview.moreCandidates === true;
+                } catch (error) {
+                    this._alert('error', 'retention_cleanup_failed', 'Automatic retention cleanup failed', { error: String(error?.message || error) });
+                }
+            }
+            if (!cleanup) {
+                try { await this.pruneBackups(); } catch (_) {}
+            }
         }
         this._lastStorageReport = null;
         let reportAfter;
@@ -971,6 +1035,8 @@ class EmailBackupStorageManager {
             lastBackupError: this.state.lastBackupError,
             lastMaintenanceAt: this.state.lastMaintenanceAt,
             lastCleanupAt: this.state.lastCleanupAt,
+            lastRetentionSweepAt: this.state.lastRetentionSweepAt,
+            retentionCatchupPending: this.state.retentionCatchupPending === true,
             lastRestoreAt: this.state.lastRestoreAt,
             storage: report,
             backups: { count: backups.count, latest: backups.backups[0] || null },

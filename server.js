@@ -9,6 +9,7 @@ const { createSmtpOutboundTransport } = require('./apps/emails/core/smtp-outboun
 const sendmail = createSmtpOutboundTransport({ logger: (message) => console.log('[smtp-outbound]', message) });
 const { createEmailService } = require('./apps/emails/core/email-service');
 const { createEmailAbusePolicy } = require('./apps/emails/core/abuse-policy');
+const { acceptedEnvelopeRecipients } = require('./apps/emails/core/smtp-recipient');
 const { createEmailMcpService } = require('./apps/emails/mcp-service');
 const { createEmailScheduler } = require('./apps/emails/core/email-scheduler');
 const { OfficialInboxTriage } = require('./apps/emails/core/official-inbox-triage');
@@ -314,12 +315,14 @@ const smtpServer = new SMTPServer({
                         throw smtpError('An attachment exceeds the configured size limit', 552);
                     }
                 }
+                const actualRecipients = acceptedEnvelopeRecipients(session);
+                if (!actualRecipients.length) throw smtpError('No accepted SMTP envelope recipient', 550);
                 await site.emailService.ingestIncoming({
                     messageId: parsed.messageId || '',
                     folder: 'inbox',
                     subject,
                     from,
-                    to: parsed.to?.text || '',
+                    to: actualRecipients.join(', '),
                     cc: parsed.cc?.text || '',
                     replyTo: parsed.replyTo?.text || '',
                     inReplyTo: parsed.inReplyTo || '',

@@ -1,0 +1,26 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const js = fs.readFileSync('apps/emails/site_files/js/index.js','utf8');
+const html = fs.readFileSync('apps/emails/site_files/html/free.html','utf8');
+function helper(name){const a=js.indexOf('    function '+name+'(');const b=js.indexOf('\n    }\n',a);assert(a>=0&&b>a);return vm.runInNewContext('('+js.slice(a,b+6).trim()+')');}
+const senderDisplay=helper('senderDisplay');
+const matchOtpCode=helper('matchOtpCode');
+assert.equal(senderDisplay('"PUBG Mobile" <noreply@pubgmobile.com>').name,'PUBG Mobile');
+assert.equal(senderDisplay('"PUBG Mobile" <noreply@pubgmobile.com>').address,'noreply@pubgmobile.com');
+assert.equal(matchOtpCode('[PUBG MOBILE] Your login verification code is 65492'),'65492');
+const start=js.indexOf('            listHost.innerHTML = items.map((mail, index) => {');
+const end=js.indexOf("            }).join('');",start)+"            }).join('');".length;
+assert(start>=0&&end>start);
+const escape=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const render=new Function('items','newGuids','matchOtpCode','senderDisplay','escape','ui','const listHost={};'+js.slice(start,end)+';return listHost.innerHTML;');
+const renderOne=mail=>render([mail],new Set(),matchOtpCode,senderDisplay,escape,{dateTime:v=>v});
+const sample=renderOne({guid:'g1',from:'"PUBG Mobile" <noreply@pubgmobile.com>',subject:'[PUBG MOBILE] Your login verification code is 65492',date:'2026-10-25'});
+for(const phrase of ['mail-message-card has-otp','mail-sender-name">PUBG Mobile','mail-sender-email','mail-message-subject','otp-copy-value">65492','data-code="65492"','data-otp-copy-label>Copy code','mail-message-view-btn'])assert(sample.includes(phrase),phrase);
+assert(html.includes('.inbox-list .otp-copy-value{'));
+assert(html.includes('.inbox-list .mail-message-card{'));
+const ordinary=renderOne({guid:'g2',from:'contact@example.com',subject:'Hello',date:'today'});
+assert(!ordinary.includes('otp-copy-card'));
+assert(ordinary.includes('View message'));
+console.log('Mail message cards, OTP hierarchy and normal message rendering PASS');

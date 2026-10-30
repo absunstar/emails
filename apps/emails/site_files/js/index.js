@@ -99,6 +99,30 @@
         }
     }
 
+    async function copyInboxCode(button) {
+        const code = String(button?.dataset.code || '').trim();
+        if (!code) return false;
+        try {
+            const copied = await ui.copy(code);
+            if (!copied) throw new Error('Copy failed');
+            const label = button.querySelector('[data-otp-copy-label]');
+            if (label) {
+                label.textContent = 'Copied!';
+                button.classList.add('is-copied');
+                setTimeout(() => {
+                    if (!button.isConnected) return;
+                    label.textContent = 'Copy code';
+                    button.classList.remove('is-copied');
+                }, 1600);
+            }
+            toast('Verification code copied to clipboard.', 'success', 'Code copied');
+            return true;
+        } catch (error) {
+            toast(error.message || 'Unable to copy the verification code.', 'error', 'Copy failed');
+            return false;
+        }
+    }
+
     function flashButton(button, label, type) {
         if (!button) return;
         const original = button.dataset.originalHtml || button.innerHTML;
@@ -506,6 +530,14 @@
         return list;
     }
 
+    function senderDisplay(value) {
+        const raw = String(value || '').trim();
+        const match = raw.match(/^(.*?)\s*<([^<>]+)>$/);
+        if (!match) return { name: raw || 'Unknown sender', address: '' };
+        const name = match[1].trim().replace(/^['"]|['"]$/g, '');
+        return { name: name || match[2], address: name ? match[2] : '' };
+    }
+
     function renderInboxToolbar(filteredCount) {
         const total = q('[data-inbox-total]');
         if (total) total.textContent = String(filteredCount) + (filteredCount === 1 ? ' message' : ' messages') + (filteredCount !== state.list.length ? ' of ' + state.list.length : '');
@@ -563,10 +595,11 @@
                 const attachmentBadge = mail.hasAttachments || (mail.attachments && mail.attachments.length) ? '<span class="mail-attachment-badge">Attachment</span>' : '';
                 const newBadge = isNew ? '<span class="mail-new-badge">New</span>' : '';
                 const otp = matchOtpCode(mail.subject);
-                const codeBadge = otp ? '<button class="smart-inbox-message-badge is-otp" type="button" data-action="copy-inbox-code" data-code="' + escape(otp) + '" title="Copy verification code">Code ' + escape(otp) + ' · Copy</button>' : '';
+                const from = senderDisplay(mail.from);
+                const codeBadge = otp ? '<div class="otp-highlight-row"><button class="otp-copy-card" type="button" data-action="copy-inbox-code" data-code="' + escape(otp) + '" aria-label="Copy verification code ' + escape(otp) + '"><span class="otp-copy-info"><span class="otp-copy-label">Verification code</span><strong class="otp-copy-value">' + escape(otp) + '</strong></span><span class="otp-copy-action"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path></svg><span data-otp-copy-label>Copy code</span></span></button></div>' : '';
                 const previewBadge = !otp && /verification|verify|confirm|activate|otp|security code/i.test(String(mail.subject || '')) ? '<span class="smart-inbox-message-badge">Verification</span>' : '';
                 const badgeRow = codeBadge || previewBadge ? '<div class="smart-inbox-mail-preview">' + codeBadge + previewBadge + '</div>' : '';
-                return '<article class="sb-mail-card mail-message-card' + (isNew ? ' is-new' : '') + '" data-guid="' + escape(mail.guid) + '"><span class="mail-message-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><div class="mail-message-copy"><div class="sb-mail-meta">' + escape(mail.from) + '</div><div class="sb-mail-subject">' + escape(mail.subject || '(No subject)') + '</div><div class="mail-message-date">' + escape(ui.dateTime(mail.date)) + '</div>' + badgeRow + '</div><div class="mail-message-actions-side"><div class="sb-actions">' + newBadge + attachmentBadge + '</div><button class="sb-btn sb-btn-small" type="button" data-action="view" data-guid="' + escape(mail.guid) + '"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg><span>View Message</span></button></div></article>';
+                return '<article class="sb-mail-card mail-message-card' + (isNew ? ' is-new' : '') + (otp ? ' has-otp' : '') + '" data-guid="' + escape(mail.guid) + '"><span class="mail-message-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><div class="mail-message-copy"><div class="mail-message-top"><div class="mail-message-sender"><strong class="mail-sender-name">' + escape(from.name) + '</strong>' + (from.address ? '<span class="mail-sender-email">&lt;' + escape(from.address) + '&gt;</span>' : '') + '</div><span class="mail-message-date">' + escape(ui.dateTime(mail.date)) + '</span></div><h3 class="sb-mail-subject mail-message-subject">' + escape(mail.subject || '(No subject)') + '</h3>' + badgeRow + '</div><div class="mail-message-actions-side"><div class="sb-actions mail-message-badges">' + newBadge + attachmentBadge + '</div><button class="sb-btn sb-btn-small mail-message-view-btn" type="button" data-action="view" data-guid="' + escape(mail.guid) + '"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg><span>View message</span></button></div></article>';
             }).join('');
             return;
         }
@@ -1202,7 +1235,7 @@
                 if (banner) banner.hidden = true;
                 return checkInbox(q('[data-action="check-inbox"]'));
             }
-            if (action === 'copy-inbox-code') return copyWithFeedback(button, button.dataset.code || '', 'Verification code copied to clipboard.');
+            if (action === 'copy-inbox-code') return copyInboxCode(button);
             if (action === 'previous-message') return navigateMessage(-1);
             if (action === 'next-message') return navigateMessage(1);
             if (action === 'toggle-saved-inboxes') {

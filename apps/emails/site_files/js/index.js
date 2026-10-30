@@ -26,6 +26,11 @@
         currentEmail: null,
         currentMailbox: '',
         activeNewCount: 0,
+        inboxFilter: 'all',
+        inboxSort: 'newest',
+        loadGeneration: 0,
+        viewGeneration: 0,
+        pendingLiveRefresh: 0,
         minEmailLength: location.pathname.includes('vip') ? 6 : 8,
         maxEmailLength: location.pathname.includes('vip') ? 10 : 14,
         sidebarSearch: '',
@@ -444,6 +449,8 @@
         const input = q('[data-mail-address]');
         if (!state.addressBook.active) {
             if (input) input.value = '';
+            state.loadGeneration += 1;
+            state.busy = false;
             state.list = [];
             state.count = 0;
             render();
@@ -457,6 +464,7 @@
         const normalized = normalizeMailbox(email);
         if (!addressEntry(normalized)) return;
         state.addressBook.active = normalized;
+        state.pendingLiveRefresh = 0;
         saveAddressBook();
         renderAddressSidebar();
         const input = q('[data-mail-address]');
@@ -478,24 +486,87 @@
         updateClientBadges();
     }
 
+    function matchOtpCode(value) {
+        const source = String(value || '').replace(/\s+/g, ' ').slice(0, 16000);
+        const match = source.match(/(?:verification|verify|security|confirmation|confirm|login|sign[ -]?in|otp|passcode|one[ -]?time|code|pin|رمز|كود|تأكيد)[^\r\n]{0,55}?\b([0-9]{4,8}|(?=[a-z0-9]{5,9}\b)(?=[a-z0-9]*[0-9])[a-z0-9]{5,9})\b/i);
+        return match ? match[1] : '';
+    }
+
+    function visibleInboxMessages() {
+        const filter = mode === 'free' ? state.inboxFilter : 'all';
+        const query = mode === 'free' ? String(q('[data-inbox-search]')?.value || '').trim().toLowerCase() : '';
+        const list = state.list.filter((mail) => {
+            if (query && ![mail.from, mail.to, mail.subject].some((value) => String(value || '').toLowerCase().includes(query))) return false;
+            if (filter === 'codes' && !matchOtpCode(mail.subject)) return false;
+            if (filter === 'attachments' && !mail.hasAttachments && !(Array.isArray(mail.attachments) && mail.attachments.length)) return false;
+            return true;
+        });
+        if (state.inboxSort === 'oldest') return list.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+        if (state.inboxSort === 'sender') return list.sort((a, b) => String(a.from || '').localeCompare(String(b.from || '')));
+        return list;
+    }
+
+    function renderInboxToolbar(filteredCount) {
+        const total = q('[data-inbox-total]');
+        if (total) total.textContent = String(filteredCount) + (filteredCount === 1 ? ' message' : ' messages') + (filteredCount !== state.list.length ? ' of ' + state.list.length : '');
+        for (const button of qa('[data-inbox-filter]')) button.setAttribute('aria-pressed', String(button.dataset.inboxFilter === state.inboxFilter));
+    }
+
+    function showInboxAlert(count) {
+        const alert = q('[data-inbox-alert]');
+        if (!alert) return;
+        const label = q('[data-inbox-alert-text]', alert);
+        if (label) label.textContent = String(count || 1) + ' new message' + (count === 1 ? '' : 's') + ' received';
+        alert.hidden = false;
+    }
+
+    function updateMessageNavigation(guid) {
+        const navigation = document.querySelector('[data-inbox-navigation]');
+        if (!navigation) return;
+        const items = mode === 'free' ? visibleInboxMessages() : [];
+        const index = items.findIndex((item) => String(item.guid) === String(guid));
+        navigation.hidden = index < 0;
+        if (index < 0) return;
+        const position = document.querySelector('[data-message-position]');
+        if (position) position.textContent = (index + 1) + ' / ' + items.length;
+        const previous = navigation.querySelector('[data-action="previous-message"]');
+        const next = navigation.querySelector('[data-action="next-message"]');
+        if (previous) previous.disabled = index <= 0;
+        if (next) next.disabled = index >= items.length - 1;
+    }
+
+    function navigateMessage(direction) {
+        if (mode !== 'free' || !state.currentEmail) return;
+        const items = visibleInboxMessages();
+        const index = items.findIndex((item) => String(item.guid) === String(state.currentEmail.guid));
+        const target = items[index + direction];
+        if (index >= 0 && target) return viewEmail(target.guid);
+    }
+
     function render() {
         const listHost = q('[data-email-list]');
         if (!listHost) return;
         if (mode === 'free') renderAddressSidebar();
         const filterText = String(q('[data-search-text]')?.value || '').trim().toLowerCase();
-        const items = filterText ? state.list.filter((mail) => [mail.from, mail.to, mail.subject, mail.folder].some((value) => String(value || '').toLowerCase().includes(filterText))) : state.list;
+        const items = mode === 'free' ? visibleInboxMessages() : filterText ? state.list.filter((mail) => [mail.from, mail.to, mail.subject, mail.folder].some((value) => String(value || '').toLowerCase().includes(filterText))) : state.list;
+        if (mode === 'free') renderInboxToolbar(items.length);
+        const newGuids = new Set(state.list.slice(0, Math.max(0, state.activeNewCount)).map((entry) => String(entry.guid)));
         const count = q('[data-email-count]');
         if (count) count.textContent = String(state.count);
         if (mode === 'free') {
             if (!items.length) {
-                listHost.innerHTML = '<div class="empty-inbox"><span class="empty-inbox-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><strong>No messages yet</strong><span>Keep this page open. New messages will appear automatically, and verification codes will be highlighted for you.</span></div>';
+                listHost.innerHTML = state.list.length ? '<div class="smart-inbox-empty"><strong>No matching messages</strong><span>Try another search or switch back to All.</span></div>' : '<div class="empty-inbox"><span class="empty-inbox-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><strong>No messages yet</strong><span>Keep this page open. New messages will appear automatically, and verification codes will be highlighted for you.</span></div>';
                 return;
             }
             listHost.innerHTML = items.map((mail, index) => {
-                const isNew = index < state.activeNewCount;
+                const isNew = newGuids.has(String(mail.guid));
                 const attachmentBadge = mail.hasAttachments || (mail.attachments && mail.attachments.length) ? '<span class="mail-attachment-badge">Attachment</span>' : '';
                 const newBadge = isNew ? '<span class="mail-new-badge">New</span>' : '';
-                return '<article class="sb-mail-card mail-message-card' + (isNew ? ' is-new' : '') + '" data-guid="' + escape(mail.guid) + '"><span class="mail-message-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><div class="mail-message-copy"><div class="sb-mail-meta">' + escape(mail.from) + '</div><div class="sb-mail-subject">' + escape(mail.subject || '(No subject)') + '</div><div class="mail-message-date">' + escape(ui.dateTime(mail.date)) + '</div></div><div class="mail-message-actions-side"><div class="sb-actions">' + newBadge + attachmentBadge + '</div><button class="sb-btn sb-btn-small" type="button" data-action="view" data-guid="' + escape(mail.guid) + '"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg><span>View Message</span></button></div></article>';
+                const otp = matchOtpCode(mail.subject);
+                const codeBadge = otp ? '<button class="smart-inbox-message-badge is-otp" type="button" data-action="copy-inbox-code" data-code="' + escape(otp) + '" title="Copy verification code">Code ' + escape(otp) + ' · Copy</button>' : '';
+                const previewBadge = !otp && /verification|verify|confirm|activate|otp|security code/i.test(String(mail.subject || '')) ? '<span class="smart-inbox-message-badge">Verification</span>' : '';
+                const badgeRow = codeBadge || previewBadge ? '<div class="smart-inbox-mail-preview">' + codeBadge + previewBadge + '</div>' : '';
+                return '<article class="sb-mail-card mail-message-card' + (isNew ? ' is-new' : '') + '" data-guid="' + escape(mail.guid) + '"><span class="mail-message-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><div class="mail-message-copy"><div class="sb-mail-meta">' + escape(mail.from) + '</div><div class="sb-mail-subject">' + escape(mail.subject || '(No subject)') + '</div><div class="mail-message-date">' + escape(ui.dateTime(mail.date)) + '</div>' + badgeRow + '</div><div class="mail-message-actions-side"><div class="sb-actions">' + newBadge + attachmentBadge + '</div><button class="sb-btn sb-btn-small" type="button" data-action="view" data-guid="' + escape(mail.guid) + '"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg><span>View Message</span></button></div></article>';
             }).join('');
             return;
         }
@@ -503,12 +574,15 @@
     }
 
     async function loadAll(where, limit, options) {
-        if (state.busy) return false;
+        if (state.busy && (mode !== 'free' || options?.background)) return false;
+        const generation = ++state.loadGeneration;
+        const requestWhere = where || {};
         state.busy = true;
         setError('');
-        state.currentWhere = where || {};
+        state.currentWhere = requestWhere;
         try {
-            const response = await ui.post('/api/emails/all', { where: state.currentWhere, exactTo: mode === 'free' && !!state.currentWhere.to, limit: Math.max(1, Math.min(Number(limit || 500), 5000)), select: { id: 1, guid: 1, from: 1, to: 1, subject: 1, date: 1, folder: 1, attachments: 1 } });
+            const response = await ui.post('/api/emails/all', { where: requestWhere, exactTo: mode === 'free' && !!requestWhere.to, limit: Math.max(1, Math.min(Number(limit || 500), 5000)), select: { id: 1, guid: 1, from: 1, to: 1, subject: 1, date: 1, folder: 1, attachments: 1 } });
+            if (generation !== state.loadGeneration) return false;
             if (response.isVIP) setError('Some VIP emails are protected and are not shown.');
             if (!response.done) throw new Error(response.error || 'Unable to load emails');
             state.list = Array.isArray(response.list) ? response.list : [];
@@ -522,10 +596,19 @@
             render();
             return true;
         } catch (error) {
-            setError(error.message || String(error), undefined, !!options?.background);
+            if (generation === state.loadGeneration) setError(error.message || String(error), undefined, !!options?.background);
             return false;
         } finally {
-            state.busy = false;
+            if (generation === state.loadGeneration) {
+                state.busy = false;
+                if (state.pendingLiveRefresh && mode === 'free' && state.addressBook.active) {
+                    const pendingCount = state.pendingLiveRefresh;
+                    state.pendingLiveRefresh = 0;
+                    setTimeout(() => {
+                        if (!state.busy && state.addressBook.active) loadAll({ to: state.addressBook.active }, 500, { markRead: true, background: true, newCount: pendingCount });
+                    }, 0);
+                }
+            }
         }
     }
 
@@ -535,28 +618,27 @@
     }
 
     function extractVerification(mail) {
-        const source = [mail?.subject || '', mail?.text || '', stripHtml(mail?.html || '')].join('\n').replace(/\s+/g, ' ');
-        const patterns = [/(?:verification|verify|security|confirmation|login|sign[ -]?in|otp|passcode|code|pin)[^a-z0-9]{0,24}([a-z0-9]{4,10})\b/i, /\b(\d{4,8})\b/];
-        let code = '';
-        for (const pattern of patterns) {
-            const match = source.match(pattern);
-            if (match && match[1]) {
-                code = match[1];
-                break;
-            }
-        }
+        const subject = String(mail?.subject || '');
+        const text = String(mail?.text || '');
+        const html = String(mail?.html || '');
+        const source = [subject, text, stripHtml(html)].join('\n');
+        const code = matchOtpCode(source);
         const links = [];
-        if (mail?.html) {
-            const doc = new DOMParser().parseFromString(mail.html, 'text/html');
-            Array.from(doc.querySelectorAll('a[href]')).forEach((anchor) => {
-                const href = String(anchor.getAttribute('href') || '').trim();
-                const label = String(anchor.textContent || '').trim().replace(/\s+/g, ' ');
-                if (!(href.startsWith('http:') || href.startsWith('https:'))) return;
-                if (!/(verify|confirm|activate|sign|login|continue|approve|validate|complete)/i.test(label + ' ' + href)) return;
-                if (!links.some((item) => item.href === href)) links.push({ href, label: label || 'Open verification link' });
-            });
+        function addLink(raw, label) {
+            if (links.length >= 4) return;
+            try {
+                const parsed = new URL(String(raw || '').trim());
+                if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) return;
+                if (!/verify|confirm|activate|sign|login|continue|approve|validate|complete|تأكيد|تفعيل/i.test(String(label || '') + ' ' + parsed.pathname + ' ' + parsed.search)) return;
+                if (!links.some((item) => item.href === parsed.href)) links.push({ href: parsed.href, label: String(label || 'Open verification link').slice(0, 70), domain: parsed.host });
+            } catch (_) {}
         }
-        return { code, links: links.slice(0, 4) };
+        if (html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            Array.from(doc.querySelectorAll('a[href]')).forEach((anchor) => addLink(anchor.getAttribute('href'), String(anchor.textContent || '').trim().replace(/\s+/g, ' ')));
+        }
+        for (const url of text.match(/https?:\/\/[^\s<>"']+/gi) || []) addLink(url.replace(/[.,;)]+$/, ''), 'Open verification link');
+        return { code, links };
     }
 
     function renderVerification(mail) {
@@ -566,7 +648,9 @@
         const code = document.querySelector('[data-verification-code]');
         const links = document.querySelector('[data-verification-links]');
         if (code) code.textContent = info.code || '';
-        if (links) links.innerHTML = info.links.map((item) => '<a href="' + escape(item.href) + '" target="_blank" rel="noopener noreferrer" data-action="open-verification-link"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"></path></svg><span>' + escape(item.label) + '</span></a>').join('');
+        const codeCard = document.querySelector('[data-otp-card]');
+        if (codeCard) codeCard.hidden = !info.code;
+        if (links) links.innerHTML = info.links.map((item) => '<a href="' + escape(item.href) + '" target="_blank" rel="noopener noreferrer" data-action="open-verification-link"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"></path></svg><span>' + escape(item.label) + '</span><small>' + escape(item.domain) + '</small></a>').join('');
         host.hidden = !info.code && !info.links.length;
     }
 
@@ -606,11 +690,13 @@
     }
 
     async function viewEmail(guid) {
+        const generation = ++state.viewGeneration;
         setError('', '[data-view-error]');
         try {
             const listed = state.list.find((item) => String(item.guid) === String(guid));
             const mailbox = normalizeMailbox(state.currentWhere?.to || listed?.to || q('[data-mail-address]')?.value || '');
             const response = await ui.post('/api/emails/view', { guid, to: mailbox });
+            if (generation !== state.viewGeneration) return;
             if (!response.done) throw new Error(response.error || 'Email not found');
             const mail = response.doc || response.message || (Array.isArray(response.list) ? response.list[0] : null);
             if (response.isVIP && !mail) throw new Error('VIP Email Protected');
@@ -625,6 +711,7 @@
             renderVerification(mail);
             renderPrivacy(mail);
             renderAttachments(mail, mailbox);
+            updateMessageNavigation(guid);
             const replyFrom = document.querySelector('[data-reply-from]');
             const forwardFrom = document.querySelector('[data-forward-from]');
             if (replyFrom) replyFrom.value = mailbox;
@@ -634,6 +721,12 @@
             updateClientBadges();
             ui.show('#viewEmailModal');
         } catch (error) {
+            if (generation !== state.viewGeneration) return;
+            state.currentEmail = null;
+            updateMessageNavigation('');
+            const frame = document.querySelector('#div-message');
+            if (frame) frame.src = 'about:blank';
+            renderVerification({});
             setError(error.message || String(error), '[data-view-error]');
             ui.show('#viewEmailModal');
         }
@@ -752,6 +845,9 @@
         input.classList.remove('empty-animate');
         setBusy(button, false);
         if (mode === 'free') addAddress(email);
+        state.loadGeneration += 1;
+        state.busy = false;
+        state.pendingLiveRefresh = 0;
         state.list = [];
         state.count = 0;
         state.activeNewCount = 0;
@@ -781,6 +877,7 @@
     }
 
     function notifyNewMail(email, item, delta) {
+        if (email === state.addressBook.active) showInboxAlert(delta);
         playSound();
         const latest = item.latest || {};
         toast((latest.subject ? latest.subject + ' · ' : '') + delta + ' new message' + (delta === 1 ? '' : 's') + ' for ' + email + '.', 'success', 'New mail arrived', { duration: 4400 });
@@ -830,6 +927,7 @@
             if (lastPoll) lastPoll.textContent = 'Checked now';
             state.pollReady = true;
             if (refreshActive && !state.busy) await loadAll({ to: state.addressBook.active }, 500, { markRead: true, background: true, newCount: activeDelta });
+            else if (refreshActive) state.pendingLiveRefresh += activeDelta;
         } catch (error) {
             const lastPoll = q('[data-last-poll]');
             if (lastPoll) lastPoll.textContent = 'Retrying…';
@@ -841,6 +939,8 @@
     function setLiveLabel(text) {
         const lastPoll = q('[data-last-poll]');
         if (lastPoll) lastPoll.textContent = text || '';
+        const inboxState = q('[data-active-inbox-state]');
+        if (inboxState) inboxState.textContent = text === 'Live push' ? 'New messages arrive automatically' : text === 'Reconnecting…' ? 'Reconnecting · checking every 10 seconds' : 'Checking every 10 seconds';
     }
 
     function setPollingInterval(ms) {
@@ -875,6 +975,7 @@
         renderAddressSidebar();
         setLiveLabel('Live push');
         if (refreshActive && !state.busy) await loadAll({ to: state.addressBook.active }, 500, { markRead: true, background: true, newCount: 1 });
+        else if (refreshActive) state.pendingLiveRefresh += 1;
     }
 
     function connectLiveSse() {
@@ -1096,6 +1197,14 @@
                 return copied;
             }
             if (action === 'check-inbox') return checkInbox(button);
+            if (action === 'refresh-unread') {
+                const banner = q('[data-inbox-alert]');
+                if (banner) banner.hidden = true;
+                return checkInbox(q('[data-action="check-inbox"]'));
+            }
+            if (action === 'copy-inbox-code') return copyWithFeedback(button, button.dataset.code || '', 'Verification code copied to clipboard.');
+            if (action === 'previous-message') return navigateMessage(-1);
+            if (action === 'next-message') return navigateMessage(1);
             if (action === 'toggle-saved-inboxes') {
                 const sidebar = q('.mailbox-sidebar');
                 if (!sidebar) return;
@@ -1168,6 +1277,17 @@
         if (name === 'android_apk') trackQuickMailEvent('temp_mail_android_apk_click');
         if (name === 'social_browser') trackQuickMailEvent('temp_mail_social_browser_click');
         if (name === 'egytag_tools') trackQuickMailEvent('temp_mail_egytag_tools_click');
+    });
+
+    const inboxSearch = q('[data-inbox-search]');
+    if (inboxSearch) inboxSearch.addEventListener('input', render);
+    const inboxSort = q('[data-inbox-sort]');
+    if (inboxSort) inboxSort.addEventListener('change', function () { state.inboxSort = inboxSort.value || 'newest'; render(); });
+    root.addEventListener('click', function (event) {
+        const filter = event.target.closest('[data-inbox-filter]');
+        if (!filter || !root.contains(filter)) return;
+        state.inboxFilter = filter.dataset.inboxFilter || 'all';
+        render();
     });
 
     const localSearch = q('[data-search-text]');

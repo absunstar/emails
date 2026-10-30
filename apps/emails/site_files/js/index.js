@@ -47,6 +47,14 @@
     };
 
     const q = (selector, base) => (base || root).querySelector(selector);
+
+    function trackQuickMailEvent(eventName) {
+        if (mode !== 'free') return;
+        try {
+            if (typeof window.gtag === 'function') window.gtag('event', eventName, { product: 'egytag_temp_mail' });
+            else if (Array.isArray(window.dataLayer)) window.dataLayer.push({ event: eventName, product: 'egytag_temp_mail' });
+        } catch (_) {}
+    }
     const qa = (selector, base) => Array.from((base || root).querySelectorAll(selector));
 
     function toast(message, type, title, options) {
@@ -722,6 +730,7 @@
         if (loaded) {
             flashButton(button, 'Updated');
             toast(state.count ? ('Found ' + state.count + ' message' + (state.count === 1 ? '' : 's') + ' in this inbox.') : 'Inbox checked. No messages yet.', 'success', 'Inbox refreshed');
+            trackQuickMailEvent('temp_mail_inbox_checked');
         }
     }
 
@@ -749,6 +758,7 @@
         render();
         flashButton(button, 'Created');
         toast(email + ' is ready to use.', 'success', 'New email created');
+        trackQuickMailEvent('temp_mail_created');
     }
 
     function playSound() {
@@ -1080,8 +1090,22 @@
         const action = button.getAttribute('data-action');
         try {
             if (action === 'generate-email') return generateEmail(button);
-            if (action === 'copy-email') return copyWithFeedback(button, q('[data-mail-address]')?.value || '', 'Email address copied to clipboard.');
+            if (action === 'copy-email') {
+                const copied = await copyWithFeedback(button, q('[data-mail-address]')?.value || '', 'Email address copied to clipboard.');
+                if (copied) trackQuickMailEvent('temp_mail_copied');
+                return copied;
+            }
             if (action === 'check-inbox') return checkInbox(button);
+            if (action === 'toggle-saved-inboxes') {
+                const sidebar = q('.mailbox-sidebar');
+                if (!sidebar) return;
+                const expanded = sidebar.classList.toggle('is-open');
+                button.setAttribute('aria-expanded', String(expanded));
+                const label = q('.quick-mail-manage-label', button);
+                if (label) label.textContent = expanded ? 'Hide my saved emails & tools' : 'Show my saved emails & tools';
+                if (expanded) trackQuickMailEvent('temp_mail_tools_opened');
+                return;
+            }
             if (action === 'select-address') return selectAddress(button.dataset.email);
             if (action === 'remove-address') return removeAddress(button.dataset.email);
             if (action === 'dismiss-limit-alert') return hideLimitAlert();
@@ -1134,6 +1158,16 @@
         } catch (error) {
             setError(error.message || String(error));
         }
+    });
+
+    root.addEventListener('click', function (event) {
+        const link = event.target.closest('[data-quick-mail-link]');
+        if (!link || !root.contains(link)) return;
+        const name = link.getAttribute('data-quick-mail-link');
+        if (name === 'android_play') trackQuickMailEvent('temp_mail_android_play_click');
+        if (name === 'android_apk') trackQuickMailEvent('temp_mail_android_apk_click');
+        if (name === 'social_browser') trackQuickMailEvent('temp_mail_social_browser_click');
+        if (name === 'egytag_tools') trackQuickMailEvent('temp_mail_egytag_tools_click');
     });
 
     const localSearch = q('[data-search-text]');
@@ -1190,6 +1224,7 @@
             input.placeholder = 'name@' + currentDomain();
         }
         renderAddressSidebar();
+        root.classList.add('quick-mail-js');
         if (active) await loadAll({ to: active }, 500, { markRead: true });
         else render();
         state.pollReady = true;

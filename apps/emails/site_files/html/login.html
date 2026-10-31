@@ -54,6 +54,17 @@ body{margin:0;background:#0b1220}.browser-login-page{font-family:system-ui,-appl
 .browser-login-step span{font-size:12px;line-height:1.55;color:#9fb3ca}
 .browser-login-help{font-size:12px;line-height:1.6;padding:14px;margin-top:14px}
 .browser-login-side-tip{font-size:12px;margin-top:14px;line-height:1.6}
+
+.browser-login-page .browser-login-actions :is(a,button).sb-btn{font-family:inherit;font-weight:800;text-decoration:none!important;line-height:1.4;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease,transform .15s ease}
+.browser-login-page .browser-login-actions .browser-login-download,.browser-login-page .browser-login-actions .browser-login-download:visited{color:#fff!important;border:1px solid rgba(147,197,253,.5)!important;text-decoration:none!important}
+.browser-login-page .browser-login-actions .browser-login-linux,.browser-login-page .browser-login-actions .browser-login-linux:visited{color:#eaf5ff!important;border:1px solid rgba(103,184,230,.43)!important;background:rgba(22,47,76,.91)!important;text-decoration:none!important}
+.browser-login-page .browser-login-actions .browser-login-copy,.browser-login-page .browser-login-actions .browser-login-secondary{color:#eaf5ff!important;border:1px solid rgba(103,184,230,.36)!important;background:rgba(22,39,64,.9)!important}
+.browser-login-page .browser-login-actions :is(.browser-login-download,.browser-login-linux,.browser-login-copy,.browser-login-secondary) :is(span,svg){color:inherit!important;stroke:currentColor}
+.browser-login-page .browser-login-actions :is(.browser-login-linux,.browser-login-copy,.browser-login-secondary):hover{color:#fff!important;border-color:rgba(125,211,252,.78)!important;background:rgba(40,76,115,.92)!important;filter:none}
+.browser-login-page .browser-login-actions .browser-login-download:hover{color:#fff!important;filter:brightness(1.12)}
+.browser-login-page .browser-login-actions button:disabled{color:#c6d8e9!important;opacity:.85;cursor:progress}
+.browser-login-page .browser-login-actions button.is-success{border-color:rgba(52,211,153,.72)!important;color:#bbf7d0!important;background:rgba(6,78,59,.45)!important}
+.browser-login-page .browser-login-actions :is(a,button):focus-visible{outline:3px solid #7dd3fc!important;outline-offset:3px}
 .browser-login-actions a:focus-visible,.browser-login-actions button:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}
 .browser-login-page .browser-login-nav .email-language-switch{margin-inline:auto}
 .browser-login-page .browser-login-nav .email-language-switch select{min-width:150px}

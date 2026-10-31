@@ -15,6 +15,8 @@ assert(!/<a[^>]*data-browser-download[^>]* hidden/.test(source),'Download CTA ca
 assert(!/<button[^>]*data-copy-page-link[^>]* hidden/.test(source),'Copy link must be usable during detection');
 assert(source.includes('social-browser-brand-icon.png'),'Official browser icon should be used');
 assert(source.includes('font-family:system-ui'),'Login typography must not fall back to serif');
+assert(source.includes('.browser-login-step span{font-size:13px'), 'Instruction text must remain legible');
+assert(source.includes('html[dir="rtl"] .browser-login-page{letter-spacing:0}'), 'RTL text must avoid decorative letter-spacing');
 assert(source.includes('.browser-login-actions .browser-login-linux:visited{color:#eaf5ff!important'), 'Linux download must not inherit default blue link color');
 assert(source.includes('.browser-login-actions .browser-login-copy,.browser-login-page .browser-login-actions .browser-login-secondary{color:#eaf5ff!important'), 'Secondary actions need explicit high-contrast text');
 assert(source.includes('button.is-success{border-color:'), 'Copy success must remain legible');

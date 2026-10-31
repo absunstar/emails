@@ -71,6 +71,25 @@ body{margin:0;background:#0b1220}.browser-login-page{font-family:system-ui,-appl
 html[dir="rtl"] .browser-login-page{text-align:start}
 html[dir="rtl"] .browser-login-top{text-align:center}
 html[dir="rtl"] .browser-login-step-number,html[dir="rtl"] .browser-login-benefit-icon{direction:ltr}
+/* Shared visual hierarchy for both LTR and RTL login pages. */
+.browser-login-page{--login-muted:#b4c7df;--login-soft:#a2b8d0}
+.browser-login-nav{margin-bottom:24px}
+.browser-login-top{margin-bottom:23px}
+.browser-login-top p{color:var(--login-muted);font-size:15px;line-height:1.7}
+.browser-login-brand p{font-size:13.5px;color:var(--login-muted)}
+.browser-login-side-head p{font-size:13px;color:var(--login-soft)}
+.browser-login-step{min-height:76px;padding:12px 13px;gap:11px}
+.browser-login-step strong{font-size:14px;line-height:1.45}
+.browser-login-step span{font-size:13px;line-height:1.5;color:var(--login-muted)}
+.browser-login-help{font-size:13px;line-height:1.65}
+.browser-login-side-tip,.browser-login-note{font-size:13px;line-height:1.65}
+.browser-login-source{font-size:12px;line-height:1.5}
+.browser-login-unlock-title span{font-size:12px;color:var(--login-soft)}
+.browser-login-benefit strong{font-size:13px}
+.browser-login-benefit span{font-size:12px;line-height:1.6;color:var(--login-muted)}
+html[dir="rtl"] .browser-login-page{letter-spacing:0}
+html[dir="rtl"] .browser-login-nav-note,html[dir="rtl"] .browser-login-step span,html[dir="rtl"] .browser-login-benefit span{text-align:start}
+@media(max-width:640px){.browser-login-top{margin-bottom:20px}.browser-login-step{min-height:74px}.browser-login-step span{font-size:12.5px}.browser-login-source{font-size:11.5px}.browser-login-benefit span{font-size:12.5px}}
 @media(max-width:920px){.browser-login-layout{grid-template-columns:1fr}.browser-login-side{order:2}.browser-login-main{padding:26px}.browser-login-benefit span{font-size:12px}}
 @media(max-width:640px){.browser-login-page{padding:20px 12px 38px}.browser-login-nav{margin-bottom:22px;gap:8px}.browser-login-main,.browser-login-side{padding:20px 17px}.browser-login-top h1{font-size:clamp(27px,7.5vw,36px)}.browser-login-top p{font-size:13px}.browser-login-actions{grid-template-columns:1fr}.browser-login-download,.browser-login-linux{grid-column:auto}.browser-login-actions .sb-btn{min-height:49px;font-size:13px}.browser-login-download{font-size:14px!important}.browser-login-benefits{grid-template-columns:1fr}.browser-login-benefit{padding:12px}.browser-login-nav-note{display:none}.browser-login-brand h2{font-size:19px}.browser-login-side{padding:21px 17px}.browser-login-page .browser-login-nav .email-language-switch{margin-inline-start:auto;margin-inline-end:0}}
 </style>

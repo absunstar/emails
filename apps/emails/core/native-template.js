@@ -118,7 +118,7 @@ function createNativeTemplateRenderer(site, options = {}) {
             for (const [name,row] of wordMap) if (name.startsWith('email_l_')) words[row.En]=row[req.session.language.id]||row.En;
             const dictionary = JSON.stringify(words).replace(/</g,'\\u003c');
             if (base === '/login' && !html.includes('</head>')) {
-                const bootstrap = '<meta name="robots" content="noindex,follow"><script>document.documentElement.lang='+JSON.stringify(langCode)+';document.documentElement.dir='+JSON.stringify(req.session.language.dir)+';window.__emailUITranslation='+dictionary+';</script><style>'+languageStyles+'</style>';
+                const bootstrap = '<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,follow"><script>document.documentElement.lang='+JSON.stringify(langCode)+';document.documentElement.dir='+JSON.stringify(req.session.language.dir)+';window.__emailUITranslation='+dictionary+';</script><style>'+languageStyles+'</style>';
                 html = bootstrap + html + '<script>'+languageSwitcherScript+'</script>';
             } else {
                 html = html.replace('</head>', '<style>'+languageStyles+'</style></head>');

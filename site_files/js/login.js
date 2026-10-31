@@ -76,11 +76,11 @@
             setButtonLabel(manual ? 'Check Again' : 'I opened it — Check Again');
             if (manual) toast('This page is not open in Social Browser yet.', { type: 'info', title: 'Open the page in Social Browser', duration: 2600 });
         } catch (error) {
-            setState('has-error');
-            if (message) message.textContent = translate('We could not complete the check. Open this page in Social Browser and try again.');
+            setState('needs-browser');
+            if (message) message.textContent = translate('Open this same page in Social Browser to continue.');
             showGuestActions();
-            setButtonLabel('Try Again');
-            toast('We could not complete the check. Please try again.', { type: 'error', title: 'Check failed' });
+            setButtonLabel('Check Again');
+            if (manual) toast('Open the page in Social Browser', { type: 'info', title: 'Check Again', duration: 2200 });
         } finally {
             if (button) {
                 button.disabled = false;

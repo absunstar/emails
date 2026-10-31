@@ -17,6 +17,8 @@ assert(source.includes('social-browser-brand-icon.png'),'Official browser icon s
 assert(source.includes('font-family:system-ui'),'Login typography must not fall back to serif');
 assert(script.includes('if (download) download.hidden = false'),'Auth check should not hide downloading');
 assert(script.includes('Promise.race'),'Auth timeout avoids indefinite waiting');
+assert(script.includes("setState('needs-browser');"),'Non-browser sessions should offer helpful next steps');
+assert(!script.includes("setState('has-error');"),'Normal Chrome access should not appear as a login error');
 assert(script.includes('SBUI.copy(location.href)'),'Copy action needs to preserve original URL and next');
 assert(navbar.includes("window.emailLocalizedPath('/login')"),'Signing in from localized homepage should use localized login route');
 for (const code of ['en','ar','es','pt','de','fr','hi','ru','id','tr','vi']) {
@@ -26,6 +28,7 @@ for (const code of ['en','ar','es','pt','de','fr','hi','ru','id','tr','vi']) {
  assert(html.includes('data-email-language-switch'),'Language picker missing: '+code);
  assert(html.includes('value="'+code+'" selected'),'Selected language missing: '+code);
  assert(html.includes('document.documentElement.lang="'+code+'"'),'Document language initialization missing: '+code);
+ assert(html.includes('<meta name="viewport" content="width=device-width,initial-scale=1">'),'Mobile viewport should use actual screen width: '+code);
  assert(html.indexOf('window.__emailUITranslation')<html.indexOf('const root = document.querySelector'),'Translation data must load before auth logic: '+code);
  assert(html.includes('https://social-browser.com/download-windows-latest'),'Windows download missing: '+code);
  assert(html.includes('https://social-browser.com/download-linux-latest'),'Linux download missing: '+code);

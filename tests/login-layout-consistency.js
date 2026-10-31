@@ -7,6 +7,7 @@ const doc=parseDocument(source);
 const nodes=(cls)=>DomUtils.findAll(n=>n.type==='tag'&&(n.attribs?.class||'').split(/\s+/).includes(cls),doc.children);
 for(const cls of ['browser-login-layout','browser-login-main','browser-login-side','browser-login-actions','browser-login-checkline','browser-login-unlock'])assert.equal(nodes(cls).length,1,cls+' needs one instance');
 assert.equal(nodes('browser-login-benefit').length,3);
+assert.equal(nodes('browser-login-help').length,0,'Avoid repeating install/copy instructions in both panels');
 const layout=nodes('browser-login-layout')[0],benefits=nodes('browser-login-unlock')[0];
 assert.equal(layout.parent,benefits.parent,'Benefits must be full width below the 2-column layout');
 assert.equal(nodes('browser-login-main')[0].parent,layout,'Primary panel belongs to layout');

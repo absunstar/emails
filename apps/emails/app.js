@@ -770,6 +770,13 @@ module.exports = function init(site) {
         compress: true,
     });
 
+    site.onGET({ name: 'open', path: __dirname + '/site_files/html/open.html', compress: true, overwrite: true });
+    site.onGET({ name: 'o', path: __dirname + '/site_files/html/open.html', compress: true, overwrite: true });
+    site.onGET({ name: '/.well-known/assetlinks.json', overwrite: true }, (req, res) => {
+        res.set('Content-Type', 'application/json; charset=utf-8');
+        res.set('Cache-Control', 'public, max-age=3600');
+        res.end(fs.readFileSync(path.join(__dirname, 'site_files/json/assetlinks.json'), 'utf8'));
+    });
     site.onGET({ name: 'temporary-email', path: __dirname + '/site_files/html/seo/temporary-email.html', parser: 'html css js', compress: true, overwrite: true });
     site.onGET({ name: 'disposable-email', path: __dirname + '/site_files/html/seo/disposable-email.html', parser: 'html css js', compress: true, overwrite: true });
     site.onGET({ name: 'verification-code-email', path: __dirname + '/site_files/html/seo/verification-code-email.html', parser: 'html css js', compress: true, overwrite: true });
@@ -1416,7 +1423,10 @@ module.exports = function init(site) {
         try {
             const email = normalizeEmail(req.query?.email || '');
             if (!email || !email.includes('@')) return res.status(400).send('Valid email is required');
-            const svg = qrSvg(email);
+            const handoff = String(req.query?.handoff || '') === '1';
+            if (handoff && (!/^[a-z0-9][a-z0-9._+%-]{0,63}@egytag\.com$/i.test(email) || service.isOfficialMessage({ to: email }))) return res.status(400).send('Public @egytag.com address required');
+            const transferUrl = 'https://emails.egytag.com/o#' + encodeURIComponent(email);
+            const svg = qrSvg(handoff && Buffer.byteLength(transferUrl) <= 106 ? transferUrl : email);
             res.set('Content-Type', 'image/svg+xml; charset=utf-8');
             res.set('Cache-Control', 'private, max-age=300');
             res.end(svg);

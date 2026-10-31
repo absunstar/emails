@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.egytag.mails",
+      "sha256_cert_fingerprints": [
+        "6E:34:86:40:A4:6A:18:39:6C:1C:E3:E5:33:D5:3B:F6:C5:26:87:BA:F3:C1:5B:EB:70:7C:B2:B7:3D:35:9D:4E"
+      ]
+    }
+  }
+]

@@ -1188,7 +1188,15 @@
         if (!email) return toast('Enter or choose a valid email address first.', 'warning', 'Email address required');
         const image = q('[data-qr-image]');
         const label = q('[data-qr-email]');
-        if (image) image.src = '/api/emails/qr?email=' + encodeURIComponent(email);
+        const handoff = '/open#email=' + encodeURIComponent(email);
+        const qrLink = 'https://emails.egytag.com/o#' + encodeURIComponent(email);
+        const allowed = /^[a-z0-9][a-z0-9._+%-]{0,63}@egytag\.com$/i.test(email) && !['info@egytag.com', 'support@egytag.com'].includes(email);
+        const appQr = allowed && qrLink.length <= 106;
+        if (image) image.src = '/api/emails/qr?' + (appQr ? 'handoff=1&' : '') + 'email=' + encodeURIComponent(email);
+        const qrHint = q('.qr-handoff-hint');
+        if (qrHint) qrHint.textContent = appQr ? 'Scan to open this public email in the Android app, or install it. Private Pro inboxes are never shared.' : 'Scan to copy this address. Use the transfer link for a supported public @egytag.com inbox.';
+        const link = q('[data-qr-handoff-link]');
+        if (link) link.href = handoff;
         if (label) label.textContent = email;
         ui.show('#mailQrModal');
         toast('Scan the QR code to move this email address to another device.', 'info', 'QR code ready', { duration: 2400 });
@@ -1299,6 +1307,12 @@
             if (action === 'export-addresses') return exportAddresses();
             if (action === 'import-addresses') return q('[data-address-import-file]')?.click();
             if (action === 'show-qr') return showQr();
+            if (action === 'open-in-app') {
+                const email = normalizeMailbox(q('[data-mail-address]')?.value || '');
+                if (!email || !/^[a-z0-9][a-z0-9._+%-]{0,63}@egytag\.com$/i.test(email) || ['info@egytag.com', 'support@egytag.com'].includes(email)) return toast('Select a public @egytag.com mailbox first.', 'warning', 'Public mailbox required');
+                location.href = '/open#email=' + encodeURIComponent(email);
+                return;
+            }
             if (action === 'copy-qr-email') return copyWithFeedback(button, q('[data-qr-email]')?.textContent || '', 'Email address copied from the QR panel.');
             if (action === 'view') return viewEmail(button.dataset.guid);
             if (action === 'copy-verification-code') return copyWithFeedback(button, document.querySelector('[data-verification-code]')?.textContent || '', 'Verification code copied to clipboard.');
@@ -1408,7 +1422,7 @@
         readPreferences();
         readAddressBook();
         const input = q('[data-mail-address]');
-        const queryEmail = normalizeMailbox(new URLSearchParams(location.search).get('email'));
+        const queryEmail = normalizeMailbox(new URLSearchParams(location.search).get('email') || new URLSearchParams(location.hash.slice(1)).get('email'));
         if (queryEmail) addAddress(queryEmail);
         if (!state.addressBook.addresses.length) addAddress(makeId() + '@' + currentDomain());
         const active = queryEmail && addressEntry(queryEmail) ? queryEmail : state.addressBook.active || state.addressBook.addresses[0]?.email || '';

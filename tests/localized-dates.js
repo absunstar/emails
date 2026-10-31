@@ -13,6 +13,8 @@ const clean = text => text.replace(/[\u200e\u200f\u061c\u202a-\u202e\u2066-\u206
 const arabic = clean(dateTime(date));
 assert(/25\/10\/2026/.test(arabic), 'Arabic UI should show day/month/year in local order: '+arabic);
 assert(/[0-9]/.test(arabic) && !/[٠-٩]/.test(arabic), 'Date numbers should stay Latin');
+assert(/^\d{2}\/\d{2}\/\d{4} · \d{2}:\d{2}$/.test(arabic), 'Arabic UI timestamp must be visually stable, 24-hour and free of bidirectional AM/PM: '+arabic);
+assert(!/[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]/.test(dateTime(date)), 'Arabic timestamp should contain no bidi formatting controls');
 const englishFormatter = vm.runInNewContext(factory, {Intl, Date, String, Number, document:{documentElement:{lang:'en'}}});
 assert.equal(englishFormatter(date), new Date(date).toLocaleString(), 'English date formatting must remain backward compatible');
 assert.equal(dateTime('not-date'), 'not-date');

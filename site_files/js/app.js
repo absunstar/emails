@@ -126,7 +126,15 @@
         if (Number.isNaN(d.getTime())) return String(value);
         const lang = String(document.documentElement.lang || 'en').toLowerCase();
         if (lang === 'en') return d.toLocaleString();
-        const locales = { ar: 'ar-EG-u-nu-latn', es: 'es-ES', pt: 'pt-BR', de: 'de-DE', fr: 'fr-FR', hi: 'hi-IN-u-nu-latn', ru: 'ru-RU', id: 'id-ID', tr: 'tr-TR', vi: 'vi-VN' };
+        if (lang === 'ar') {
+            const parts = new Intl.DateTimeFormat('en-GB', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+            }).formatToParts(d);
+            const value = (type) => parts.find((part) => part.type === type)?.value || '';
+            return value('day') + '/' + value('month') + '/' + value('year') + ' · ' + value('hour') + ':' + value('minute');
+        }
+        const locales = { es: 'es-ES', pt: 'pt-BR', de: 'de-DE', fr: 'fr-FR', hi: 'hi-IN-u-nu-latn', ru: 'ru-RU', id: 'id-ID', tr: 'tr-TR', vi: 'vi-VN' };
         const locale = locales[lang] || 'en-GB';
         try {
             return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);

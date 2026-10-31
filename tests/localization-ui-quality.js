@@ -31,6 +31,9 @@ const style = fs.readFileSync(path.join(root, 'apps/emails/site_files/css/langua
 const script = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/language-switch.js'), 'utf8');
 assert(style.includes('html[dir="rtl"] .mailbox-sidebar-title'));
 assert(style.includes('html[dir="rtl"] .mail-message-subject'));
+assert(style.includes('html[dir="rtl"] time.mail-message-date'));
+const inboxJs = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/index.js'), 'utf8');
+assert(inboxJs.includes('<time class="mail-message-date" dir="ltr" lang="en">'), 'Time must be an isolated LTR element even in RTL layout');
 assert(style.includes('html[dir="rtl"] .mailbox-address-copy strong'));
 assert(script.includes('.otp-copy-label'));
 assert(!script.includes(".mail-message-copy,.mail-sender-name"), 'OTP translation must not be skipped with the message container');

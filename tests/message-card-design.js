@@ -14,13 +14,16 @@ const start=js.indexOf('            listHost.innerHTML = items.map((mail, index)
 const end=js.indexOf("            }).join('');",start)+"            }).join('');".length;
 assert(start>=0&&end>start);
 const escape=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const render=new Function('items','newGuids','matchOtpCode','senderDisplay','escape','ui','const listHost={};'+js.slice(start,end)+';return listHost.innerHTML;');
-const renderOne=mail=>render([mail],new Set(),matchOtpCode,senderDisplay,escape,{dateTime:v=>v});
+const render=new Function('items','newGuids','matchOtpCode','senderDisplay','escape','ui','state','unifiedLabel','const listHost={};'+js.slice(start,end)+';return listHost.innerHTML;');
+const renderOne=(mail,unified=false)=>render([mail],new Set(),matchOtpCode,senderDisplay,escape,{dateTime:v=>v},{inboxMode:unified?'unified':'current'},()=> 'Received at');
 const sample=renderOne({guid:'g1',from:'"PUBG Mobile" <noreply@pubgmobile.com>',subject:'[PUBG MOBILE] Your login verification code is 65492',date:'2026-10-25'});
 for(const phrase of ['mail-message-card has-otp','mail-sender-name">PUBG Mobile','mail-sender-email','mail-message-subject','otp-copy-value">65492','data-code="65492"','data-otp-copy-label>Copy code','mail-message-view-btn'])assert(sample.includes(phrase),phrase);
 assert(html.includes('.inbox-list .otp-copy-value{'));
 assert(html.includes('.inbox-list .mail-message-card{'));
 const ordinary=renderOne({guid:'g2',from:'contact@example.com',subject:'Hello',date:'today'});
+const grouped=renderOne({guid:'g3',mailbox:'beta@egytag.com',from:'noreply@example.net',subject:'Welcome',date:'today'},true);
+assert(grouped.includes('Received at')&&grouped.includes('beta@egytag.com'),'Unified card must show the receiving address');
+assert(!ordinary.includes('unified-inbox-recipient'),'Single mailbox view must remain uncluttered');
 assert(!ordinary.includes('otp-copy-card'));
 assert(ordinary.includes('View message'));
 console.log('Mail message cards, OTP hierarchy and normal message rendering PASS');

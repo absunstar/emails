@@ -469,6 +469,38 @@ function createEmailService(options) {
             return { count: messages.length, messages, notFound, blockedVip, outsideDomain };
         },
 
+        // One indexed read per saved recipient. Only metadata is returned;
+        // the existing message-view endpoint remains responsible for full bodies.
+        async unifiedMailboxMessages(addresses, context) {
+            context = context || {};
+            const mailboxes = Array.from(new Set(normalizeAddressList(addresses)))
+                .slice(0, Math.max(1, Math.min(Number(context.maxAddresses || 100), 100)));
+            const perMailbox = Math.max(1, Math.min(Number(context.perMailbox || 30), 100));
+            const limit = Math.max(1, Math.min(Number(context.limit || 300), 500));
+            const messages = new Map();
+            let total = 0;
+            for (const email of mailboxes) {
+                const source = typeof store.messageValuesForRecipient === 'function'
+                    ? store.messageValuesForRecipient(email) : store.messageValues();
+                const matching = [];
+                for (const doc of source) {
+                    if (context.domain && !messageBelongsToDomain(doc, context.domain)) continue;
+                    if (!normalizeAddressList([doc.to, doc.cc]).includes(email)) continue;
+                    if (!officialVisible(doc, context) || (!context.allowVip && isVipMessage(doc))) continue;
+                    matching.push(doc);
+                }
+                matching.sort((a, b) => dateValue(b.date) - dateValue(a.date));
+                total += matching.length;
+                for (const doc of matching.slice(0, perMailbox)) {
+                    if (!doc.guid || messages.has(doc.guid)) continue;
+                    messages.set(doc.guid, { ...safeMessage(doc, false), mailbox: email });
+                }
+            }
+            const sorted = Array.from(messages.values())
+                .sort((a, b) => dateValue(b.date) - dateValue(a.date)).slice(0, limit);
+            return { messages: sorted, count: sorted.length, totalMatches: total, mailboxCount: mailboxes.length };
+        },
+
         async mailboxStatuses(addresses, context) {
             context = context || {};
             const normalized = Array.from(new Set(normalizeAddressList(addresses))).slice(0, Math.max(1, Math.min(Number(context.maxAddresses || 100), 100)));

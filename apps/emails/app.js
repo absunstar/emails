@@ -910,6 +910,31 @@ module.exports = function init(site) {
         res.json(getClientContext(req));
     });
 
+    onPost('/api/emails/inboxes/unified', async (req, res) => {
+        const data = body(req);
+        const raw = Array.isArray(data.addresses) ? data.addresses : [];
+        const maxAddresses = isBrowserSession(req) ? 100 : 10;
+        const domain = currentDomain(req);
+        // Match the existing temporary-mail rules: no official, VIP, or Pro-only inboxes.
+        const normalized = Array.from(new Set(raw.slice(0, maxAddresses)
+            .map((value) => normalizeEmail(value))
+            .filter((value) => value && value.endsWith('@' + domain) && !isProOnlyMailbox(value))));
+        try {
+            const result = await service.unifiedMailboxMessages(normalized, {
+                ...readContext(req, null, domain),
+                maxAddresses,
+                perMailbox: 50,
+                limit: 400,
+                allowVip: false,
+                isAdmin: false,
+            });
+            res.set('Cache-Control', 'no-store');
+            res.json({ done: true, list: result.messages, count: result.count, mailboxCount: result.mailboxCount });
+        } catch (error) {
+            res.json({ done: false, list: [], count: 0, error: error?.message || String(error) });
+        }
+    });
+
     onPost('/api/emails/inboxes/status', async (req, res) => {
         const data = body(req);
         const addresses = Array.isArray(data.addresses) ? data.addresses.slice(0, 100) : [];

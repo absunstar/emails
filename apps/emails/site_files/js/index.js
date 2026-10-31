@@ -27,6 +27,11 @@
         currentMailbox: '',
         activeNewCount: 0,
         inboxFilter: 'all',
+        inboxMode: 'current',
+        unifiedList: [],
+        unifiedLoading: false,
+        unifiedGeneration: 0,
+        unifiedError: '',
         inboxSort: 'newest',
         loadGeneration: 0,
         viewGeneration: 0,
@@ -246,6 +251,83 @@
         return 'social-temp-mail.address-book.v1.' + currentDomain();
     }
 
+    function unifiedTipKey() {
+        return 'social-temp-mail.unified-tip-dismissed.v1.' + currentDomain();
+    }
+
+    function unifiedLabel(key) {
+        return root.dataset['unified' + key] || '';
+    }
+
+    function renderUnifiedDiscovery() {
+        if (mode !== 'free') return;
+        const count = state.addressBook.addresses.length;
+        const available = count >= 2;
+        const button = q('[data-action="show-unified-inbox"]');
+        const badge = q('[data-unified-count]');
+        const tip = q('[data-unified-tip]');
+        if (badge) badge.textContent = String(count);
+        if (button) button.disabled = !available;
+        if (tip) {
+            let dismissed = false;
+            try { dismissed = localStorage.getItem(unifiedTipKey()) === '1'; } catch (_) {}
+            tip.hidden = !available || dismissed || state.inboxMode === 'unified';
+        }
+        qa('[data-inbox-mode]').forEach((control) =>
+            control.setAttribute('aria-pressed', String(control.dataset.inboxMode === state.inboxMode)));
+        const title = q('[data-inbox-title]');
+        if (title) title.textContent = state.inboxMode === 'unified' ? unifiedLabel('Title') : unifiedLabel('CurrentTitle');
+        const description = q('[data-unified-description]');
+        if (description) description.hidden = state.inboxMode !== 'unified';
+    }
+
+    async function loadUnified() {
+        if (mode !== 'free' || state.inboxMode !== 'unified') return false;
+        const addresses = state.addressBook.addresses.map((item) => item.email);
+        if (addresses.length < 2) { state.inboxMode = 'current'; render(); return false; }
+        if (state.unifiedLoading) return false;
+        const generation = ++state.unifiedGeneration;
+        state.unifiedLoading = true;
+        state.unifiedError = '';
+        render();
+        try {
+            const response = await ui.post('/api/emails/inboxes/unified', { addresses });
+            if (generation !== state.unifiedGeneration) return false;
+            if (!response.done) throw new Error(response.error || unifiedLabel('LoadFailed'));
+            state.unifiedList = Array.isArray(response.list) ? response.list : [];
+            state.unifiedError = '';
+            render();
+            return true;
+        } catch (error) {
+            if (generation === state.unifiedGeneration) {
+                state.unifiedError = error.message || unifiedLabel('LoadFailed');
+                render();
+            }
+            return false;
+        } finally {
+            if (generation === state.unifiedGeneration) { state.unifiedLoading = false; render(); }
+        }
+    }
+
+    async function switchInboxMode(next) {
+        if (mode !== 'free') return;
+        const requested = next === 'unified' && state.addressBook.addresses.length >= 2 ? 'unified' : 'current';
+        if (state.inboxMode === requested) {
+            if (requested === 'unified') return loadUnified();
+            return;
+        }
+        state.inboxMode = requested;
+        state.inboxFilter = 'all';
+        state.unifiedError = '';
+        const search = q('[data-inbox-search]');
+        if (search) search.value = '';
+        if (requested === 'unified') trackQuickMailEvent('temp_mail_unified_inbox_opened');
+        if (requested === 'unified') return loadUnified();
+        state.unifiedGeneration += 1;
+        state.unifiedLoading = false;
+        render();
+    }
+
     function preferenceStorageKey() {
         return 'social-temp-mail.preferences.v1.' + currentDomain();
     }
@@ -444,6 +526,7 @@
         const host = q('[data-address-list]');
         if (!host) return;
         updateClientBadges();
+        renderUnifiedDiscovery();
         const items = sortedAddresses();
         if (!items.length) {
             host.innerHTML = '<div class="mailbox-address-empty">' + (state.addressBook.addresses.length ? 'No addresses match your search.' : 'No saved addresses yet.') + '</div>';
@@ -513,6 +596,12 @@
         state.addressBook.addresses.splice(index, 1);
         if (state.addressBook.active === normalized) state.addressBook.active = state.addressBook.addresses[Math.min(index, state.addressBook.addresses.length - 1)]?.email || '';
         saveAddressBook();
+        if (state.inboxMode === 'unified' && state.addressBook.addresses.length < 2) state.inboxMode = 'current';
+        else if (state.inboxMode === 'unified') {
+            state.unifiedGeneration += 1;
+            state.unifiedLoading = false;
+            loadUnified();
+        }
         renderAddressSidebar();
         if (state.pollReady) scheduleLiveReconnect();
         toast(normalized + ' was removed from My Emails.', 'success', 'Address removed');
@@ -531,6 +620,11 @@
     }
 
     async function selectAddress(email) {
+        if (state.inboxMode === 'unified') {
+            state.inboxMode = 'current';
+            state.unifiedGeneration += 1;
+            state.unifiedLoading = false;
+        }
         const normalized = normalizeMailbox(email);
         if (!addressEntry(normalized)) return;
         state.addressBook.active = normalized;
@@ -565,7 +659,7 @@
     function visibleInboxMessages() {
         const filter = mode === 'free' ? state.inboxFilter : 'all';
         const query = mode === 'free' ? String(q('[data-inbox-search]')?.value || '').trim().toLowerCase() : '';
-        const list = state.list.filter((mail) => {
+        const list = (state.inboxMode === 'unified' ? state.unifiedList : state.list).filter((mail) => {
             if (query && ![mail.from, mail.to, mail.subject].some((value) => String(value || '').toLowerCase().includes(query))) return false;
             if (filter === 'codes' && !(mail.verificationCode || matchOtpCode(mail.subject))) return false;
             if (filter === 'attachments' && !mail.hasAttachments && !(Array.isArray(mail.attachments) && mail.attachments.length)) return false;
@@ -586,7 +680,8 @@
 
     function renderInboxToolbar(filteredCount) {
         const total = q('[data-inbox-total]');
-        if (total) total.textContent = String(filteredCount) + (filteredCount === 1 ? ' message' : ' messages') + (filteredCount !== state.list.length ? ' of ' + state.list.length : '');
+        const listSize = state.inboxMode === 'unified' ? state.unifiedList.length : state.list.length;
+        if (total) total.textContent = String(filteredCount) + (filteredCount === 1 ? ' message' : ' messages') + (filteredCount !== listSize ? ' of ' + listSize : '');
         for (const button of qa('[data-inbox-filter]')) button.setAttribute('aria-pressed', String(button.dataset.inboxFilter === state.inboxFilter));
     }
 
@@ -628,12 +723,12 @@
         const filterText = String(q('[data-search-text]')?.value || '').trim().toLowerCase();
         const items = mode === 'free' ? visibleInboxMessages() : filterText ? state.list.filter((mail) => [mail.from, mail.to, mail.subject, mail.folder].some((value) => String(value || '').toLowerCase().includes(filterText))) : state.list;
         if (mode === 'free') renderInboxToolbar(items.length);
-        const newGuids = new Set(state.list.slice(0, Math.max(0, state.activeNewCount)).map((entry) => String(entry.guid)));
+        const newGuids = new Set(state.inboxMode === 'unified' ? [] : state.list.slice(0, Math.max(0, state.activeNewCount)).map((entry) => String(entry.guid)));
         const count = q('[data-email-count]');
         if (count) count.textContent = String(state.count);
         if (mode === 'free') {
             if (!items.length) {
-                listHost.innerHTML = state.list.length ? '<div class="smart-inbox-empty"><strong>No matching messages</strong><span>Try another search or switch back to All.</span></div>' : '<div class="empty-inbox"><span class="empty-inbox-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><strong>No messages yet</strong><span>Keep this page open. New messages will appear automatically, and verification codes will be highlighted for you.</span></div>';
+                listHost.innerHTML = state.inboxMode === 'unified' && state.unifiedError ? '<div class="smart-inbox-empty"><strong>' + escape(unifiedLabel('LoadFailed')) + '</strong><span>' + escape(state.unifiedError) + '</span></div>' : state.inboxMode === 'unified' && state.unifiedLoading ? '<div class="smart-inbox-empty"><strong>' + escape(unifiedLabel('Loading')) + '</strong></div>' : (state.inboxMode === 'unified' ? state.unifiedList.length : state.list.length) ? '<div class="smart-inbox-empty"><strong>No matching messages</strong><span>Try another search or switch back to All.</span></div>' : '<div class="empty-inbox"><span class="empty-inbox-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><strong>No messages yet</strong><span>Keep this page open. New messages will appear automatically, and verification codes will be highlighted for you.</span></div>';
                 return;
             }
             listHost.innerHTML = items.map((mail, index) => {
@@ -645,7 +740,8 @@
                 const codeBadge = otp ? '<div class="otp-highlight-row"><button class="otp-copy-card" type="button" data-action="copy-inbox-code" data-code="' + escape(otp) + '" aria-label="Copy verification code ' + escape(otp) + '"><span class="otp-copy-info"><span class="otp-copy-label">Verification code</span><strong class="otp-copy-value">' + escape(otp) + '</strong></span><span class="otp-copy-action"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path></svg><span data-otp-copy-label>Copy code</span></span></button></div>' : '';
                 const previewBadge = !otp && /verification|verify|confirm|activate|otp|security code/i.test(String(mail.subject || '')) ? '<span class="smart-inbox-message-badge">Verification</span>' : '';
                 const badgeRow = codeBadge || previewBadge ? '<div class="smart-inbox-mail-preview">' + codeBadge + previewBadge + '</div>' : '';
-                return '<article class="sb-mail-card mail-message-card' + (isNew ? ' is-new' : '') + (otp ? ' has-otp' : '') + '" data-guid="' + escape(mail.guid) + '"><span class="mail-message-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><div class="mail-message-copy"><div class="mail-message-top"><div class="mail-message-sender"><strong class="mail-sender-name">' + escape(from.name) + '</strong>' + (from.address ? '<span class="mail-sender-email">&lt;' + escape(from.address) + '&gt;</span>' : '') + '</div><time class="mail-message-date" dir="ltr" lang="en">' + escape(ui.dateTime(mail.date)) + '</time></div><h3 class="sb-mail-subject mail-message-subject">' + escape(mail.subject || '(No subject)') + '</h3>' + badgeRow + '</div><div class="mail-message-actions-side"><div class="sb-actions mail-message-badges">' + newBadge + attachmentBadge + '</div><button class="sb-btn sb-btn-small mail-message-view-btn" type="button" data-action="view" data-guid="' + escape(mail.guid) + '"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg><span>View message</span></button></div></article>';
+                const recipient = state.inboxMode === 'unified' && mail.mailbox ? '<div class="unified-inbox-recipient"><span>' + escape(unifiedLabel('DeliveredTo')) + '</span><b dir="ltr">' + escape(mail.mailbox) + '</b></div>' : '';
+                return '<article class="sb-mail-card mail-message-card' + (isNew ? ' is-new' : '') + (otp ? ' has-otp' : '') + '" data-guid="' + escape(mail.guid) + '"><span class="mail-message-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg></span><div class="mail-message-copy"><div class="mail-message-top"><div class="mail-message-sender"><strong class="mail-sender-name">' + escape(from.name) + '</strong>' + (from.address ? '<span class="mail-sender-email">&lt;' + escape(from.address) + '&gt;</span>' : '') + '</div><time class="mail-message-date" dir="ltr" lang="en">' + escape(ui.dateTime(mail.date)) + '</time></div><h3 class="sb-mail-subject mail-message-subject">' + escape(mail.subject || '(No subject)') + '</h3>' + recipient + badgeRow + '</div><div class="mail-message-actions-side"><div class="sb-actions mail-message-badges">' + newBadge + attachmentBadge + '</div><button class="sb-btn sb-btn-small mail-message-view-btn" type="button" data-action="view" data-guid="' + escape(mail.guid) + '"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg><span>View message</span></button></div></article>';
             }).join('');
             return;
         }
@@ -772,8 +868,8 @@
         const generation = ++state.viewGeneration;
         setError('', '[data-view-error]');
         try {
-            const listed = state.list.find((item) => String(item.guid) === String(guid));
-            const mailbox = normalizeMailbox(state.currentWhere?.to || listed?.to || q('[data-mail-address]')?.value || '');
+            const listed = (state.inboxMode === 'unified' ? state.unifiedList : state.list).find((item) => String(item.guid) === String(guid));
+            const mailbox = normalizeMailbox(listed?.mailbox || state.currentWhere?.to || listed?.to || q('[data-mail-address]')?.value || '');
             const response = await ui.post('/api/emails/view', { guid, to: mailbox });
             if (generation !== state.viewGeneration) return;
             if (!response.done) throw new Error(response.error || 'Email not found');
@@ -978,6 +1074,7 @@
             const response = await ui.post('/api/emails/inboxes/status', { addresses });
             if (!response.done) throw new Error(response.error || 'Live inbox check failed');
             let refreshActive = false;
+            let refreshUnified = false;
             let activeDelta = 0;
             for (const status of response.items || []) {
                 const item = addressEntry(status.email);
@@ -993,6 +1090,7 @@
                     item.lastMessageFrom = status.latest.from || item.lastMessageFrom;
                 }
                 if (delta > 0 && state.pollReady) {
+                    refreshUnified = true;
                     item.unreadCount = Math.max(0, Number(item.unreadCount || 0)) + delta;
                     notifyNewMail(item.email, status, delta);
                     if (item.email === state.addressBook.active && document.visibilityState === 'visible') {
@@ -1006,6 +1104,7 @@
             const lastPoll = q('[data-last-poll]');
             if (lastPoll) lastPoll.textContent = 'Checked now';
             state.pollReady = true;
+            if (state.inboxMode === 'unified' && refreshUnified) loadUnified();
             if (refreshActive && !state.busy) await loadAll({ to: state.addressBook.active }, 500, { markRead: true, background: true, newCount: activeDelta });
             else if (refreshActive) state.pendingLiveRefresh += activeDelta;
         } catch (error) {
@@ -1053,6 +1152,7 @@
         }
         saveAddressBook();
         renderAddressSidebar();
+        if (state.inboxMode === 'unified') loadUnified();
         setLiveLabel('Live push');
         if (refreshActive && !state.busy) await loadAll({ to: state.addressBook.active }, 500, { markRead: true, background: true, newCount: 1 });
         else if (refreshActive) state.pendingLiveRefresh += 1;
@@ -1284,7 +1384,14 @@
                 if (copied) trackQuickMailEvent('temp_mail_copied');
                 return copied;
             }
-            if (action === 'check-inbox') return checkInbox(button);
+            if (action === 'check-inbox') return state.inboxMode === 'unified' ? loadUnified() : checkInbox(button);
+            if (action === 'show-unified-inbox') return switchInboxMode('unified');
+            if (action === 'show-current-inbox') return switchInboxMode('current');
+            if (action === 'dismiss-unified-tip') {
+                try { localStorage.setItem(unifiedTipKey(), '1'); } catch (_) {}
+                renderUnifiedDiscovery();
+                return;
+            }
             if (action === 'refresh-unread') {
                 const banner = q('[data-inbox-alert]');
                 if (banner) banner.hidden = true;

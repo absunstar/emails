@@ -1,0 +1,34 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { createNativeTemplateRenderer } = require('../apps/emails/core/native-template');
+const root=path.resolve(__dirname,'..');
+const renderer=createNativeTemplateRenderer({cwd:root,dir:path.join(root,'site_files'),options:{lang:'En'}});
+const template=path.join(root,'apps/emails/site_files/html/login.html');
+const source=fs.readFileSync(template,'utf8');
+const script=fs.readFileSync(path.join(root,'site_files/js/login.js'),'utf8');
+const navbar=fs.readFileSync(path.join(root,'site_files/js/navbar.js'),'utf8');
+assert(source.includes('href="https://social-browser.com/download-windows-latest"'),'Official direct Windows download must be present');
+assert(source.includes('href="https://social-browser.com/download-linux-latest"'),'Linux option must be present');
+assert(!/<a[^>]*data-browser-download[^>]* hidden/.test(source),'Download CTA cannot start hidden');
+assert(!/<button[^>]*data-copy-page-link[^>]* hidden/.test(source),'Copy link must be usable during detection');
+assert(source.includes('social-browser-brand-icon.png'),'Official browser icon should be used');
+assert(source.includes('font-family:system-ui'),'Login typography must not fall back to serif');
+assert(script.includes('if (download) download.hidden = false'),'Auth check should not hide downloading');
+assert(script.includes('Promise.race'),'Auth timeout avoids indefinite waiting');
+assert(script.includes('SBUI.copy(location.href)'),'Copy action needs to preserve original URL and next');
+assert(navbar.includes("window.emailLocalizedPath('/login')"),'Signing in from localized homepage should use localized login route');
+for (const code of ['en','ar','es','pt','de','fr','hi','ru','id','tr','vi']) {
+ const url=(code==='en'?'/login':'/'+code+'/login')+'?next=%2Far%2F';
+ const html=renderer.render(template,{url,headers:{host:'emails.egytag.com'}});
+ assert(!html.includes('##word.'),'Unresolved localization strings: '+code);
+ assert(html.includes('data-email-language-switch'),'Language picker missing: '+code);
+ assert(html.includes('value="'+code+'" selected'),'Selected language missing: '+code);
+ assert(html.includes('document.documentElement.lang="'+code+'"'),'Document language initialization missing: '+code);
+ assert(html.indexOf('window.__emailUITranslation')<html.indexOf('const root = document.querySelector'),'Translation data must load before auth logic: '+code);
+ assert(html.includes('https://social-browser.com/download-windows-latest'),'Windows download missing: '+code);
+ assert(html.includes('https://social-browser.com/download-linux-latest'),'Linux download missing: '+code);
+ if(code==='ar')assert(html.includes('تحميل Social Browser لويندوز'),'Arabic download text missing');
+}
+console.log('Login UX: visible official Windows/Linux downloads, 11 languages, runtime copy and auth timeout PASS');

@@ -14,7 +14,7 @@ const languages = Object.freeze({
  vi:{id:'Vi',name:'vi',title:'Tiếng Việt',dir:'ltr',text:'left',urlPrefix:'/vi'}
 });
 const codes = Object.keys(languages);
-const publicPages=['/','/free','/vip','/open','/o','/privacy','/temporary-email','/disposable-email','/verification-code-email','/temp-email-for-testing','/multiple-temporary-inboxes','/developer-temp-mail'];
+const publicPages=['/','/login','/free','/vip','/open','/o','/privacy','/temporary-email','/disposable-email','/verification-code-email','/temp-email-for-testing','/multiple-temporary-inboxes','/developer-temp-mail'];
 function fromPath(pathname) {const first=String(pathname||'').split(/[?#]/)[0].split('/').filter(Boolean)[0];return languages[first] ? first : null;}
 function prefix(code){return languages[code]?.urlPrefix || '';}
 function translatedPath(pathname, code){const old=fromPath(pathname),base=old?pathname.slice(old.length+1)||'/':pathname;return prefix(code)+(base==='/'?'/':base);}

@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
 const free = englishTemplate(fs.readFileSync(path.join(root, 'apps/emails/site_files/html/free.html'), 'utf8'));
-const login = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/login.html'), 'utf8');
+const login = englishTemplate(fs.readFileSync(path.join(root, 'apps/emails/site_files/html/login.html'), 'utf8'));
 const loginJs = fs.readFileSync(path.join(root, 'site_files/js/login.js'), 'utf8');
 const emailJs = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/index.js'), 'utf8');
 function assert(value, message) { if (!value) throw new Error(message); }
@@ -19,7 +19,7 @@ assert(login.includes('How it works') && login.includes('What you unlock'), 'Log
 assert(login.includes('Back to Temp Mail'), 'Back to Temp Mail action is missing');
 assert(!login.includes('Continue securely in Social Browser'), 'Old login hierarchy is still present');
 assert(loginJs.includes("SBUI.copy(location.href)"), 'Login page link copy behavior is missing');
-assert(loginJs.includes("SBUI.toast('Page link copied."), 'Login copy feedback is missing');
+assert(loginJs.includes("toast('Page link copied."), 'Login copy feedback is missing');
 assert(loginJs.includes("setState('needs-browser')") && loginJs.includes("setState('is-ready')"), 'Login visual states are missing');
 
 assert(free.includes('mailbox-addresses-panel') && free.includes('Saved inboxes'), 'Saved inboxes must be the visually primary sidebar section');

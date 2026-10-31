@@ -111,13 +111,19 @@ function createNativeTemplateRenderer(site, options = {}) {
         if (publicPages.includes(base)) {
             const switcher = languageSwitcher(langCode);
             if (html.includes('class="sb-navbar-actions"')) html = html.replace('class="sb-navbar-actions"', 'class="sb-navbar-actions" data-language-host') .replace('data-language-host>', 'data-language-host>'+switcher);
+            else if (html.includes('class="browser-login-nav"')) html = html.replace('class="browser-login-nav"','class="browser-login-nav" data-language-host').replace('data-language-host>','data-language-host>'+switcher);
             else if (html.includes('class="seo-landing-header"')) html = html.replace('</header>',switcher+'</header>');
             else html = html.replace(/<body([^>]*)>/i, '<body$1>'+switcher);
             const words = {};
             for (const [name,row] of wordMap) if (name.startsWith('email_l_')) words[row.En]=row[req.session.language.id]||row.En;
             const dictionary = JSON.stringify(words).replace(/</g,'\\u003c');
-            html = html.replace('</head>', '<style>'+languageStyles+'</style></head>');
-            html = html.replace('</body>', '<script>window.__emailUITranslation='+dictionary+';</script><script>'+languageSwitcherScript+'</script></body>');
+            if (base === '/login' && !html.includes('</head>')) {
+                const bootstrap = '<meta name="robots" content="noindex,follow"><script>document.documentElement.lang='+JSON.stringify(langCode)+';document.documentElement.dir='+JSON.stringify(req.session.language.dir)+';window.__emailUITranslation='+dictionary+';</script><style>'+languageStyles+'</style>';
+                html = bootstrap + html + '<script>'+languageSwitcherScript+'</script>';
+            } else {
+                html = html.replace('</head>', '<style>'+languageStyles+'</style></head>');
+                html = html.replace('</body>', '<script>window.__emailUITranslation='+dictionary+';</script><script>'+languageSwitcherScript+'</script></body>');
+            }
         }
         // The route is already localized by the server. Never rewrite /api URLs or external links.
         return html;

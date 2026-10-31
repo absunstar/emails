@@ -1,3 +1,4 @@
+const { englishTemplate } = require('./render-english-template');
 'use strict';
 
 const assert = require('assert');
@@ -48,7 +49,7 @@ const root = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(root, 'apps', 'emails', 'app.js'), 'utf8');
 const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const backend = fs.readFileSync(path.join(root, 'apps', 'emails', 'core', 'browser-auth.js'), 'utf8');
-const login = fs.readFileSync(path.join(root, 'apps', 'emails', 'site_files', 'html', 'login.html'), 'utf8');
+const login = englishTemplate(fs.readFileSync(path.join(root, 'apps', 'emails', 'site_files', 'html', 'login.html'), 'utf8'));
 const scripts = fs.readFileSync(path.join(root, 'site_files', 'html', 'scripts.html'), 'utf8');
 const navbar = fs.readFileSync(path.join(root, 'site_files', 'html', 'navbar', 'index.html'), 'utf8');
 const admin = fs.readFileSync(path.join(root, 'apps', 'emails', 'site_files', 'html', 'index.html'), 'utf8');

@@ -787,7 +787,7 @@ module.exports = function init(site) {
     // Same /<language>/<page> URL routing model as Social Browser.
     const { languages: emailLanguages } = require('./core/languages');
     const localizedTemplates = {
-        '/':'free.html','/free':'free.html','/vip':'free.html',
+        '/':'free.html','/login':'login.html','/free':'free.html','/vip':'free.html',
         '/open':'open.html','/o':'open.html','/privacy':'privacy.html',
         '/temporary-email':'seo/temporary-email.html','/disposable-email':'seo/disposable-email.html',
         '/verification-code-email':'seo/verification-code-email.html','/temp-email-for-testing':'seo/temp-email-for-testing.html',

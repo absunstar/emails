@@ -1,7 +1,8 @@
+const { englishTemplate } = require('./render-english-template');
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const html = fs.readFileSync('apps/emails/site_files/html/free.html', 'utf8');
+const html = englishTemplate(fs.readFileSync('apps/emails/site_files/html/free.html', 'utf8'));
 const js = fs.readFileSync('apps/emails/site_files/js/index.js', 'utf8');
 const workspace = html.indexOf('<div class="mail-workspace">');
 const main = html.indexOf('<div class="mailbox-main">', workspace);

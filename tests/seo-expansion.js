@@ -1,3 +1,4 @@
+const { englishTemplate } = require('./render-english-template');
 'use strict';
 
 const assert = require('assert');
@@ -6,7 +7,7 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(root, 'apps/emails/app.js'), 'utf8');
-const free = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/free.html'), 'utf8');
+const free = englishTemplate(fs.readFileSync(path.join(root, 'apps/emails/site_files/html/free.html'), 'utf8'));
 const sitemap = fs.readFileSync(path.join(root, 'site_files', 'sitemap.xml'), 'utf8');
 const robots = fs.readFileSync(path.join(root, 'site_files', 'robots.txt'), 'utf8');
 const slugs = ['temporary-email', 'disposable-email', 'verification-code-email', 'temp-email-for-testing', 'multiple-temporary-inboxes', 'developer-temp-mail'];
@@ -18,7 +19,7 @@ for (const slug of slugs) {
     assert.ok(app.includes("name: '" + slug + "'"), 'route missing: ' + slug);
     assert.ok(sitemap.includes('https://emails.egytag.com/' + slug), 'sitemap missing: ' + slug);
     const file = path.join(root, 'apps/emails/site_files/html/seo', slug + '.html');
-    const html = fs.readFileSync(file, 'utf8');
+    const html = englishTemplate(fs.readFileSync(file, 'utf8'));
     assert.ok(html.includes('<h1>'), slug + ' H1 missing');
     assert.ok(html.includes('rel="canonical" href="https://emails.egytag.com/' + slug + '"'), slug + ' canonical missing');
     assert.ok(html.includes('application/ld+json'), slug + ' structured data missing');

@@ -1,3 +1,4 @@
+const { englishTemplate } = require('./render-english-template');
 'use strict';
 
 const assert = require('assert');
@@ -13,7 +14,7 @@ assert.deepStrictEqual(getClientContext({ headers: { 'x-browser': 'anything' } }
 assert.deepStrictEqual(getClientContext({ headers: {} }), { done: true, isSocialBrowser: false });
 
 const frontend = fs.readFileSync(path.join(__dirname, '..', 'apps', 'emails', 'site_files', 'js', 'index.js'), 'utf8');
-const freeHtml = fs.readFileSync(path.join(__dirname, '..', 'apps', 'emails', 'site_files', 'html', 'free.html'), 'utf8');
+const freeHtml = englishTemplate(fs.readFileSync(path.join(__dirname, '..', 'apps', 'emails', 'site_files', 'html', 'free.html'), 'utf8'));
 const app = fs.readFileSync(path.join(__dirname, '..', 'apps', 'emails', 'app.js'), 'utf8');
 
 assert(/GUEST_ADDRESS_LIMIT\s*=\s*10/.test(frontend), 'Guest limit must be 10 addresses');

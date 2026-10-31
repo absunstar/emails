@@ -1310,7 +1310,7 @@
             if (action === 'open-in-app') {
                 const email = normalizeMailbox(q('[data-mail-address]')?.value || '');
                 if (!email || !/^[a-z0-9][a-z0-9._+%-]{0,63}@egytag\.com$/i.test(email) || ['info@egytag.com', 'support@egytag.com'].includes(email)) return toast('Select a public @egytag.com mailbox first.', 'warning', 'Public mailbox required');
-                location.href = '/open#email=' + encodeURIComponent(email);
+                location.href = (window.emailLocalizedPath ? window.emailLocalizedPath('/open') : '/open') + '#email=' + encodeURIComponent(email);
                 return;
             }
             if (action === 'copy-qr-email') return copyWithFeedback(button, q('[data-qr-email]')?.textContent || '', 'Email address copied from the QR panel.');

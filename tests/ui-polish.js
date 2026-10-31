@@ -1,7 +1,8 @@
+const { englishTemplate } = require('./render-english-template');
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
-const free = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/free.html'), 'utf8');
+const free = englishTemplate(fs.readFileSync(path.join(root, 'apps/emails/site_files/html/free.html'), 'utf8'));
 const login = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/login.html'), 'utf8');
 const loginJs = fs.readFileSync(path.join(root, 'site_files/js/login.js'), 'utf8');
 const emailJs = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/index.js'), 'utf8');

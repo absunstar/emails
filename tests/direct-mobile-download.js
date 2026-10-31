@@ -1,13 +1,14 @@
+const { englishTemplate } = require('./render-english-template');
 'use strict';
 
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
-const html = fs.readFileSync(
+const html = englishTemplate(fs.readFileSync(
   path.join(__dirname, '..', 'apps', 'emails', 'site_files', 'html', 'free.html'),
   'utf8'
-);
+));
 
 assert(html.includes('mobile-download-actions'), 'Android download action group is missing');
 assert(

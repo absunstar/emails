@@ -1,9 +1,10 @@
+const { englishTemplate } = require('./render-english-template');
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
 const appJs = fs.readFileSync(path.join(root, 'site_files/js/app.js'), 'utf8');
 const emailJs = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/index.js'), 'utf8');
-const freeHtml = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/free.html'), 'utf8');
+const freeHtml = englishTemplate(fs.readFileSync(path.join(root, 'apps/emails/site_files/html/free.html'), 'utf8'));
 const viewHtml = fs.readFileSync(path.join(root, 'apps/emails/site_files/html/view.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'site_files/css/zero-ui.css'), 'utf8');
 function assert(value, message) { if (!value) throw new Error(message); }

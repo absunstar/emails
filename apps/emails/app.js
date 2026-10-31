@@ -784,6 +784,22 @@ module.exports = function init(site) {
     site.onGET({ name: 'multiple-temporary-inboxes', path: __dirname + '/site_files/html/seo/multiple-temporary-inboxes.html', parser: 'html css js', compress: true, overwrite: true });
     site.onGET({ name: 'developer-temp-mail', path: __dirname + '/site_files/html/seo/developer-temp-mail.html', parser: 'html css js', compress: true, overwrite: true });
 
+    // Same /<language>/<page> URL routing model as Social Browser.
+    const { languages: emailLanguages } = require('./core/languages');
+    const localizedTemplates = {
+        '/':'free.html','/free':'free.html','/vip':'free.html',
+        '/open':'open.html','/o':'open.html','/privacy':'privacy.html',
+        '/temporary-email':'seo/temporary-email.html','/disposable-email':'seo/disposable-email.html',
+        '/verification-code-email':'seo/verification-code-email.html','/temp-email-for-testing':'seo/temp-email-for-testing.html',
+        '/multiple-temporary-inboxes':'seo/multiple-temporary-inboxes.html','/developer-temp-mail':'seo/developer-temp-mail.html',
+    };
+    Object.keys(emailLanguages).forEach((code) => {
+        for (const [page, template] of Object.entries(localizedTemplates)) {
+            const name = page === '/' ? ['/'+code, '/'+code+'/'] : '/'+code+page;
+            site.onGET({name, path:__dirname+'/site_files/html/'+template, parser:'html css js', compress:true, overwrite:true});
+        }
+    });
+
     site.onGET({
         name: ['privacy'],
         path: __dirname + '/site_files/html/privacy.html',

@@ -1,3 +1,4 @@
+const { englishTemplate } = require('./render-english-template');
 'use strict';
 
 const assert = require('assert');
@@ -81,7 +82,7 @@ const { analyzeEmailHtml, sanitizeEmailHtml, qrSvg } = require('../apps/emails/c
     assert.strictEqual(fs.existsSync(attachmentDir), false);
 
     const frontend = fs.readFileSync(path.join(__dirname, '..', 'apps', 'emails', 'site_files', 'js', 'index.js'), 'utf8');
-    const html = fs.readFileSync(path.join(__dirname, '..', 'apps', 'emails', 'site_files', 'html', 'free.html'), 'utf8');
+    const html = englishTemplate(fs.readFileSync(path.join(__dirname, '..', 'apps', 'emails', 'site_files', 'html', 'free.html'), 'utf8'));
     const app = fs.readFileSync(path.join(__dirname, '..', 'apps', 'emails', 'app.js'), 'utf8');
     const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
 

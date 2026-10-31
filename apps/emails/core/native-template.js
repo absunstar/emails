@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createLegacyHtmlParser } = require('../../../vendor/social-browser-core/compat/isite/html-parser');
+const { languages, fromPath, prefix, translatedPath, publicPages } = require('./languages');
 
 function readWords(file) {
     try {
@@ -17,6 +18,7 @@ function createNativeTemplateRenderer(site, options = {}) {
     const wordRows = [
         ...readWords(path.join(site.cwd, 'site_files', 'json', 'words.json')),
         ...readWords(path.join(site.cwd, 'apps', 'emails', 'site_files', 'json', 'words.json')),
+        ...readWords(path.join(site.cwd, 'apps', 'emails', 'site_files', 'json', 'words-localized.json')),
     ];
     const wordMap = new Map();
     for (const row of wordRows) {
@@ -55,28 +57,70 @@ function createNativeTemplateRenderer(site, options = {}) {
         const cookie = String(req.headers?.cookie || '');
         const cookieLang = /(?:^|;\s*)sb\.lang=([^;]+)/i.exec(cookie)?.[1];
         const queryLang = req.query?.lang || req.queryRaw?.lang;
-        const raw = decodeURIComponent(String(queryLang || cookieLang || 'En'));
-        const lang = /^ar$/i.test(raw) ? 'Ar' : 'En';
+        const pathLang = fromPath(req.path || req.pathname || req.url || req.originalUrl);
+        let raw = String(queryLang || cookieLang || 'en');
+        try { raw = decodeURIComponent(raw); } catch (_) { raw = 'en'; }
+        const wanted = pathLang || raw.trim().toLowerCase();
+        const langCode = Object.prototype.hasOwnProperty.call(languages,wanted) ? wanted : 'en';
+        const language = languages[langCode];
         req.session = req.session || {};
-        req.session.lang = lang;
-        req.session.language = req.session.language || {
-            id: lang,
-            dir: lang === 'Ar' ? 'rtl' : 'ltr',
-            text: lang === 'Ar' ? 'right' : 'left',
-        };
-        req.word = (name) => site.word(name, lang);
+        req.session.lang = language.id;
+        req.session.language = language;
+        req.session.langDir = language.dir;
+        req.word = (name) => site.word(name, language.id);
         const features = hostFeatures(req);
         const priorHasFeature = typeof req.hasFeature === 'function' ? req.hasFeature.bind(req) : null;
         req.hasFeature = (name) => features.has(name) || !!priorHasFeature?.(name);
         return req;
     }
 
+    const languageSwitcherScript = fs.readFileSync(path.join(__dirname, '../site_files/js/language-switch.js'), 'utf8');
+    const languageStyles = fs.readFileSync(path.join(__dirname, '../site_files/css/language-switch.css'), 'utf8');
+    function languageSwitcher(code) {
+        return '<div class="email-language-switch"><label for="emailLanguageSelect" aria-label="Website language">🌐</label><select id="emailLanguageSelect" data-email-language-switch aria-label="Website language">'+Object.entries(languages).map(([key,language])=>'<option value="'+key+'"'+(code===key?' selected':'')+'>'+language.title+'</option>').join('')+'</select></div>';
+    }
+
     function render(file, req, data = {}) {
         req = prepareRequest(req);
-        return parser.renderFile(path.resolve(file), req, data, {
+        let html = parser.renderFile(path.resolve(file), req, data, {
             parserDir: path.dirname(path.resolve(file)),
             data,
         });
+        const langCode = req.session.language.name;
+        const current = String(req.path || req.pathname || req.url || '/').split(/[?#]/)[0] || '/';
+        const base = fromPath(current) ? current.slice(fromPath(current).length+1) || '/' : current;
+        const canonical = 'https://emails.egytag.com' + (prefix(langCode) + (base === '/' ? '/' : base));
+        // Match Social Browser's per-language URL, lang/dir and canonical conventions.
+        html = html.replace(/<html\b[^>]*>/i, (tag) => {
+            let v = tag.replace(/\blang="[^"]*"/i, 'lang="'+langCode+'"');
+            if (!/\blang=/.test(v)) v = v.replace(/>$/, ' lang="'+langCode+'">');
+            v = v.replace(/\bdir="[^"]*"/i, 'dir="'+req.session.language.dir+'"');
+            if (!/\bdir=/.test(v)) v = v.replace(/>$/, ' dir="'+req.session.language.dir+'">');
+            return v;
+        });
+        html = html.replace(/<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>(?:\s*)/i, '');
+        html = html.replace(/<link\s+rel="alternate"\s+hreflang="[^"]*"\s+href="[^"]*"\s*\/?>(?:\s*)/gi, '');
+        if (publicPages.includes(base)) {
+            const alternate = Object.entries(languages).map(([code,entry]) => '<link rel="alternate" hreflang="'+code+'" href="https://emails.egytag.com'+(prefix(code)+(base==='/'?'/':base))+'">').join('');
+            html = html.replace('</head>', '<link rel="canonical" href="'+canonical+'">'+alternate+'<link rel="alternate" hreflang="x-default" href="https://emails.egytag.com'+(base==='/'?'/':base)+'"></head>');
+        }
+        html = html.replace(/\bhref="\/(?:temporary-email|disposable-email|verification-code-email|temp-email-for-testing|multiple-temporary-inboxes|developer-temp-mail|privacy)(?=["?#])/g, value => 'href="'+prefix(langCode)+value.slice(6));
+        if (langCode !== 'en') html=html.replace(/\bhref="\/(?=["?#])/g, 'href="'+prefix(langCode)+'/');
+        html=html.replace(/(<meta\s+property="og:url"\s+content=")[^"]*(")/i,(_,a,b)=>a+canonical+b);
+        // Embed the same dictionary mechanism for JS-created interface labels.
+        if (publicPages.includes(base)) {
+            const switcher = languageSwitcher(langCode);
+            if (html.includes('class="sb-navbar-actions"')) html = html.replace('class="sb-navbar-actions"', 'class="sb-navbar-actions" data-language-host') .replace('data-language-host>', 'data-language-host>'+switcher);
+            else if (html.includes('class="seo-landing-header"')) html = html.replace('</header>',switcher+'</header>');
+            else html = html.replace(/<body([^>]*)>/i, '<body$1>'+switcher);
+            const words = {};
+            for (const [name,row] of wordMap) if (name.startsWith('email_l_')) words[row.En]=row[req.session.language.id]||row.En;
+            const dictionary = JSON.stringify(words).replace(/</g,'\\u003c');
+            html = html.replace('</head>', '<style>'+languageStyles+'</style></head>');
+            html = html.replace('</body>', '<script>window.__emailUITranslation='+dictionary+';</script><script>'+languageSwitcherScript+'</script></body>');
+        }
+        // The route is already localized by the server. Never rewrite /api URLs or external links.
+        return html;
     }
 
     function send(res, html, status = 200) {

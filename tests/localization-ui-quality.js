@@ -22,6 +22,8 @@ for (const [name, expected] of Object.entries({
 })) assert.equal(byEnglish.get(name)?.Ar, expected, 'Arabic control must be concise: ' + name);
 assert.match(ar, /<h2 class="mailbox-sidebar-title">رسائلي<\/h2>/);
 assert.match(en, /<h2 class="mailbox-sidebar-title">My Emails<\/h2>/);
+assert.match(ar, /<strong data-address-usage dir="ltr">0 \/ 10<\/strong>/, "Arabic quota must preserve numeric order");
+assert.match(en, /<strong data-address-usage dir="ltr">0 \/ 10<\/strong>/, "English quota should preserve the same order");
 const messageView = renderer.render(path.join(root, 'apps/emails/site_files/html/view.html'), { url: '/ar/', headers: { host: 'emails.egytag.com' } });
 assert.match(messageView, /<span class="verification-label">رمز التحقق<\/span>/);
 assert(messageView.includes('نسخ الرمز'), 'Message viewer should localize code copy');
@@ -32,6 +34,7 @@ const script = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/langua
 assert(style.includes('html[dir="rtl"] .mailbox-sidebar-title'));
 assert(style.includes('html[dir="rtl"] .mail-message-subject'));
 assert(style.includes('html[dir="rtl"] time.mail-message-date'));
+assert(style.includes('html[dir="rtl"] [data-address-usage]'), "Arabic quota must be bidi-isolated");
 const inboxJs = fs.readFileSync(path.join(root, 'apps/emails/site_files/js/index.js'), 'utf8');
 assert(inboxJs.includes('<time class="mail-message-date" dir="ltr" lang="en">'), 'Time must be an isolated LTR element even in RTL layout');
 assert(style.includes('html[dir="rtl"] .mailbox-address-copy strong'));

@@ -63,3 +63,6 @@ html[dir="rtl"] .mailbox-controls .mailbox-sort{font-size:12px}
 @media(max-width:1100px){html[dir="rtl"] .inbox-list .mail-message-date{text-align:start}}
 
 html[dir="rtl"] time.mail-message-date{display:inline-block;direction:ltr!important;unicode-bidi:isolate!important;text-align:left!important;white-space:nowrap;letter-spacing:0;font-variant-numeric:tabular-nums}
+
+/* A numeric usage fraction is one left-to-right value, even inside an Arabic row. */
+html[dir="rtl"] [data-address-usage]{display:inline-block;direction:ltr!important;unicode-bidi:isolate!important;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:left}

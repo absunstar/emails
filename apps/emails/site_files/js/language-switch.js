@@ -10,6 +10,12 @@ function localizedPath(code){
 }
 window.emailLocalizedPath=function(path){const code=getCode();return code==='en'?path:'/'+code+path};
 if(pick){pick.value=getCode();pick.addEventListener('change',function(){if(!codes.includes(this.value))return;location.assign(localizedPath(this.value)+location.search+location.hash)});}
+const nav=document.querySelector('.sb-navbar');
+if(nav){
+ const syncHeight=()=>document.documentElement.style.setProperty('--email-nav-height',Math.ceil(nav.getBoundingClientRect().height)+'px');
+ syncHeight();window.addEventListener('resize',syncHeight,{passive:true});
+ if(typeof ResizeObserver==='function')new ResizeObserver(syncHeight).observe(nav);
+}
 const dictionary=window.__emailUITranslation||{};
 window.emailTranslate=function(text){return dictionary[String(text)]||String(text)};
 function translateNodes(host){

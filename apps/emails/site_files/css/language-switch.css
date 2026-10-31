@@ -1,1 +1,13 @@
 .email-language-switch{display:flex;align-items:center;justify-content:center;gap:7px;min-width:138px;flex:0 0 auto;position:relative;z-index:2}.email-language-switch label{font-size:17px;color:#9bdcff}.email-language-switch select{appearance:auto;max-width:188px;min-width:106px;min-height:37px;padding:7px 10px;border-radius:10px;border:1px solid rgba(125,211,252,.35);background:#111f33;color:#eff7ff;font:600 12px/1.2 system-ui,Arial,sans-serif;cursor:pointer}.email-language-switch select:focus-visible{outline:2px solid #38bdf8;outline-offset:2px}.seo-landing-header .email-language-switch{margin-inline-start:auto}.seo-landing-header .seo-landing-cta{margin-inline-start:5px}body>.email-language-switch{position:fixed;inset-block-start:12px;inset-inline-end:16px;z-index:50;border-radius:12px;background:#101b2b;padding:5px 8px;box-shadow:0 6px 22px rgba(0,0,0,.25)}html[dir=rtl] .sb-brand,html[dir=rtl] .mailbox-sidebar,html[dir=rtl] .mailbox-main{text-align:right}html[dir=rtl] input[data-mail-address],html[dir=rtl] .qr-email,html[dir=rtl] .otp-copy-value,html[dir=rtl] [data-verification-code]{direction:ltr;unicode-bidi:isolate}html[dir=rtl] .sb-navbar-actions{flex-wrap:wrap}@media(max-width:670px){.email-language-switch{min-width:0}.email-language-switch select{min-width:75px;max-width:132px;font-size:11px}.sb-navbar .email-language-switch{order:-1}.seo-landing-header .email-language-switch{max-width:130px}.seo-landing-header{flex-wrap:wrap}}
+@media(max-width:670px){
+ .sb-navbar{min-height:62px;gap:6px;padding:8px 10px;flex-wrap:nowrap}
+ .sb-navbar .sb-brand{flex:0 1 118px;min-width:0;font-size:13px;line-height:1.2}
+ .sb-navbar .sb-brand span{display:none}
+ .sb-navbar .sb-navbar-actions{flex:1;min-width:0;gap:5px;justify-content:flex-end;flex-wrap:nowrap}
+ .sb-navbar .email-language-switch{min-width:0;order:0;gap:0;flex:0 1 110px}
+ .sb-navbar .email-language-switch label{display:none}
+ .sb-navbar .email-language-switch select{min-width:68px;max-width:110px;width:100%;font-size:10px;padding:5px}
+ .sb-navbar #btn_login{max-width:108px;min-width:0;padding:5px 7px;font-size:10px;line-height:1.22;white-space:normal}
+ .sb-navbar .sb-browser-account{max-width:118px;min-width:0;padding:5px 6px}
+ body:has(.sb-navbar){margin-top:calc(var(--email-nav-height, 88px) + 10px)!important}
+}

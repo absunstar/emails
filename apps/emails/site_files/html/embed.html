@@ -24,7 +24,7 @@ const query=new URLSearchParams(location.search),ctx=window.emailEmbedContext||{
 const themes=['dark','light'];document.body.dataset.theme=themes.includes(query.get('theme'))?query.get('theme'):'dark';
 const byId=id=>document.getElementById(id);let address='';
 const labels={copied:document.body.dataset.copied,copyFailed:document.body.dataset.copyFailed,ready:document.body.dataset.ready};
-function randomEmail(){const bytes=new Uint8Array(10);crypto.getRandomValues(bytes);return 'mail'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('')+'@egytag.com';}
+function randomEmail(){const bytes=new Uint8Array(8);crypto.getRandomValues(bytes);return 'mail'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('')+'@egytag.com';}
 function track(event){if(query.get('preview')==='1'||!ctx.token)return;const payload=JSON.stringify({token:ctx.token,event});try{fetch('/api/embed/event',{method:'POST',headers:{'Content-Type':'application/json'},body:payload,credentials:'omit',keepalive:true}).catch(()=>{});}catch(_){}}
 function renderEmail(){address=randomEmail();byId('email').textContent=address;byId('status').textContent=labels.ready;
  const path=(language==='en'?'':'/'+language)+'/';const link=new URL(path,'https://emails.egytag.com');link.searchParams.set('email',address);link.searchParams.set('utm_source','embed');link.searchParams.set('utm_medium','widget');if(ctx.hostname)link.searchParams.set('utm_content',ctx.hostname);byId('open').href=link.href;track('generated');}

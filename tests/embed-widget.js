@@ -48,6 +48,7 @@ const { createNativeTemplateRenderer } = require('../apps/emails/core/native-tem
       assert(html.includes('egytag.com'), 'Brand required');
       if(page==='embed.html'){
         assert(html.includes('crypto.getRandomValues'), 'Use browser random for temporary email');
+        assert(html.includes('new Uint8Array(8)'), 'Generated addresses need to remain short enough for compact widgets while retaining 64-bit randomness');
         assert(html.includes("new URL(path,'https://emails.egytag.com')"), 'Open real main inbox, not private iframe');
         assert(!html.includes('/api/emails/all'), 'Embed cannot read user messages');
         assert(html.includes('/*__EMBED_CONTEXT__*/'), 'Server must inject signed source');

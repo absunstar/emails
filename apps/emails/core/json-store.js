@@ -95,6 +95,8 @@ function idLike(leftValue, rightValue) {
     return left.toLowerCase() === right.toLowerCase();
 }
 
+const { detectVerificationCode } = require('./verification-code');
+
 function messageMetadata(doc) {
     if (!doc || !doc.guid) return null;
     const attachments = Array.isArray(doc.attachments) ? doc.attachments.map((item) => ({
@@ -115,6 +117,7 @@ function messageMetadata(doc) {
         to: doc.to || '',
         cc: doc.cc || '',
         subject: doc.subject || '',
+        verificationCode: doc.verificationCode || detectVerificationCode(doc),
         date: doc.date || null,
         folder: doc.folder || '',
         status: doc.status || '',

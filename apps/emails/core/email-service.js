@@ -6,6 +6,7 @@ const EventEmitter = require('events');
 const { EmailFileStore } = require('./json-store');
 const { messageBelongsToDomain } = require('./domain');
 const { buildEml } = require('./message-tools');
+const { detectVerificationCode } = require('./verification-code');
 
 function extractAddresses(value) {
     return String(value || '').match(/[A-Z0-9._%+-]+@(?:[A-Z0-9.-]+\.[A-Z]{2,}|localhost)/gi) || [];
@@ -52,6 +53,7 @@ function safeMessage(doc, includeBody) {
         to: doc.to || '',
         cc: doc.cc || '',
         subject: doc.subject || '',
+        verificationCode: doc.verificationCode || (includeBody ? detectVerificationCode(doc) : ''),
         date: doc.date || null,
         folder: doc.folder || '',
         status: doc.status || '',
@@ -146,6 +148,7 @@ function createEmailService(options) {
     if (typeof sendmail !== 'function') throw new Error('sendmail function is required');
 
     let store;
+    const codeCache = new Map(); // Bounded legacy-inbox fallback; new messages are indexed with a code.
     function isVipAddress(value) {
         const addresses = extractAddresses(value).map((v) => v.toLowerCase());
         if (!addresses.length || !store) return false;
@@ -395,6 +398,23 @@ function createEmailService(options) {
                 list = hydrated.filter(Boolean).map((doc) => safeMessage(doc, true));
             } else {
                 list = page.map((doc) => safeMessage(doc, false));
+            }
+            if (args.includeVerificationCodes && args.toExact && !context.isAdmin) {
+                // Legacy index entries predate verificationCode. Enrich recent public mail
+                // without transferring HTML/text or probing protected/official mailboxes.
+                const legacy = list.filter((doc) => !doc.verificationCode).slice(0, 100);
+                for (let i = 0; i < legacy.length; i += 8) {
+                    await Promise.all(legacy.slice(i, i + 8).map(async (doc) => {
+                        if (codeCache.has(doc.guid)) { doc.verificationCode = codeCache.get(doc.guid); return; }
+                        try {
+                            const full = await store.getMessage(doc.guid);
+                            const code = full ? detectVerificationCode(full) : '';
+                            doc.verificationCode = code;
+                            codeCache.set(doc.guid, code);
+                            if (codeCache.size > 10000) codeCache.delete(codeCache.keys().next().value);
+                        } catch (_) { doc.verificationCode = ''; }
+                    }));
+                }
             }
             return {
                 count: list.length,

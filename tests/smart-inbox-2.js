@@ -43,6 +43,9 @@ const visible = vm.runInNewContext('(' + findFunction('visibleInboxMessages') + 
 assert.equal(visible().map(x => x.guid).join(','), 'a,b,c');
 state.inboxFilter = 'codes';
 assert.equal(visible().map(x => x.guid).join(','), 'a');
+state.list.push({guid:'d', date:'2026-10-28', from:'k@example.com', subject:'Your login details', verificationCode:'617283'});
+assert.equal(visible().map(x => x.guid).join(','), 'a,d');
+state.list.pop();
 state.inboxFilter = 'attachments';
 assert.equal(visible().map(x => x.guid).join(','), 'b');
 state.inboxFilter = 'all';

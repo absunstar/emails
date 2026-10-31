@@ -557,7 +557,7 @@
         const query = mode === 'free' ? String(q('[data-inbox-search]')?.value || '').trim().toLowerCase() : '';
         const list = state.list.filter((mail) => {
             if (query && ![mail.from, mail.to, mail.subject].some((value) => String(value || '').toLowerCase().includes(query))) return false;
-            if (filter === 'codes' && !matchOtpCode(mail.subject)) return false;
+            if (filter === 'codes' && !(mail.verificationCode || matchOtpCode(mail.subject))) return false;
             if (filter === 'attachments' && !mail.hasAttachments && !(Array.isArray(mail.attachments) && mail.attachments.length)) return false;
             return true;
         });
@@ -630,7 +630,7 @@
                 const isNew = newGuids.has(String(mail.guid));
                 const attachmentBadge = mail.hasAttachments || (mail.attachments && mail.attachments.length) ? '<span class="mail-attachment-badge">Attachment</span>' : '';
                 const newBadge = isNew ? '<span class="mail-new-badge">New</span>' : '';
-                const otp = matchOtpCode(mail.subject);
+                const otp = mail.verificationCode || matchOtpCode(mail.subject);
                 const from = senderDisplay(mail.from);
                 const codeBadge = otp ? '<div class="otp-highlight-row"><button class="otp-copy-card" type="button" data-action="copy-inbox-code" data-code="' + escape(otp) + '" aria-label="Copy verification code ' + escape(otp) + '"><span class="otp-copy-info"><span class="otp-copy-label">Verification code</span><strong class="otp-copy-value">' + escape(otp) + '</strong></span><span class="otp-copy-action"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path></svg><span data-otp-copy-label>Copy code</span></span></button></div>' : '';
                 const previewBadge = !otp && /verification|verify|confirm|activate|otp|security code/i.test(String(mail.subject || '')) ? '<span class="smart-inbox-message-badge">Verification</span>' : '';
@@ -650,7 +650,7 @@
         setError('');
         state.currentWhere = requestWhere;
         try {
-            const response = await ui.post('/api/emails/all', { where: requestWhere, exactTo: mode === 'free' && !!requestWhere.to, limit: Math.max(1, Math.min(Number(limit || 500), 5000)), select: { id: 1, guid: 1, from: 1, to: 1, subject: 1, date: 1, folder: 1, attachments: 1 } });
+            const response = await ui.post('/api/emails/all', { where: requestWhere, exactTo: mode === 'free' && !!requestWhere.to, includeVerificationCodes: mode === 'free' && !!requestWhere.to, limit: Math.max(1, Math.min(Number(limit || 500), 5000)), select: { id: 1, guid: 1, from: 1, to: 1, subject: 1, date: 1, folder: 1, attachments: 1 } });
             if (generation !== state.loadGeneration) return false;
             if (response.isVIP) setError('Some VIP emails are protected and are not shown.');
             if (!response.done) throw new Error(response.error || 'Unable to load emails');

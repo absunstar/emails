@@ -1278,6 +1278,7 @@ module.exports = function init(site) {
             folder: where.folder,
             limit,
             includeBody: !!(data.select && (data.select.text || data.select.html)),
+            includeVerificationCodes: data.includeVerificationCodes === true && data.exactTo === true,
         };
         try {
             const result = await service.search(args, context);

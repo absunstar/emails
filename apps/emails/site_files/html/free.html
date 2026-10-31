@@ -264,6 +264,49 @@ body{margin-top:72px;margin-bottom:0;font-family:Tahoma,Verdana,Arial,sans-serif
 .mail-limit-replace-btn:hover{filter:brightness(1.1)}
 @media(max-width:620px){.mailbox-address-item .mailbox-address-remove{min-width:42px;min-height:44px}.mail-limit-alert-card{max-width:min(440px,100%);max-height:90dvh;overflow:auto}.mail-limit-replace-btn{width:100%}}
 </style>
+
+<style>
+/* Saved inbox capacity dialog: explicit primary action and a quiet upgrade option. */
+.mail-limit-alert-card{width:min(436px,100%);max-height:min(680px,92dvh);overflow:auto;box-sizing:border-box;padding:24px!important;border-radius:19px!important;text-align:left!important}
+.mail-limit-alert-icon{width:44px!important;height:44px!important;border-radius:13px!important;font-size:21px!important;margin:0 0 12px!important}
+.mail-limit-alert-card h2{font-size:23px!important;line-height:1.25!important;margin:0 0 8px!important;letter-spacing:-.025em}
+.mail-limit-alert-card>p{max-width:none!important;margin:0!important;color:#b5cbe0!important;font-size:13px!important;line-height:1.6!important;text-align:left!important}
+.mail-limit-replace{gap:9px!important;margin-top:18px!important}
+.mail-limit-replace label{font-size:13px!important;color:#eaf4ff!important}
+.mail-limit-replace select{min-height:48px!important;font-size:13px!important}
+.mail-limit-replace p{color:#97b2ca!important;font-size:11px!important;line-height:1.6!important}
+.mail-limit-replace-btn{width:100%;min-height:48px!important;margin-top:5px!important;font-size:14px!important;font-weight:850!important}
+.mail-limit-alert-actions{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:12px!important;margin-top:18px!important;padding-top:15px!important;border-top:1px solid rgba(148,163,184,.13)}
+.mail-limit-alert-actions button[data-action="dismiss-limit-alert"]{order:0;width:100%!important;min-height:42px!important;border:1px solid rgba(148,163,184,.28)!important;border-radius:10px!important;background:rgba(148,163,184,.06)!important;color:#cbd9e7!important;font-family:inherit!important;font-size:13px!important;font-weight:750!important}
+.mail-limit-alert-actions a[data-limit-alert-cta]{order:1;display:inline-flex!important;align-items:center;justify-content:center;gap:6px;min-height:28px!important;padding:2px 5px!important;border:0!important;background:none!important;color:#82cafa!important;text-decoration:none!important;font-size:12px!important;font-weight:700!important;line-height:1.4!important;text-align:center}
+.mail-limit-alert-actions a[data-limit-alert-cta]:hover{text-decoration:underline!important;color:#bae6fd!important}
+.mail-limit-alert-actions a[data-limit-alert-cta][hidden]{display:none!important}
+@media(max-width:620px){.mail-limit-alert{padding:12px!important}.mail-limit-alert-card{width:min(436px,100%)!important;max-width:100%!important;max-height:calc(100dvh - 24px)!important;padding:22px 20px!important;border-radius:18px!important}.mail-limit-alert-card h2{font-size:22px!important}.mail-limit-alert-card>p{font-size:13px!important}.mail-limit-alert-actions{margin-top:16px!important}}
+@media(max-height:575px){.mail-limit-alert{align-items:start!important}.mail-limit-alert-card{max-height:calc(100dvh - 24px)!important}.mail-limit-alert-icon{display:none!important}}
+</style>
+
+<style>
+.mail-limit-alternatives{display:grid;gap:10px;margin-top:17px}
+.mail-limit-choice{display:flex;align-items:center;gap:12px;min-width:0;min-height:68px;padding:11px 13px;border-radius:12px;border:1px solid rgba(125,211,252,.28);background:linear-gradient(120deg,rgba(10,44,73,.75),rgba(14,29,51,.65));color:#eaf7ff;text-decoration:none;box-sizing:border-box;transition:border-color .16s ease,background .16s ease}
+.mail-limit-choice:hover,.mail-limit-choice:focus-visible{border-color:#38bdf8;background:rgba(14,75,107,.55);outline-offset:2px}
+.mail-limit-choice.is-android{border-color:rgba(52,211,153,.34);background:linear-gradient(120deg,rgba(5,65,54,.48),rgba(14,39,45,.55))}
+.mail-limit-choice.is-android:hover,.mail-limit-choice.is-android:focus-visible{border-color:#34d399;background:rgba(5,90,69,.52)}
+.mail-limit-choice-icon{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:11px;background:rgba(56,189,248,.13);color:#7dd3fc;font-size:21px;font-weight:900}
+.mail-limit-choice.is-android .mail-limit-choice-icon{background:rgba(52,211,153,.14);color:#6ee7b7}
+.mail-limit-choice-copy{display:grid;gap:4px;min-width:0;flex:1}
+.mail-limit-choice-copy strong{font-size:14px;font-weight:850;line-height:1.3}
+.mail-limit-choice-copy small{font-size:11px;color:#a2c3db;line-height:1.4}
+.mail-limit-choice.is-android .mail-limit-choice-copy small{color:#a7dbce}
+.mail-limit-apk-link{display:inline-flex;justify-content:center;padding:2px 8px;color:#a1c8df;font-size:11px;line-height:1.3;text-underline-offset:3px}
+.mail-limit-apk-link:hover{color:#d2efff}
+.mail-limit-choice[hidden]{display:none!important}
+.mail-limit-divider{display:flex;align-items:center;gap:10px;margin:16px 0 0;color:#a8c0d2;font-size:11px;font-weight:800;text-align:center}
+.mail-limit-divider:before,.mail-limit-divider:after{content:'';height:1px;flex:1;background:rgba(148,163,184,.22)}
+.mail-limit-replace{margin-top:15px!important}
+.mail-limit-alert-card{max-height:calc(100dvh - 28px)!important}
+@media(max-width:620px){.mail-limit-alert-card{padding:20px!important}.mail-limit-alternatives{gap:8px;margin-top:14px}.mail-limit-choice{min-height:62px;padding:9px 11px}.mail-limit-choice-copy strong{font-size:13px}.mail-limit-choice-copy small{font-size:10px}.mail-limit-divider{margin-top:13px}.mail-limit-replace{margin-top:12px!important}}
+@media(prefers-reduced-motion:reduce){.mail-limit-choice{transition:none}}
+</style>
 </head>
 <body>
 <nav x-import="navbar/index.html" class="sitebar"></nav>
@@ -299,7 +342,12 @@ body{margin-top:72px;margin-bottom:0;font-family:Tahoma,Verdana,Arial,sans-serif
 </aside>
 </div>
 </div>
-<div class="mail-limit-alert" data-limit-alert hidden role="dialog" aria-modal="true" aria-labelledby="mailLimitTitle"><div class="mail-limit-alert-card"><div class="mail-limit-alert-icon">!</div><h2 id="mailLimitTitle">Email limit reached</h2><p data-limit-alert-message>You have reached the maximum number of saved email addresses.</p><div class="mail-limit-replace"><label for="mailReplaceSelect">Replace a saved address to continue</label><select id="mailReplaceSelect" data-replace-address aria-label="Choose saved address to replace"></select><p>Only removes this address from your saved list. Messages on the server are not deleted. Save the address if you want to return to it.</p><button class="mail-limit-replace-btn" type="button" data-action="replace-saved-address" data-replace-action>Replace and create email</button></div><div class="mail-limit-alert-actions"><a data-limit-alert-cta href="https://social-browser.com/" target="_blank" rel="noopener"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"></path><path d="m6 9 6-6 6 6"></path></svg><span>Use Social Browser</span></a><button class="sb-btn sb-btn-ghost" type="button" data-action="dismiss-limit-alert"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg><span>Continue</span></button></div></div></div>
+<div class="mail-limit-alert" data-limit-alert hidden role="dialog" aria-modal="true" aria-labelledby="mailLimitTitle"><div class="mail-limit-alert-card"><div class="mail-limit-alert-icon">!</div><h2 id="mailLimitTitle">Manage saved emails</h2><p data-limit-alert-message>You have reached the maximum number of saved email addresses.</p><div class="mail-limit-alternatives" aria-label="Other ways to continue">
+<a class="mail-limit-choice is-browser" data-limit-alert-cta data-quick-mail-link="social_browser" href="https://social-browser.com/" target="_blank" rel="noopener"><span class="mail-limit-choice-icon" aria-hidden="true">◫</span><span class="mail-limit-choice-copy"><strong>Use Social Browser</strong><small>Save up to 100 email addresses</small></span><span aria-hidden="true">↗</span></a>
+<a class="mail-limit-choice is-android" data-quick-mail-link="android_play" href="https://play.google.com/store/apps/details?id=com.egytag.mails" target="_blank" rel="noopener"><span class="mail-limit-choice-icon" aria-hidden="true">↓</span><span class="mail-limit-choice-copy"><strong>Download Android app</strong><small>Private mailboxes with Mobile Pro</small></span><span aria-hidden="true">↗</span></a>
+<a class="mail-limit-apk-link" data-quick-mail-link="android_apk" href="/downloads/VIP-Temp-Mail-5.2.6+18-play-signed.apk">Download APK directly instead</a>
+</div><div class="mail-limit-divider"><span>Or continue free on this website</span></div>
+<div class="mail-limit-replace"><label for="mailReplaceSelect">Choose an email to replace</label><select id="mailReplaceSelect" data-replace-address aria-label="Choose saved address to replace"></select><p>The old address leaves your saved list only. Existing messages stay on the server; keep a copy if you need it later.</p><button class="mail-limit-replace-btn" type="button" data-action="replace-saved-address" data-replace-action>Replace and create email</button></div><div class="mail-limit-alert-actions"><button class="sb-btn sb-btn-ghost" type="button" data-action="dismiss-limit-alert"><span>Cancel</span></button></div></div></div>
 <h1 class="hero-title"><span class="hero-title-line">Create a Free Temporary Email</span><span class="hero-title-line">in Seconds</span></h1><p>Receive verification codes and messages instantly, keep your personal inbox private, and manage multiple temporary inboxes from one simple workspace.</p><div class="trust-row"><span class="trust-pill"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v13H4z"></path><path d="M4 13h4l2 3h4l2-3h4"></path></svg>Instant inbox</span><span class="trust-pill"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.4c0 4.8 3.1 8.1 7.5 9.6 4.4-1.5 7.5-4.8 7.5-9.6V6L12 3Z"></path><path d="m9 12 2 2 4-4"></path></svg>Verification codes</span><span class="trust-pill"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="2"></rect><rect x="3" y="14" width="18" height="6" rx="2"></rect></svg>Multiple inboxes</span></div>
 </div></section>
 <section class="feature-showcase feature-showcase-v2" aria-labelledby="allFeaturesTitle"><div class="feature-showcase-head"><div class="feature-showcase-head-copy"><span class="section-kicker">Everything in one temporary email workspace</span><h2 id="allFeaturesTitle">Powerful features, without a complicated inbox</h2><p>Start with a temporary address, then use the tools you need for verification, privacy, attachments, multiple inboxes, and message actions.</p></div><div class="feature-access-legend" aria-label="Feature availability"><span><b>SB</b> Social Browser extra</span><span><b>LOCAL</b> Stored in this browser</span></div></div>

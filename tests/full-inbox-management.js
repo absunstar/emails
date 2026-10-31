@@ -4,6 +4,12 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const html = fs.readFileSync('apps/emails/site_files/html/free.html','utf8');
 const src = fs.readFileSync('apps/emails/site_files/js/index.js','utf8');
+for (const [label, fragment] of [
+ ['Social Browser alternative', 'data-limit-alert-cta data-quick-mail-link="social_browser"'],
+ ['Google Play alternative', 'data-quick-mail-link="android_play" href="https://play.google.com/store/apps/details?id=com.egytag.mails"'],
+ ['APK download alternative', 'data-quick-mail-link="android_apk" href="/downloads/VIP-Temp-Mail-5.2.6+18-play-signed.apk"'],
+ ['Free replacement path', 'Or continue free on this website']
+]) assert(html.includes(fragment), label + ' not offered in full-inbox dialog');
 for(const value of ['data-manage-full-inbox','data-replace-address','data-action="replace-saved-address"','data-action="remove-address"']) {
  if(value === 'data-action="remove-address"') assert(src.includes(value));
  else assert(html.includes(value),'Missing full inbox UI '+value);

@@ -332,7 +332,7 @@
     function limitReachedMessage() {
         return state.client.isSocialBrowser
             ? 'You have reached the 100-address limit for this browser. Remove a saved address before adding another one.'
-            : 'Your 10 saved-email slots are full. Choose an address to replace, or remove an old saved address to make room. Social Browser supports 100 saved addresses.';
+            : 'All 10 saved-email slots are full. Use Social Browser, download the Android app, or replace an address to keep using this website.';
     }
 
     function renderLimitReplacementOptions() {

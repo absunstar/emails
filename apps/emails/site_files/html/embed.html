@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="color-scheme" content="dark light"><title>##word.email_embed_widgetTitle##</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1828;--surface:#14263d;--edge:#2b4a68;--title:#f2f8ff;--muted:#a8bed7;--action:#028be1;--btn:#1a3653;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+*{box-sizing:border-box}body{margin:0;padding:0;min-width:0;background:var(--bg);color:var(--title)}
+body[data-theme=light]{color-scheme:light;--bg:#f3f8fd;--surface:#fff;--edge:#c6d8eb;--title:#15324c;--muted:#526c83;--action:#096ab6;--btn:#e0eefb}
+.widget{padding:16px;min-height:267px;display:flex;flex-direction:column;gap:12px;border:1px solid var(--edge);border-radius:15px;background:var(--surface)}
+header{display:flex;gap:10px;align-items:center}header .mark{width:36px;height:36px;display:grid;place-items:center;border-radius:10px;background:rgba(14,165,233,.12);font-size:20px}header strong{display:block;font-size:16px;line-height:1.3}header small{font-size:11px;color:var(--muted);line-height:1.5}.grow{flex:1}
+.email-box{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--edge);border-radius:11px;min-height:53px;padding:5px 10px}#email{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;unicode-bidi:isolate;text-align:center;font-size:clamp(14px,3.8vw,20px);font-weight:800;color:var(--title);letter-spacing:-.025em}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}button,.open{display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 8px;border:1px solid var(--edge);border-radius:9px;color:var(--title);background:var(--btn);font-size:12px;font-weight:700;line-height:1.35;font-family:inherit;text-decoration:none;min-height:43px;cursor:pointer;white-space:normal;text-align:center}button svg,.open svg{width:16px;height:16px;flex-shrink:0;stroke:currentColor;stroke-width:2;fill:none}button:hover,.open:hover{border-color:var(--action)}button:focus-visible,.open:focus-visible{outline:3px solid var(--action);outline-offset:2px}button#copy{background:var(--action);border-color:var(--action);color:white}button:disabled{opacity:.5;cursor:wait}.open{grid-column:1/-1;background:transparent;color:var(--title)}
+footer{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted)}footer a{color:var(--action);font-weight:750;text-decoration:none}footer a:hover{text-decoration:underline}#status{min-height:17px;font-size:11px;color:var(--muted)}
+body[data-theme=light] .widget{box-shadow:0 8px 20px #16476a0b}
+@media(max-width:340px){.widget{padding:11px;gap:9px}#email{font-size:14px}.actions{gap:6px}button,.open{font-size:11px;padding:8px 5px}.mark{display:none}}
+</style></head><body data-theme="dark" data-copied="##word.email_embed_copied##" data-copy-failed="##word.email_embed_copyFailed##" data-ready="##word.email_embed_readyStatus##"><main class="widget">
+<header><span class="mark" aria-hidden="true">✉</span><div class="grow"><strong>##word.email_embed_widgetTitle##</strong><small>##word.email_embed_widgetSubtitle##</small></div></header>
+<div class="email-box"><output id="email" aria-live="polite">—</output></div>
+<div class="actions"><button id="copy" type="button"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><span>##word.email_embed_copyEmail##</span></button><button id="generate" type="button"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 1-2.9-5.5M20 4v6h-6"/></svg><span>##word.email_embed_newEmail##</span></button><a class="open" id="open" href="https://emails.egytag.com/" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3"/><path d="M20 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5"/></svg><span>##word.email_embed_viewInbox##</span></a></div>
+<footer><span id="status" role="status" aria-live="polite">##word.email_embed_readyStatus##</span><a href="https://emails.egytag.com/" target="_blank" rel="noopener noreferrer">##word.email_embed_poweredBy##</a></footer>
+</main>
+<script>/*__EMBED_CONTEXT__*/</script>
+<script>
+(function () {'use strict';
+const query=new URLSearchParams(location.search),ctx=window.emailEmbedContext||{},language=ctx.language||'en';
+const themes=['dark','light'];document.body.dataset.theme=themes.includes(query.get('theme'))?query.get('theme'):'dark';
+const byId=id=>document.getElementById(id);let address='';
+const labels={copied:document.body.dataset.copied,copyFailed:document.body.dataset.copyFailed,ready:document.body.dataset.ready};
+function randomEmail(){const bytes=new Uint8Array(10);crypto.getRandomValues(bytes);return 'mail'+Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('')+'@egytag.com';}
+function track(event){if(query.get('preview')==='1'||!ctx.token)return;const payload=JSON.stringify({token:ctx.token,event});try{fetch('/api/embed/event',{method:'POST',headers:{'Content-Type':'application/json'},body:payload,credentials:'omit',keepalive:true}).catch(()=>{});}catch(_){}}
+function renderEmail(){address=randomEmail();byId('email').textContent=address;byId('status').textContent=labels.ready;
+ const path=(language==='en'?'':'/'+language)+'/';const link=new URL(path,'https://emails.egytag.com');link.searchParams.set('email',address);link.searchParams.set('utm_source','embed');link.searchParams.set('utm_medium','widget');if(ctx.hostname)link.searchParams.set('utm_content',ctx.hostname);byId('open').href=link.href;track('generated');}
+byId('generate').addEventListener('click',renderEmail);
+byId('copy').addEventListener('click',async()=>{if(!address)return;try{if(navigator.clipboard&&navigator.clipboard.writeText)await navigator.clipboard.writeText(address);else{const field=document.createElement('textarea');field.value=address;field.style.position='fixed';field.style.opacity='0';document.body.append(field);field.select();if(!document.execCommand('copy'))throw Error('copy_failed');field.remove();}byId('status').textContent=labels.copied;track('copied');}catch(_){byId('status').textContent=labels.copyFailed;const selection=document.createRange();selection.selectNodeContents(byId('email'));window.getSelection().removeAllRanges();window.getSelection().addRange(selection);}});
+byId('open').addEventListener('click',()=>track('open'));
+renderEmail();
+})();
+</script></body></html>

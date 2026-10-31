@@ -112,6 +112,7 @@ function createNativeTemplateRenderer(site, options = {}) {
             const switcher = languageSwitcher(langCode);
             if (html.includes('class="sb-navbar-actions"')) html = html.replace('class="sb-navbar-actions"', 'class="sb-navbar-actions" data-language-host') .replace('data-language-host>', 'data-language-host>'+switcher);
             else if (html.includes('class="browser-login-nav"')) html = html.replace('class="browser-login-nav"','class="browser-login-nav" data-language-host').replace('data-language-host>','data-language-host>'+switcher);
+            else if (html.includes('class="embed-builder-head"')) html = html.replace('class="embed-builder-head"', 'class="embed-builder-head" data-language-host').replace('data-language-host>', 'data-language-host>'+switcher);
             else if (html.includes('class="seo-landing-header"')) html = html.replace('</header>',switcher+'</header>');
             else html = html.replace(/<body([^>]*)>/i, '<body$1>'+switcher);
             const words = {};

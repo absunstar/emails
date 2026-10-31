@@ -15,6 +15,7 @@ const { createEmailRuntimeMonitor } = require('./core/runtime-monitor');
 const { createEmailBackupStorageManager } = require('./core/backup-storage-manager');
 const { createEmailUnsubscribeService } = require('./core/unsubscribe-service');
 const { createGooglePlayBilling } = require('./core/google-play-billing');
+const { createEmbedMetrics, publicHost } = require('./core/embed-metrics');
 
 module.exports = function init(site) {
     const { createSmtpOutboundTransport } = require('./core/smtp-outbound');
@@ -784,10 +785,54 @@ module.exports = function init(site) {
     site.onGET({ name: 'multiple-temporary-inboxes', path: __dirname + '/site_files/html/seo/multiple-temporary-inboxes.html', parser: 'html css js', compress: true, overwrite: true });
     site.onGET({ name: 'developer-temp-mail', path: __dirname + '/site_files/html/seo/developer-temp-mail.html', parser: 'html css js', compress: true, overwrite: true });
 
+    // Public, read-only embed widget. Only /embed is framable; mail and admin pages
+    // keep the framework's default X-Frame-Options: DENY.
+    const embedMetrics = createEmbedMetrics({
+        file: path.join(site.cwd, 'localStorage', 'email-embed-metrics.json'),
+        secret: process.env.EMAIL_EMBED_SIGNING_KEY || crypto.randomBytes(32),
+    });
+    const { languages: widgetLanguages, prefix: widgetPrefix } = require('./core/languages');
+    const widgetPage = __dirname + '/site_files/html/embed.html';
+    for (const code of Object.keys(widgetLanguages)) {
+        const widgetPath = (code === 'en' ? '' : '/' + code) + '/embed';
+        site.onGET({ name: widgetPath, overwrite: true }, (req, res) => {
+            const query = req.query || {};
+            const isPreview = String(query.preview || '') === '1';
+            const referrerHost = publicHost(req.headers?.referer);
+            const token = embedMetrics.issue(isPreview ? '' : referrerHost);
+            if (referrerHost && !isPreview) embedMetrics.track(referrerHost, 'view');
+            res.removeHeader('X-Frame-Options');
+            res.set('Content-Security-Policy', "frame-ancestors *; object-src 'none'; base-uri 'none'; form-action 'none'");
+            res.set('Cache-Control', 'private, no-store');
+            res.set('Content-Type', 'text/html; charset=utf-8');
+            const source = site.emailTemplateRenderer.render(widgetPage, req);
+            const safe = (value) => JSON.stringify(String(value)).replace(/</g, '\\u003c');
+            const html = source.replace('/*__EMBED_CONTEXT__*/', 'window.emailEmbedContext={token:'+safe(token)+',language:'+safe(code)+',hostname:'+safe(referrerHost)+'};');
+            return res.sendHTML(html);
+        });
+    }
+    site.onGET({ name: '/api/embed/stats', overwrite: true }, (req, res) => {
+        const host = publicHost('https://' + String(req.query?.domain || ''));
+        res.set('Cache-Control', 'no-store');
+        res.set('Content-Type', 'application/json; charset=utf-8');
+        return res.json({ done: true, metrics: embedMetrics.stats(host) });
+    });
+    onPost('/api/embed/event', (req, res) => {
+        const data = body(req);
+        const domain = embedMetrics.verify(data.token);
+        if (domain === null || !['generated','copied','open'].includes(data.event)) {
+            return res.status(400).json({ done: false, error: 'invalid_embed_event' });
+        }
+        if (domain) embedMetrics.track(domain, data.event);
+        res.set('Cache-Control','no-store');
+        return res.json({ done: true });
+    });
+    site.onGET({ name: '/embed-builder', path: __dirname + '/site_files/html/embed-builder.html', parser: 'html css js', overwrite: true });
+
     // Same /<language>/<page> URL routing model as Social Browser.
     const { languages: emailLanguages } = require('./core/languages');
     const localizedTemplates = {
-        '/':'free.html','/login':'login.html','/free':'free.html','/vip':'free.html',
+        '/':'free.html','/login':'login.html','/embed-builder':'embed-builder.html','/free':'free.html','/vip':'free.html',
         '/open':'open.html','/o':'open.html','/privacy':'privacy.html',
         '/temporary-email':'seo/temporary-email.html','/disposable-email':'seo/disposable-email.html',
         '/verification-code-email':'seo/verification-code-email.html','/temp-email-for-testing':'seo/temp-email-for-testing.html',

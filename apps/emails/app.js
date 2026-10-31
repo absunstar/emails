@@ -771,8 +771,8 @@ module.exports = function init(site) {
         compress: true,
     });
 
-    site.onGET({ name: 'open', path: __dirname + '/site_files/html/open.html', compress: true, overwrite: true });
-    site.onGET({ name: 'o', path: __dirname + '/site_files/html/open.html', compress: true, overwrite: true });
+    site.onGET({ name: 'open', path: __dirname + '/site_files/html/open.html', parser: 'html css js', compress: true, overwrite: true });
+    site.onGET({ name: 'o', path: __dirname + '/site_files/html/open.html', parser: 'html css js', compress: true, overwrite: true });
     site.onGET({ name: '/.well-known/assetlinks.json', overwrite: true }, (req, res) => {
         res.set('Content-Type', 'application/json; charset=utf-8');
         res.set('Cache-Control', 'public, max-age=3600');

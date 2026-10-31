@@ -104,7 +104,7 @@ function createNativeTemplateRenderer(site, options = {}) {
             const alternate = Object.entries(languages).map(([code,entry]) => '<link rel="alternate" hreflang="'+code+'" href="https://emails.egytag.com'+(prefix(code)+(base==='/'?'/':base))+'">').join('');
             html = html.replace('</head>', '<link rel="canonical" href="'+canonical+'">'+alternate+'<link rel="alternate" hreflang="x-default" href="https://emails.egytag.com'+(base==='/'?'/':base)+'"></head>');
         }
-        html = html.replace(/\bhref="\/(?:temporary-email|disposable-email|verification-code-email|temp-email-for-testing|multiple-temporary-inboxes|developer-temp-mail|privacy)(?=["?#])/g, value => 'href="'+prefix(langCode)+value.slice(6));
+        html = html.replace(/\bhref="\/(?:temporary-email|disposable-email|verification-code-email|temp-email-for-testing|multiple-temporary-inboxes|developer-temp-mail|embed-builder|embed-examples|privacy)(?=["?#])/g, value => 'href="'+prefix(langCode)+value.slice(6));
         if (langCode !== 'en') html=html.replace(/\bhref="\/(?=["?#])/g, 'href="'+prefix(langCode)+'/');
         html=html.replace(/(<meta\s+property="og:url"\s+content=")[^"]*(")/i,(_,a,b)=>a+canonical+b);
         // Embed the same dictionary mechanism for JS-created interface labels.
@@ -113,6 +113,7 @@ function createNativeTemplateRenderer(site, options = {}) {
             if (html.includes('class="sb-navbar-actions"')) html = html.replace('class="sb-navbar-actions"', 'class="sb-navbar-actions" data-language-host') .replace('data-language-host>', 'data-language-host>'+switcher);
             else if (html.includes('class="open-page-nav"')) html = html.replace('class="open-page-nav"', 'class="open-page-nav" data-language-host').replace('data-language-host>', 'data-language-host>'+switcher);
             else if (html.includes('class="browser-login-nav"')) html = html.replace('class="browser-login-nav"','class="browser-login-nav" data-language-host').replace('data-language-host>','data-language-host>'+switcher);
+            else if (html.includes('class="embed-examples-head"')) html = html.replace('class="embed-examples-head"','class="embed-examples-head" data-language-host').replace('data-language-host>','data-language-host>'+switcher);
             else if (html.includes('class="embed-builder-head"')) html = html.replace('class="embed-builder-head"', 'class="embed-builder-head" data-language-host').replace('data-language-host>', 'data-language-host>'+switcher);
             else if (html.includes('class="seo-landing-header"')) html = html.replace('</header>',switcher+'</header>');
             else html = html.replace(/<body([^>]*)>/i, '<body$1>'+switcher);

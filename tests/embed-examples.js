@@ -1,0 +1,37 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const {createNativeTemplateRenderer}=require('../apps/emails/core/native-template');
+const {languages,publicPages}=require('../apps/emails/core/languages');
+const root=path.resolve(__dirname,'..');
+const file=path.join(root,'apps/emails/site_files/html/embed-examples.html');
+const source=fs.readFileSync(file,'utf8');
+const render=createNativeTemplateRenderer({cwd:root,dir:path.join(root,'site_files'),options:{lang:'En'}});
+assert(publicPages.includes('/embed-examples'));
+assert.equal((source.match(/class="template" data-layout=/g)||[]).length,3);
+assert.equal((source.match(/class="mock-frame"/g)||[]).length,3);
+assert.equal((source.match(/data-platform="/g)||[]).length,3);
+for(const [code,meta] of Object.entries(languages)){
+ const url=(code==='en'?'':'/'+code)+'/embed-examples';
+ const html=render.render(file,{url,headers:{host:'emails.egytag.com'}});
+ assert(!html.includes('##word.'),'Untranslated text: '+code);
+ assert(html.includes('<html lang="'+code+'" dir="'+meta.dir+'"'), 'Wrong direction: '+code);
+ assert(html.includes('data-email-language-switch'), 'Language picker absent: '+code);
+ assert(html.includes('value="'+code+'" selected'),'Wrong language selected: '+code);
+ assert(html.includes('rel="canonical" href="https://emails.egytag.com'+url+'"'),'Canonical incorrect: '+code);
+ assert(html.includes('href="'+(code==='en'?'':'/'+code)+'/embed-builder"'),'Builder must stay in current language: '+code);
+ assert(html.includes('href="'+(code==='en'?'':'/'+code)+'/"'),'Homepage language must be preserved: '+code);
+ const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+ for(const [_,script] of scripts)assert.doesNotThrow(()=>new Function(script),'Invalid JS in '+code);
+ assert(html.includes("if(preview)u.searchParams.set('preview','1')"),'Preview should not count towards partner stats');
+ assert(html.includes('referrerpolicy="origin"'),'Partner attribution must use origin-only referrer');
+ assert(html.includes('src="')||html.includes("frame.src=url"),'Widget preview must be real iframe');
+}
+const app=fs.readFileSync(path.join(root,'apps/emails/app.js'),'utf8');
+assert(app.includes("name: '/embed-examples'"));
+assert(app.includes("'/embed-examples':'embed-examples.html'"));
+assert(fs.readFileSync(path.join(root,'apps/emails/site_files/html/embed-builder.html'),'utf8').includes('href="/embed-examples"'));
+assert(fs.readFileSync(path.join(root,'apps/emails/site_files/html/free.html'),'utf8').includes('href="/embed-examples"'));
+assert(fs.readFileSync(path.join(root,'site_files/sitemap.xml'),'utf8').includes('https://emails.egytag.com/ar/embed-examples'));
+console.log('Widget examples: 3 real placements, 3 platform guides, 11-language HTML and JS, links and SEO PASS');

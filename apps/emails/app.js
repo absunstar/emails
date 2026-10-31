@@ -828,11 +828,12 @@ module.exports = function init(site) {
         return res.json({ done: true });
     });
     site.onGET({ name: '/embed-builder', path: __dirname + '/site_files/html/embed-builder.html', parser: 'html css js', overwrite: true });
+    site.onGET({ name: '/embed-examples', path: __dirname + '/site_files/html/embed-examples.html', parser: 'html css js', overwrite: true });
 
     // Same /<language>/<page> URL routing model as Social Browser.
     const { languages: emailLanguages } = require('./core/languages');
     const localizedTemplates = {
-        '/':'free.html','/login':'login.html','/embed-builder':'embed-builder.html','/free':'free.html','/vip':'free.html',
+        '/':'free.html','/login':'login.html','/embed-builder':'embed-builder.html','/embed-examples':'embed-examples.html','/free':'free.html','/vip':'free.html',
         '/open':'open.html','/o':'open.html','/privacy':'privacy.html',
         '/temporary-email':'seo/temporary-email.html','/disposable-email':'seo/disposable-email.html',
         '/verification-code-email':'seo/verification-code-email.html','/temp-email-for-testing':'seo/temp-email-for-testing.html',

@@ -1,0 +1,31 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const source=fs.readFileSync('apps/emails/site_files/html/embed-examples.html','utf8').match(/<script>([\s\S]*?)<\/script>/)?.[1];
+assert(source);
+const handlers=new Map(), ids=new Map();let frames=0,execCopies=0;
+function el(id){if(ids.has(id))return ids.get(id);let node={id,textContent:'',value:'',dataset:{},children:[],_src:'',set src(v){frames++;this._src=v},get src(){return this._src},setAttribute(k,v){this[k]=v},addEventListener(event,fn){handlers.set(id+':'+event,fn)},focus(){},select(){},append(...items){this.children.push(...items)},replaceChildren(...items){this.children=[...items]}};ids.set(id,node);return node;}
+const cards=['inline','sidebar','tools'].map(layout=>{const heading=el('title-'+layout);heading.textContent=layout.toUpperCase();const select=el('choose-'+layout);select.dataset.choose=layout;const card=el('card-'+layout);card.dataset.layout=layout;card.querySelector=()=>select;card.heading=heading;return card});
+const buttons=['wordpress','blogger','html'].map(p=>{const b=el('platform-'+p);b.dataset.platform=p;return b});
+const previews=['one','two','three'].map(p=>el('iframe-'+p));
+const document={body:{dataset:{copied:'Copied!',copyFailed:'Failed',wordpress1:'WordPress one',wordpress2:'WordPress two',wordpress3:'WordPress three',blogger1:'Blogger one',blogger2:'Blogger two',blogger3:'Blogger three',html1:'HTML one',html2:'HTML two',html3:'HTML three'}},getElementById:el,querySelector(selector){const m=selector.match(/^\[data-layout="(\w+)"\] h2$/);if(m)return cards.find(c=>c.dataset.layout===m[1]).heading;return null},querySelectorAll(selector){return selector==='.mock-frame'?previews:selector==='.template'?cards:selector==='[data-choose]'?cards.map(c=>c.querySelector()):selector==='[data-platform]'?buttons:[]},createElement(tag){return el('dynamic-'+Math.random())},execCommand(cmd){if(cmd==='copy'){execCopies++;return true}return false}};
+const context={document,location:{pathname:'/ar/embed-examples'},URL,Number,Object,encodeURIComponent,navigator:{clipboard:{writeText(){return Promise.reject(Error('blocked'))}}},console};
+vm.runInNewContext(source,context);
+const fire=(id,event)=>{let h=handlers.get(id+':'+event);assert(h,'Missing '+id+' '+event);return h()};
+(async()=>{
+ assert.equal(el('widget-language').value,'ar');
+ assert(el('embed-code').value.includes('/ar/embed?theme=dark'),'Initial code must use Arabic production URL');
+ assert(!el('embed-code').value.includes('preview=1'),'Production code must not be in preview mode');
+ assert(previews.every(f=>f.src.includes('preview=1')),'Preview must be excluded from metrics');
+ assert.equal(frames,3);
+ fire('choose-sidebar','click');assert(el('embed-code').value.includes('max-width:360px'));
+ fire('choose-tools','click');assert(el('embed-code').value.includes('max-width:700px'));
+ assert.equal(frames,3,'Layout selection must not regenerate addresses in preview frames');
+ el('widget-theme').value='light';fire('widget-theme','change');assert.equal(frames,6);
+ assert(el('embed-code').value.includes('theme=light'));
+ fire('platform-blogger','click');assert.equal(el('steps').children[0].textContent,'Blogger one');
+ fire('platform-html','click');assert.equal(el('steps').children[0].textContent,'HTML one');
+ await fire('copy-code','click');assert.equal(execCopies,1);assert.equal(el('feedback').textContent,'Copied!');
+ console.log('Widget example interactions: localized iframe, 3 presets, 3 CMS guides, preview isolation and copy fallback PASS');
+})().catch(err=>{console.error(err);process.exitCode=1});

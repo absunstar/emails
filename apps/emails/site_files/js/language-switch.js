@@ -21,14 +21,25 @@ window.emailTranslate=function(text){return dictionary[String(text)]||String(tex
 function translateNodes(host){
  if(!host||getCode()==='en')return;
  const walker=document.createTreeWalker(host,NodeFilter.SHOW_TEXT);let node;
- while((node=walker.nextNode())){if(node.parentElement?.closest('.mail-message-copy,.mail-sender-name,.mail-sender-email,.mail-message-subject,.mailbox-address-copy,.qr-email,.mail-address,.sb-mail-meta,.sb-mail-subject'))continue;
- const raw=node.nodeValue||'';const key=raw.trim();if(key&&dictionary[key]&&dictionary[key]!==key)node.nodeValue=raw.replace(key,dictionary[key]);
+ while((node=walker.nextNode())){
+  const el=node.parentElement;
+  if(el?.closest('.mail-message-copy,.mail-sender-name,.mail-sender-email,.mail-message-subject,.qr-email,.mail-address,.sb-mail-meta,.sb-mail-subject'))continue;
+  const status=el?.matches('.mailbox-address-copy small');
+  if(el?.closest('.mailbox-address-copy')&&!status)continue;
+  const raw=node.nodeValue||'',key=raw.trim();if(!key)continue;
+  if(status&&!/^[0-9]+ messages?(?:\s|$)/i.test(key))continue;
+  let value=dictionary[key]||key;
+  if(value===key){
+   value=key.replace(/^([0-9]+) (message|messages)(?=\b|\s|$)/i,(_,n,word)=>n+' '+(dictionary[word]||word));
+   value=value.replace(/checked now/gi,m=>dictionary[m]||dictionary['checked now']||m);
+  }
+  if(value!==key)node.nodeValue=raw.replace(key,value);
  }
 }
 
 if(getCode()!=='en'){
- const allowed='.smart-inbox-empty,.empty-inbox,.mail-new-badge,.mail-attachment-badge,.otp-copy-label,.otp-copy-action,.mail-message-view-btn,.sb-toast,.mailbox-limit,.mailbox-secondary-tools,.mailbox-address-empty';
- const observer=new MutationObserver(mutations=>{for(const m of mutations){for(const n of m.addedNodes||[]){if(n.nodeType!==1)continue;if(n.matches?.(allowed))translateNodes(n);for(const el of n.querySelectorAll?.(allowed)||[])translateNodes(el);} if(m.type==='characterData'&&m.target.parentElement?.closest(allowed))translateNodes(m.target.parentElement);}});
+ const allowed='.smart-inbox-empty,.empty-inbox,.mail-new-badge,.mail-attachment-badge,.otp-copy-label,.otp-copy-action,.mail-message-view-btn,.sb-toast,.mailbox-limit,.mailbox-secondary-tools,.mailbox-address-empty,.mailbox-tier,.mailbox-preference-row,.mailbox-live,.inbox-live-state,[data-inbox-total],.mailbox-address-copy small';
+ const observer=new MutationObserver(mutations=>{for(const m of mutations){for(const n of m.addedNodes||[]){if(n.nodeType===3){if(n.parentElement?.closest(allowed))translateNodes(n.parentElement);continue;}if(n.nodeType!==1)continue;if(n.matches?.(allowed))translateNodes(n);for(const el of n.querySelectorAll?.(allowed)||[])translateNodes(el);} if(m.type==='characterData'&&m.target.parentElement?.closest(allowed))translateNodes(m.target.parentElement);}});
  observer.observe(document.body,{subtree:true,childList:true,characterData:true});
  document.querySelectorAll(allowed).forEach(translateNodes);
 }

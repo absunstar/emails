@@ -9,7 +9,7 @@ function publicHost(input) {
         if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return '';
         let host = url.hostname.toLowerCase().replace(/\.$/, '');
         if (!host || host.length > 190 || !/^[a-z0-9.-]+$/.test(host) || !host.includes('.')) return '';
-        if (host === 'localhost' || host === 'egytag.com' || host === 'emails.egytag.com' || host.endsWith('.local')) return '';
+        if (host === 'localhost' || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.endsWith('.invalid') || host === 'egytag.com' || host === 'emails.egytag.com' || host.endsWith('.local')) return '';
         return host;
     } catch (_) { return ''; }
 }

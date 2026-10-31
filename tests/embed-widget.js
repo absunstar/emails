@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
-const { createEmbedMetrics, publicHost } = require('../apps/emails/core/embed-metrics');
+const { createEmbedMetrics, publicHost, loadOrCreateEmbedSigningKey } = require('../apps/emails/core/embed-metrics');
 const { createNativeTemplateRenderer } = require('../apps/emails/core/native-template');
 (async()=>{
   assert.equal(publicHost('https://example.com/abc?email=something'), 'example.com');
@@ -14,9 +14,14 @@ const { createNativeTemplateRenderer } = require('../apps/emails/core/native-tem
   assert.equal(publicHost('https://emails.egytag.com/ar/embed-builder'), '');
   const work=fs.mkdtempSync(path.join(os.tmpdir(),'egytag-embed-metrics-'));
   try{
-    let current=Date.UTC(2026,9,31),cfg={file:path.join(work,'metrics.json'),secret:'widget-test-secret-key',now:()=>current};
+    const signingFile = path.join(work, 'key', 'embed.key');
+    const firstSecret = loadOrCreateEmbedSigningKey(signingFile);
+    assert.equal(firstSecret.length, 32);
+    assert.deepEqual(loadOrCreateEmbedSigningKey(signingFile), firstSecret, 'Signed sessions must survive restarts');
+    let current=Date.UTC(2026,9,31),cfg={file:path.join(work,'metrics.json'),secret:firstSecret,now:()=>current};
     const m=createEmbedMetrics(cfg);const token=m.issue('example.com');
     assert.equal(m.verify(token),'example.com');
+    assert.equal(createEmbedMetrics({...cfg, secret:loadOrCreateEmbedSigningKey(signingFile)}).verify(token),'example.com', 'Token must survive a server restart');
     assert.equal(m.verify(token+'tampered'),null);
     assert.equal(m.verify('random'),null);
     assert.equal(m.track('example.com','view'),true);
@@ -29,7 +34,7 @@ const { createNativeTemplateRenderer } = require('../apps/emails/core/native-tem
     assert.equal(m.stats('another.com').views,0);
     await m.flush();
     assert.equal(createEmbedMetrics(cfg).stats('example.com').views,1);
-    current+=3601000;assert.equal(m.verify(token),null,'Expired tokens must be rejected');
+    current+=86401000;assert.equal(m.verify(token),null,'Expired tokens must be rejected');
   }finally{fs.rmSync(work,{recursive:true,force:true})}
   const root=path.resolve(__dirname,'..');const renderer=createNativeTemplateRenderer({cwd:root,dir:path.join(root,'site_files'),options:{lang:'En'}});
   for(const lang of ['en','ar','es','pt','de','fr','hi','ru','id','tr','vi']){

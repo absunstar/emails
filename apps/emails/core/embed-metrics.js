@@ -3,6 +3,19 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const EVENTS = new Set(['view', 'generated', 'copied', 'open']);
+function loadOrCreateEmbedSigningKey(file) {
+    const keyFile = String(file || '');
+    if (!keyFile) throw new Error('embed_signing_key_file_required');
+    fs.mkdirSync(path.dirname(keyFile), { recursive: true });
+    try {
+        fs.writeFileSync(keyFile, crypto.randomBytes(32).toString('hex'), { flag: 'wx', mode: 0o600 });
+    } catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+    }
+    const hex = fs.readFileSync(keyFile, 'utf8').trim();
+    if (!/^[a-f0-9]{64}$/i.test(hex)) throw new Error('invalid_embed_signing_key');
+    return Buffer.from(hex, 'hex');
+}
 function publicHost(input) {
     try {
         const url = new URL(String(input || '').slice(0, 2048));
@@ -27,7 +40,7 @@ function createEmbedMetrics({file, secret = crypto.randomBytes(32), now = () => 
     const key = Buffer.isBuffer(secret) ? secret : Buffer.from(String(secret));
     const sign = payload => crypto.createHmac('sha256', key).update(payload).digest('base64url');
     function issue(domain) {
-        const value = Buffer.from(JSON.stringify({ h: domain || '', exp: Math.floor(now() / 1000) + 3600, nonce: crypto.randomBytes(9).toString('base64url') })).toString('base64url');
+        const value = Buffer.from(JSON.stringify({ h: domain || '', exp: Math.floor(now() / 1000) + 86400, nonce: crypto.randomBytes(9).toString('base64url') })).toString('base64url');
         return value + '.' + sign(value);
     }
     function verify(token) {
@@ -37,7 +50,7 @@ function createEmbedMetrics({file, secret = crypto.randomBytes(32), now = () => 
         const actual = Buffer.from(segments[1]); const expected = Buffer.from(sign(segments[0]));
         if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return null;
         try {const value = JSON.parse(Buffer.from(segments[0], 'base64url').toString('utf8'));
-            if (value.exp <= now()/1000 || value.exp > now()/1000+3700) return null;
+            if (value.exp <= now()/1000 || value.exp > now()/1000+86500) return null;
             return value.h === '' || /^[a-z0-9.-]{3,190}$/.test(value.h) ? value.h : null;
         } catch (_) { return null; }
     }
@@ -78,4 +91,4 @@ function createEmbedMetrics({file, secret = crypto.randomBytes(32), now = () => 
     }
     return {publicHost, issue, verify,track,stats,flush};
 }
-module.exports={publicHost,createEmbedMetrics};
+module.exports={publicHost,createEmbedMetrics,loadOrCreateEmbedSigningKey};

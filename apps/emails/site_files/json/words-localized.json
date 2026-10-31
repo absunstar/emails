@@ -7026,5 +7026,61 @@
     "Ru": "Скачать Социальный Браузер для Windows",
     "Tr": "Windows için Sosyal Tarayıcıyı İndirin",
     "Vi": "Tải xuống Trình duyệt xã hội cho Windows"
+  },
+  {
+    "name": "email_embed_dailyBreakdown",
+    "En": "Daily breakdown (last 30 days)",
+    "Ar": "تفاصيل التفاعلات اليومية (آخر 30 يومًا)",
+    "Es": "Desglose diario (últimos 30 días)",
+    "Pt": "Detalhamento diário (últimos 30 dias)",
+    "De": "Tägliche Aufschlüsselung (letzte 30 Tage)",
+    "Fr": "Répartition quotidienne (30 derniers jours)",
+    "Hi": "दैनिक ब्रेकडाउन (पिछले 30 दिन)",
+    "Ru": "Разбивка по дням (последние 30 дней)",
+    "Id": "Rincian harian (30 hari terakhir)",
+    "Tr": "Günlük döküm (son 30 gün)",
+    "Vi": "Phân tích hàng ngày (30 ngày qua)"
+  },
+  {
+    "name": "email_embed_exportCSV",
+    "En": "Export CSV",
+    "Ar": "تصدير CSV",
+    "Es": "Exportar CSV",
+    "Pt": "Exportar CSV",
+    "De": "CSV exportieren",
+    "Fr": "Exporter au format CSV",
+    "Hi": "सीएसवी निर्यात करें",
+    "Ru": "Экспортировать CSV",
+    "Id": "Ekspor CSV",
+    "Tr": "CSV'yi dışa aktar",
+    "Vi": "Xuất CSV"
+  },
+  {
+    "name": "email_embed_date",
+    "En": "Date",
+    "Ar": "التاريخ",
+    "Es": "Fecha",
+    "Pt": "Data",
+    "De": "Datum",
+    "Fr": "Date",
+    "Hi": "दिनांक",
+    "Ru": "Дата",
+    "Id": "Tanggal",
+    "Tr": "Tarih",
+    "Vi": "Ngày"
+  },
+  {
+    "name": "email_embed_noActivity",
+    "En": "No activity recorded for this website yet.",
+    "Ar": "لا توجد تفاعلات مسجلة لهذا الموقع حتى الآن.",
+    "Es": "Aún no se ha registrado actividad en este sitio web.",
+    "Pt": "Nenhuma atividade registrada para este site ainda.",
+    "De": "Für diese Website wurden noch keine Aktivitäten aufgezeichnet.",
+    "Fr": "Aucune activité enregistrée pour ce site pour le moment.",
+    "Hi": "इस वेबसाइट के लिए अभी तक कोई गतिविधि रिकॉर्ड नहीं की गई है.",
+    "Ru": "На этом сайте пока не зарегистрировано ни одной активности.",
+    "Id": "Belum ada aktivitas yang dicatat untuk situs web ini.",
+    "Tr": "Bu web sitesi için henüz bir etkinlik kaydedilmedi.",
+    "Vi": "Chưa có hoạt động nào được ghi lại cho trang web này."
   }
 ]

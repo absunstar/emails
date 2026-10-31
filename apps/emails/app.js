@@ -15,7 +15,7 @@ const { createEmailRuntimeMonitor } = require('./core/runtime-monitor');
 const { createEmailBackupStorageManager } = require('./core/backup-storage-manager');
 const { createEmailUnsubscribeService } = require('./core/unsubscribe-service');
 const { createGooglePlayBilling } = require('./core/google-play-billing');
-const { createEmbedMetrics, publicHost } = require('./core/embed-metrics');
+const { createEmbedMetrics, publicHost, loadOrCreateEmbedSigningKey } = require('./core/embed-metrics');
 
 module.exports = function init(site) {
     const { createSmtpOutboundTransport } = require('./core/smtp-outbound');
@@ -789,7 +789,7 @@ module.exports = function init(site) {
     // keep the framework's default X-Frame-Options: DENY.
     const embedMetrics = createEmbedMetrics({
         file: path.join(site.cwd, 'localStorage', 'email-embed-metrics.json'),
-        secret: process.env.EMAIL_EMBED_SIGNING_KEY || crypto.randomBytes(32),
+        secret: process.env.EMAIL_EMBED_SIGNING_KEY || loadOrCreateEmbedSigningKey(path.join(site.cwd, 'localStorage', 'email-embed-signing-key')),
     });
     const { languages: widgetLanguages, prefix: widgetPrefix } = require('./core/languages');
     const widgetPage = __dirname + '/site_files/html/embed.html';

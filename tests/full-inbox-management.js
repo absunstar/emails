@@ -4,6 +4,16 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const html = fs.readFileSync('apps/emails/site_files/html/free.html','utf8');
 const src = fs.readFileSync('apps/emails/site_files/js/index.js','utf8');
+for (const logo of [
+  {file: 'site_files/images/social-browser-brand-icon.png', src: '/images/social-browser-brand-icon.png', alt: 'Social Browser logo', size: 128},
+  {file: 'site_files/images/vip-temp-mail-app-icon.png', src: '/images/vip-temp-mail-app-icon.png', alt: 'VIP Temp Mail app icon', size: 192}
+]) {
+ const bytes = fs.readFileSync(logo.file);
+ assert(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])), 'Official logo must be a valid PNG: ' + logo.file);
+ assert.equal(bytes.readUInt32BE(16), logo.size, 'Official logo dimensions changed');
+ assert(html.includes('src="'+logo.src+'" alt="'+logo.alt+'"'), 'Modal must display the real ' + logo.alt);
+}
+assert(!html.includes('class="mail-limit-choice-icon" aria-hidden="true"'), 'Placeholder icons must not be displayed');
 for (const [label, fragment] of [
  ['Social Browser alternative', 'data-limit-alert-cta data-quick-mail-link="social_browser"'],
  ['Google Play alternative', 'data-quick-mail-link="android_play" href="https://play.google.com/store/apps/details?id=com.egytag.mails"'],

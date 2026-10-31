@@ -307,6 +307,17 @@ body{margin-top:72px;margin-bottom:0;font-family:Tahoma,Verdana,Arial,sans-serif
 @media(max-width:620px){.mail-limit-alert-card{padding:20px!important}.mail-limit-alternatives{gap:8px;margin-top:14px}.mail-limit-choice{min-height:62px;padding:9px 11px}.mail-limit-choice-copy strong{font-size:13px}.mail-limit-choice-copy small{font-size:10px}.mail-limit-divider{margin-top:13px}.mail-limit-replace{margin-top:12px!important}}
 @media(prefers-reduced-motion:reduce){.mail-limit-choice{transition:none}}
 </style>
+
+<style>
+/* Display each product's authentic mark: SB brand shield and Android APK launcher icon. */
+.mail-limit-choice-icon{display:grid;place-items:center;flex:0 0 48px!important;width:48px!important;height:48px!important;overflow:hidden;border-radius:12px!important;background:rgba(6,25,43,.48)!important}
+.mail-limit-choice-icon img{display:block;width:44px!important;height:44px!important;max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+.mail-limit-choice.is-android .mail-limit-choice-icon{background:#fff!important;border-radius:11px!important}
+.mail-limit-choice.is-android .mail-limit-choice-icon img{width:48px!important;height:48px!important;border-radius:9px}
+.mail-limit-choice-copy{gap:4px!important}
+.mail-limit-choice-copy strong{font-size:14px!important}
+@media(max-width:620px){.mail-limit-choice{gap:12px!important}.mail-limit-choice-icon{flex-basis:44px!important;width:44px!important;height:44px!important}.mail-limit-choice-icon img{width:42px!important;height:42px!important}.mail-limit-choice.is-android .mail-limit-choice-icon img{width:44px!important;height:44px!important}.mail-limit-choice-copy strong{font-size:13px!important}}
+</style>
 </head>
 <body>
 <nav x-import="navbar/index.html" class="sitebar"></nav>
@@ -343,8 +354,8 @@ body{margin-top:72px;margin-bottom:0;font-family:Tahoma,Verdana,Arial,sans-serif
 </div>
 </div>
 <div class="mail-limit-alert" data-limit-alert hidden role="dialog" aria-modal="true" aria-labelledby="mailLimitTitle"><div class="mail-limit-alert-card"><div class="mail-limit-alert-icon">!</div><h2 id="mailLimitTitle">Manage saved emails</h2><p data-limit-alert-message>You have reached the maximum number of saved email addresses.</p><div class="mail-limit-alternatives" aria-label="Other ways to continue">
-<a class="mail-limit-choice is-browser" data-limit-alert-cta data-quick-mail-link="social_browser" href="https://social-browser.com/" target="_blank" rel="noopener"><span class="mail-limit-choice-icon" aria-hidden="true">◫</span><span class="mail-limit-choice-copy"><strong>Use Social Browser</strong><small>Save up to 100 email addresses</small></span><span aria-hidden="true">↗</span></a>
-<a class="mail-limit-choice is-android" data-quick-mail-link="android_play" href="https://play.google.com/store/apps/details?id=com.egytag.mails" target="_blank" rel="noopener"><span class="mail-limit-choice-icon" aria-hidden="true">↓</span><span class="mail-limit-choice-copy"><strong>Download Android app</strong><small>Private mailboxes with Mobile Pro</small></span><span aria-hidden="true">↗</span></a>
+<a class="mail-limit-choice is-browser" data-limit-alert-cta data-quick-mail-link="social_browser" href="https://social-browser.com/" target="_blank" rel="noopener"><span class="mail-limit-choice-icon"><img src="/images/social-browser-brand-icon.png" alt="Social Browser logo" width="44" height="44" loading="eager" decoding="async"></span><span class="mail-limit-choice-copy"><strong>Use Social Browser</strong><small>Save up to 100 email addresses</small></span><span aria-hidden="true">↗</span></a>
+<a class="mail-limit-choice is-android" data-quick-mail-link="android_play" href="https://play.google.com/store/apps/details?id=com.egytag.mails" target="_blank" rel="noopener"><span class="mail-limit-choice-icon"><img src="/images/vip-temp-mail-app-icon.png" alt="VIP Temp Mail app icon" width="44" height="44" loading="eager" decoding="async"></span><span class="mail-limit-choice-copy"><strong>Download Android app</strong><small>Private mailboxes with Mobile Pro</small></span><span aria-hidden="true">↗</span></a>
 <a class="mail-limit-apk-link" data-quick-mail-link="android_apk" href="/downloads/VIP-Temp-Mail-5.2.6+18-play-signed.apk">Download APK directly instead</a>
 </div><div class="mail-limit-divider"><span>Or continue free on this website</span></div>
 <div class="mail-limit-replace"><label for="mailReplaceSelect">Choose an email to replace</label><select id="mailReplaceSelect" data-replace-address aria-label="Choose saved address to replace"></select><p>The old address leaves your saved list only. Existing messages stay on the server; keep a copy if you need it later.</p><button class="mail-limit-replace-btn" type="button" data-action="replace-saved-address" data-replace-action>Replace and create email</button></div><div class="mail-limit-alert-actions"><button class="sb-btn sb-btn-ghost" type="button" data-action="dismiss-limit-alert"><span>Cancel</span></button></div></div></div>

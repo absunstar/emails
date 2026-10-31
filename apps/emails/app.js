@@ -733,6 +733,7 @@ module.exports = function init(site) {
         raw.write('event: ready\ndata: ' + JSON.stringify({ done: true, addresses, mode: 'sse' }) + '\n\n');
         const unsubscribeEvent = service.subscribe((event) => {
             if (!event || event.type !== 'incoming') return;
+            if (service.isOfficialMessage(event.message)) return;
             const matched = (event.recipients || []).filter((email) => wanted.has(String(email || '').toLowerCase()));
             if (!matched.length) return;
             runtimeMonitor.increment('sseEvents');
@@ -989,7 +990,7 @@ module.exports = function init(site) {
             if (!raw || !messageBelongsToDomain(raw, domain)) {
                 return res.json({ done: false, error: 'Email not found' });
             }
-            if (service.isVipMessage(raw)) {
+            if (service.isVipMessage(raw) || service.isOfficialMessage(raw)) {
                 res.status(403);
                 return res.json({ done: false, error: 'Protected messages cannot be deleted from the public mailbox.' });
             }
@@ -1144,7 +1145,7 @@ module.exports = function init(site) {
                 }
 
                 if (raw) {
-                    if (service.isVipMessage(raw) && !context.allowVip) {
+                    if ((service.isOfficialMessage(raw) && !admin(req)) || (service.isVipMessage(raw) && !context.allowVip)) {
                         response.done = true;
                         response.isVIP = true;
                         return res.json(response);

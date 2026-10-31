@@ -8,8 +8,9 @@ The public temp-mail address manager is browser-local by design.
 - The browser stores the address book in `localStorage`.
 - Guest UI limit: 10 saved addresses.
 - Social Browser UI limit: 100 saved addresses.
-- Guest users cannot remove a saved address from the local address book.
-- Social Browser users can remove saved addresses locally.
+- Guest and Social Browser users can remove locally saved addresses after an explicit confirmation.
+- When all slots are full, choosing New Email or opening a new typed address presents a replacement picker; the user selects which saved address to replace and confirms before it is removed.
+- Unread inboxes remain selectable but clearly show their unread count in the picker.
 - Removing an address from the browser does **not** delete mail messages from server storage.
 - Switching a saved address loads that mailbox from the existing email API.
 - The active address and last-known message count are persisted locally.
@@ -52,7 +53,7 @@ social-temp-mail.address-book.v1.<root-mail-domain>
 The key is still subject to normal browser origin/localStorage isolation.
 ## Manual mailbox entry
 
-The free page address field is editable. A user may type a full mailbox address directly or type only a local name, in which case the current site's mail domain is appended. A full address keeps its explicit domain. The typed mailbox is not counted merely because it was entered; when the user chooses View Messages, the mailbox is added to the local address book if it is not already present. The same browser-side quota applies to this automatic addition: 10 saved addresses for a guest and 100 in Social Browser. If the quota is full, a new typed mailbox is not added or opened.
+The free page address field is editable. A user may type a full mailbox address directly or type only a local name, in which case the current site's mail domain is appended. A full address keeps its explicit domain. The typed mailbox is not counted merely because it was entered; when the user chooses View Messages, the mailbox is added to the local address book if it is not already present. The same browser-side quota applies to this automatic addition: 10 saved addresses for a guest and 100 in Social Browser. If the quota is full, the user may first replace an existing locally saved address (with confirmation), then open the typed mailbox.
 
 
 

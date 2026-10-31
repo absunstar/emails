@@ -161,12 +161,23 @@ function createEmailService(options) {
         return !!doc && (isVipAddress(doc.to) || isVipAddress(doc.cc));
     }
 
+    const reservedOfficialAddresses = new Set(['info@egytag.com', 'support@egytag.com']);
+    function isOfficialMessage(doc) {
+        if (!doc) return false;
+        const recipients = extractAddresses([doc.to || '', doc.cc || ''].join(', ')).map((value) => value.toLowerCase());
+        return recipients.some((email) => reservedOfficialAddresses.has(email));
+    }
+    function officialVisible(doc, context) {
+        return !isOfficialMessage(doc) || context?.isAdmin === true;
+    }
+
+
     store = new EmailFileStore({
         baseDir: options.dataDir || path.join(process.cwd(), 'localStorage', 'email-files'),
         vipPath: options.vipPath || path.join(process.cwd(), 'localStorage', 'vip-email-list.json'),
         maxMessages: Number(options.maxMessages || process.env.EMAIL_MAX_MESSAGES || 100000),
         logger,
-        isProtectedMessage: isVipMessage,
+        isProtectedMessage: (doc) => isVipMessage(doc) || isOfficialMessage(doc),
     });
 
     async function deliver(message) {
@@ -373,6 +384,7 @@ function createEmailService(options) {
             const startedAt = Date.now();
             const limit = Math.max(1, Math.min(Number(args.limit || 25), Number(context.maxLimit || 1000)));
             let matches = await searchRaw(args, context);
+            if (!context.isAdmin) matches = matches.filter((doc) => officialVisible(doc, context));
             const blockedVip = context.allowVip ? [] : matches.filter((doc) => isVipMessage(doc));
             if (!context.allowVip) matches = matches.filter((doc) => !isVipMessage(doc));
             const offset = Math.max(0, Number(args.offset || 0));
@@ -403,7 +415,7 @@ function createEmailService(options) {
                 error.code = 'DOMAIN_SCOPE';
                 throw error;
             }
-            if (isVipMessage(doc) && !context.allowVip) {
+            if (!officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) {
                 const error = new Error('VIP email access is required');
                 error.code = 'VIP_REQUIRED';
                 throw error;
@@ -428,7 +440,7 @@ function createEmailService(options) {
                     outsideDomain.push(guid);
                     continue;
                 }
-                if (isVipMessage(doc) && !context.allowVip) {
+                if (!officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) {
                     blockedVip.push(guid);
                     continue;
                 }
@@ -449,7 +461,7 @@ function createEmailService(options) {
                     : store.messageValues();
                 for (const doc of source) {
                     if (typeof store.messageValuesForRecipient !== 'function' && !normalizeAddressList([doc.to, doc.cc]).includes(email)) continue;
-                    const protectedMessage = isVipMessage(doc) && !context.allowVip;
+                    const protectedMessage = !officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip);
                     if (protectedMessage) {
                         item.protected = true;
                         continue;
@@ -528,7 +540,7 @@ function createEmailService(options) {
             const doc = await store.getMessage(guid);
             if (!doc) return null;
             if (context.domain && !messageBelongsToDomain(doc, context.domain)) return null;
-            if (isVipMessage(doc) && !context.allowVip) throw new Error('VIP email access is required');
+            if (!officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) throw new Error('VIP email access is required');
             const allowed = {};
             for (const key of ['subject', 'text', 'html', 'folder', 'read', 'status', 'favorite']) {
                 if (patch && patch[key] !== undefined) allowed[key] = patch[key];
@@ -555,7 +567,7 @@ function createEmailService(options) {
                     outsideDomain.push(guid);
                     continue;
                 }
-                if (isVipMessage(doc) && !context.allowVip) {
+                if (!officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) {
                     blockedVip.push(guid);
                     continue;
                 }
@@ -624,6 +636,7 @@ function createEmailService(options) {
             return store.removeVip(email);
         },
 
+        isOfficialMessage,
         listVip() {
             return store.listVip();
         },

@@ -31,6 +31,7 @@
         loadGeneration: 0,
         viewGeneration: 0,
         pendingLiveRefresh: 0,
+        pendingAddressAction: null,
         minEmailLength: location.pathname.includes('vip') ? 6 : 8,
         maxEmailLength: location.pathname.includes('vip') ? 10 : 14,
         sidebarSearch: '',
@@ -331,7 +332,43 @@
     function limitReachedMessage() {
         return state.client.isSocialBrowser
             ? 'You have reached the 100-address limit for this browser. Remove a saved address before adding another one.'
-            : 'You reached the 10 saved-email limit. Use Social Browser to unlock 100 saved emails and address removal.';
+            : 'Your 10 saved-email slots are full. Choose an address to replace, or remove an old saved address to make room. Social Browser supports 100 saved addresses.';
+    }
+
+    function renderLimitReplacementOptions() {
+        const select = q('[data-replace-address]');
+        const action = q('[data-replace-action]');
+        if (!select) return;
+        const current = state.addressBook.active;
+        const options = state.addressBook.addresses.slice().sort((a, b) => {
+            const score = (item) => (item.email === current ? 1000000000000000 : 0) + (Number(item.unreadCount || 0) ? 100000000000000 : 0) + (Number(item.lastMessageAt || 0) || Number(item.createdAt || 0));
+            return score(a) - score(b);
+        });
+        select.innerHTML = options.map((item) => '<option value="' + escape(item.email) + '">' + escape(item.email) + (item.unreadCount ? ' · ' + item.unreadCount + ' unread' : item.messageCount ? ' · ' + item.messageCount + ' messages' : ' · empty') + '</option>').join('');
+        if (action) action.textContent = state.pendingAddressAction?.type === 'typed' ? 'Replace and view email' : 'Replace and create email';
+    }
+
+    async function replaceSavedAddress() {
+        if (mode !== 'free' || state.addressBook.addresses.length < state.client.addressLimit) return;
+        const selected = normalizeMailbox(q('[data-replace-address]')?.value || '');
+        const index = state.addressBook.addresses.findIndex((item) => item.email === selected);
+        if (index < 0) return;
+        const item = state.addressBook.addresses[index];
+        const warning = 'Replace ' + selected + ' in your saved list?\n\nThis does NOT delete messages from the mail server, but you will no longer monitor this address automatically. Save a copy of the address if you may need it later.' + (item.unreadCount ? '\n\nWarning: ' + item.unreadCount + ' unread messages.' : '');
+        if (!confirm(warning)) return;
+        const pending = state.pendingAddressAction || { type: 'generate' };
+        hideLimitAlert();
+        state.addressBook.addresses.splice(index, 1);
+        if (state.addressBook.active === selected) state.addressBook.active = state.addressBook.addresses[0]?.email || '';
+        saveAddressBook();
+        renderAddressSidebar();
+        if (state.pollReady) scheduleLiveReconnect();
+        const input = q('[data-mail-address]');
+        if (pending.type === 'typed' && pending.email) {
+            if (input) input.value = pending.email;
+            return checkInbox(q('[data-action="check-inbox"]'));
+        }
+        return generateEmail(q('[data-action="generate-email"]'));
     }
 
     function showLimitAlert(message) {
@@ -340,6 +377,7 @@
         const cta = q('[data-limit-alert-cta]');
         if (text) text.textContent = message || limitReachedMessage();
         if (cta) cta.hidden = state.client.isSocialBrowser;
+        renderLimitReplacementOptions();
         if (box) {
             box.hidden = false;
             box.classList.add('is-open');
@@ -351,12 +389,13 @@
         if (!box) return;
         box.classList.remove('is-open');
         box.hidden = true;
+        state.pendingAddressAction = null;
     }
 
     function showUpgrade(message) {
         const panel = q('[data-upgrade-panel]');
         const text = q('[data-upgrade-message]');
-        if (text) text.textContent = message || 'Unlock 100 saved emails plus address removal, reply and forward with Social Browser.';
+        if (text) text.textContent = message || 'Unlock 100 saved emails, reply and forward with Social Browser.';
         if (panel) panel.hidden = false;
     }
 
@@ -377,6 +416,8 @@
         if (usage) usage.textContent = count + ' / ' + limit;
         if (progress) progress.style.width = percent + '%';
         if (usageCard) usageCard.classList.toggle('is-near-limit', percent >= 80);
+        const manage = q('[data-manage-full-inbox]');
+        if (manage) manage.hidden = count < limit;
         qa('[data-browser-send-action]').forEach((button) => { button.hidden = !state.client.isSocialBrowser; });
     }
 
@@ -402,7 +443,7 @@
             const originalIndex = state.addressBook.addresses.findIndex((entry) => entry.email === item.email) + 1;
             const active = item.email === state.addressBook.active;
             const unread = Math.max(0, Number(item.unreadCount || 0));
-            const remove = state.client.canRemoveAddress ? '<button class="mailbox-address-remove" type="button" data-action="remove-address" data-email="' + escape(item.email) + '" title="Remove address from this browser" aria-label="Remove ' + escape(item.email) + '"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m8 11 1 8h6l1-8"></path></svg></button>' : '';
+            const remove = state.client.canRemoveAddress ? '<button class="mailbox-address-remove" type="button" data-action="remove-address" data-email="' + escape(item.email) + '" title="Remove from saved list (messages are not deleted)" aria-label="Remove ' + escape(item.email) + '"><svg class="ui-icon ui-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="m8 11 1 8h6l1-8"></path></svg></button>' : '';
             const status = item.lastMessageAt ? (escape(item.lastMessageSubject || 'New message') + ' · ' + relativeTime(item.lastMessageAt)) : (Number(item.messageCount || 0) + ' message' + (Number(item.messageCount || 0) === 1 ? '' : 's') + (item.lastCheckedAt ? ' · checked ' + relativeTime(item.lastCheckedAt) : ''));
             return '<div class="mailbox-address-item' + (active ? ' is-active' : '') + (unread ? ' has-unread' : '') + '"><button class="mailbox-address-select" type="button" data-action="select-address" data-email="' + escape(item.email) + '"><span class="mailbox-address-index">' + originalIndex + '</span><span class="mailbox-address-copy"><strong>' + escape(item.label || item.email) + '</strong>' + (item.label ? '<small>' + escape(item.email) + '</small>' : '') + '<small>' + status + '</small></span>' + (unread ? '<span class="mailbox-unread">' + unread + '</span>' : '<span></span>') + '</button>' + remove + '</div>';
         }).join('');
@@ -421,6 +462,7 @@
         }
         if (state.addressBook.addresses.length >= state.client.addressLimit) {
             const message = limitReachedMessage();
+            state.pendingAddressAction = { type: 'typed', email: normalized };
             showUpgrade(message);
             if (!options?.silentLimit) showLimitAlert(message);
             return false;
@@ -431,11 +473,7 @@
         saveAddressBook();
         renderAddressSidebar();
         if (state.pollReady) scheduleLiveReconnect();
-        if (state.addressBook.addresses.length === state.client.addressLimit) {
-            const message = limitReachedMessage();
-            showUpgrade(message);
-            if (!options?.silentLimit) showLimitAlert(message);
-        }
+        if (state.addressBook.addresses.length === state.client.addressLimit) showUpgrade(limitReachedMessage());
         return true;
     }
 
@@ -456,14 +494,12 @@
     }
 
     async function removeAddress(email) {
-        if (!state.client.canRemoveAddress) {
-            showUpgrade('Remove saved addresses and free up inbox slots with Social Browser.');
-            toast('Open this site in Social Browser to remove saved addresses.', 'info', 'Address removal');
-            return;
-        }
+        if (mode !== 'free') return;
         const normalized = normalizeMailbox(email);
         const index = state.addressBook.addresses.findIndex((item) => item.email === normalized);
         if (index < 0) return;
+        const saved = state.addressBook.addresses[index];
+        if (!confirm('Remove ' + normalized + ' from your saved list?\n\nIts messages are NOT deleted from the server, but this browser will stop monitoring this address. Save the address somewhere if you might need it again.' + (saved.unreadCount ? '\n\nThis inbox has ' + saved.unreadCount + ' unread messages.' : ''))) return;
         state.addressBook.addresses.splice(index, 1);
         if (state.addressBook.active === normalized) state.addressBook.active = state.addressBook.addresses[Math.min(index, state.addressBook.addresses.length - 1)]?.email || '';
         saveAddressBook();
@@ -505,7 +541,7 @@
             state.client.isSocialBrowser = false;
         }
         state.client.addressLimit = state.client.isSocialBrowser ? SOCIAL_BROWSER_ADDRESS_LIMIT : GUEST_ADDRESS_LIMIT;
-        state.client.canRemoveAddress = state.client.isSocialBrowser;
+        state.client.canRemoveAddress = true;
         hideUpgrade();
         updateClientBadges();
     }
@@ -864,6 +900,7 @@
         const input = q('[data-mail-address]');
         if (!input) return;
         if (mode === 'free' && state.addressBook.addresses.length >= state.client.addressLimit) {
+            state.pendingAddressAction = { type: 'generate' };
             const message = limitReachedMessage();
             showUpgrade(message);
             showLimitAlert(message);
@@ -1251,6 +1288,11 @@
             if (action === 'select-address') return selectAddress(button.dataset.email);
             if (action === 'remove-address') return removeAddress(button.dataset.email);
             if (action === 'dismiss-limit-alert') return hideLimitAlert();
+            if (action === 'replace-saved-address') return replaceSavedAddress();
+            if (action === 'manage-full-inbox') {
+                state.pendingAddressAction = { type: 'generate' };
+                return showLimitAlert(limitReachedMessage());
+            }
             if (action === 'toggle-notifications') return toggleNotifications();
             if (action === 'toggle-sound') return toggleSound();
             if (action === 'open-data-tools') { setDataToolStatus(''); return ui.show('#mailDataModal'); }

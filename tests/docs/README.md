@@ -75,7 +75,7 @@ A single Node/iSite process can therefore serve multiple DNS names on the same h
 
 ## Browser-local temp-mail address book
 
-The public page now keeps created temp-mail addresses in browser `localStorage`. Guest UI supports 10 saved addresses. A request carrying the `x-browser` header receives a transient `isSocialBrowser` page signal and the UI supports 100 saved addresses plus local address removal. No quota or address-book state is stored on the server. See `LOCAL_ADDRESS_BOOK.md`.
+The public page now keeps created temp-mail addresses in browser `localStorage`. Guest UI supports 10 saved addresses. A request carrying the `x-browser` header receives a transient `isSocialBrowser` page signal and the UI supports 100 saved addresses; both guest and Social Browser users may remove saved addresses or replace a saved slot with confirmation. No quota or address-book state is stored on the server. See `LOCAL_ADDRESS_BOOK.md`.
 
 ## x-browser-only login
 

@@ -123,7 +123,16 @@
     SBUI.dateTime = function (value) {
         if (!value) return '';
         const d = new Date(value);
-        return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+        if (Number.isNaN(d.getTime())) return String(value);
+        const lang = String(document.documentElement.lang || 'en').toLowerCase();
+        if (lang === 'en') return d.toLocaleString();
+        const locales = { ar: 'ar-EG-u-nu-latn', es: 'es-ES', pt: 'pt-BR', de: 'de-DE', fr: 'fr-FR', hi: 'hi-IN-u-nu-latn', ru: 'ru-RU', id: 'id-ID', tr: 'tr-TR', vi: 'vi-VN' };
+        const locale = locales[lang] || 'en-GB';
+        try {
+            return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+        } catch (_) {
+            return d.toLocaleString();
+        }
     };
 
     document.addEventListener('click', function (event) {

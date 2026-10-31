@@ -44,7 +44,7 @@
   {
     "name": "email_l_4ef6dc2a58f5",
     "En": "Sign in with Social Browser",
-    "Ar": "قم بتسجيل الدخول باستخدام المتصفح الاجتماعي",
+    "Ar": "الدخول عبر Social Browser",
     "Es": "Iniciar sesión con el navegador social",
     "Pt": "Faça login com o navegador social",
     "De": "Melden Sie sich mit dem Social Browser an",
@@ -856,7 +856,7 @@
   {
     "name": "email_l_22a130645342",
     "En": "Private mailboxes? Get VIP Temp Mail Pro.",
-    "Ar": "تريد صندوق بريد خاص؟ جرّب VIP Temp Mail Pro.",
+    "Ar": "صندوق بريد خاص؟ جرّب VIP Temp Mail Pro",
     "Es": "¿Buzones privados? Obtenga VIP Temp Mail Pro.",
     "Pt": "Caixas de correio privadas? Obtenha o VIP Temp Mail Pro.",
     "De": "Private Postfächer? Holen Sie sich VIP Temp Mail Pro.",
@@ -1122,7 +1122,7 @@
   {
     "name": "email_l_cb2593959aa4",
     "En": "Switch between your saved inboxes",
-    "Ar": "تنقّل بين عناوينك المحفوظة",
+    "Ar": "تصفّح عناوينك المحفوظة",
     "Es": "Cambiar entre tus bandejas de entrada guardadas",
     "Pt": "Alternar entre suas caixas de entrada salvas",
     "De": "Wechseln Sie zwischen Ihren gespeicherten Posteingängen",
@@ -1178,7 +1178,7 @@
   {
     "name": "email_l_031a07b79e93",
     "En": "Search my emails",
-    "Ar": "ابحث في عناوينك",
+    "Ar": "ابحث في البريد",
     "Es": "buscar mis correos electrónicos",
     "Pt": "Pesquisar meus e-mails",
     "De": "Durchsuchen Sie meine E-Mails",

@@ -59,6 +59,27 @@ function sha256File(filePath) {
     return hash.digest('hex');
 }
 
+async function sha256FileAsync(filePath) {
+    const hash = crypto.createHash('sha256');
+    for await (const chunk of fs.createReadStream(filePath, { highWaterMark: 256 * 1024 })) hash.update(chunk);
+    return hash.digest('hex');
+}
+
+async function* walkFilesAsync(root) {
+    const stack = [root];
+    while (stack.length) {
+        const current = stack.pop();
+        let entries;
+        try { entries = await fs.promises.readdir(current, { withFileTypes: true }); }
+        catch (_) { continue; }
+        for (const entry of entries) {
+            const full = path.join(current, entry.name);
+            if (entry.isDirectory()) stack.push(full);
+            else if (entry.isFile()) yield full;
+        }
+    }
+}
+
 function walkFiles(root, out) {
     if (!fs.existsSync(root)) return out;
     const stack = [root];
@@ -314,23 +335,29 @@ class EmailBackupStorageManager {
 
     async _copySource(relative, destinationRoot, manifestFiles) {
         const source = path.join(this.rootDir, relative);
-        if (!fs.existsSync(source)) return;
-        const stat = fs.statSync(source);
-        const destination = path.join(destinationRoot, relative);
+        let stat;
+        try { stat = await fs.promises.stat(source); } catch (_) { return; }
+        async function copyAndChecksum(sourceFile, relativeFile) {
+            const target = path.join(destinationRoot, relativeFile);
+            await fs.promises.mkdir(path.dirname(target), { recursive: true });
+            await fs.promises.copyFile(sourceFile, target);
+            const copied = await fs.promises.stat(target);
+            return {
+                path: relativeFile.replace(/\\/g, '/'),
+                size: copied.size,
+                mtimeMs: copied.mtimeMs,
+                sha256: await sha256FileAsync(target),
+            };
+        }
         if (stat.isFile()) {
-            ensureDir(path.dirname(destination));
-            fs.copyFileSync(source, destination);
-            const copied = fs.statSync(destination);
-            manifestFiles.push({ path: relative.replace(/\\/g, '/'), size: copied.size, mtimeMs: copied.mtimeMs, sha256: sha256File(destination) });
+            manifestFiles.push(await copyAndChecksum(source, relative));
             return;
         }
-        for (const filePath of walkFiles(source, [])) {
+        let count = 0;
+        for await (const filePath of walkFilesAsync(source)) {
             const rel = path.relative(this.rootDir, filePath);
-            const target = path.join(destinationRoot, rel);
-            ensureDir(path.dirname(target));
-            fs.copyFileSync(filePath, target);
-            const copied = fs.statSync(target);
-            manifestFiles.push({ path: rel.replace(/\\/g, '/'), size: copied.size, mtimeMs: copied.mtimeMs, sha256: sha256File(target) });
+            manifestFiles.push(await copyAndChecksum(filePath, rel));
+            if (++count % 16 === 0) await new Promise((resolve) => setImmediate(resolve));
         }
     }
 
@@ -460,11 +487,13 @@ class EmailBackupStorageManager {
         let bytes = 0;
         for (const item of manifest.files || []) {
             const filePath = path.join(dir, 'data', item.path);
-            if (!fs.existsSync(filePath)) { missing.push(item.path); continue; }
-            const stat = fs.statSync(filePath);
+            let stat;
+            try { stat = await fs.promises.stat(filePath); }
+            catch (_) { missing.push(item.path); continue; }
             bytes += stat.size;
             checked += 1;
-            if (stat.size !== Number(item.size || 0) || sha256File(filePath) !== item.sha256) changed.push(item.path);
+            if (stat.size !== Number(item.size || 0) || await sha256FileAsync(filePath) !== item.sha256) changed.push(item.path);
+            if (checked % 16 === 0) await new Promise((resolve) => setImmediate(resolve));
         }
         const valid = missing.length === 0 && changed.length === 0 && checked === Number(manifest.fileCount || 0);
         return { valid, id: manifest.id, checked, bytes, missing, changed, expectedFiles: Number(manifest.fileCount || 0), expectedBytes: Number(manifest.totalBytes || 0) };

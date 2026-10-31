@@ -918,7 +918,7 @@ module.exports = function init(site) {
         // Match the existing temporary-mail rules: no official, VIP, or Pro-only inboxes.
         const normalized = Array.from(new Set(raw.slice(0, maxAddresses)
             .map((value) => normalizeEmail(value))
-            .filter((value) => value && value.endsWith('@' + domain) && !isProOnlyMailbox(value))));
+            .filter((value) => value && value.endsWith('@' + domain) && !['info@egytag.com', 'support@egytag.com'].includes(value) && !isProOnlyMailbox(value))));
         try {
             const result = await service.unifiedMailboxMessages(normalized, {
                 ...readContext(req, null, domain),

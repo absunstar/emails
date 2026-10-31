@@ -27,6 +27,7 @@ const {createEmailService} = require('../apps/emails/core/email-service');
  const html=fs.readFileSync('apps/emails/site_files/html/free.html','utf8');
  assert(app.includes("onPost('/api/emails/inboxes/unified'"),'Dedicated grouped request required');
  assert(app.includes('isProOnlyMailbox(value)'),'Do not include protected mobile Pro mailboxes');
+ assert(app.includes("!['info@egytag.com', 'support@egytag.com'].includes(value)"),'Do not include official mailboxes in public aggregated requests');
  assert(app.includes('allowVip: false'),'No VIP message metadata in combined inbox');
  for(const action of ['show-unified-inbox','show-current-inbox','dismiss-unified-tip']) assert(html.includes('data-action="'+action+'"'));
  assert(html.includes('data-unified-tip hidden role="note"'));

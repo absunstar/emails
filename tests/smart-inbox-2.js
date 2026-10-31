@@ -4,7 +4,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const html = fs.readFileSync('apps/emails/site_files/html/free.html', 'utf8');
 const view = fs.readFileSync('apps/emails/site_files/html/view.html', 'utf8');
-const modal = fs.readFileSync('apps/emails/site_files/html/view_modal.html', 'utf8');
+const { englishTemplate } = require('./render-english-template');
+const modal = englishTemplate(fs.readFileSync('apps/emails/site_files/html/view_modal.html', 'utf8'));
 const script = fs.readFileSync('apps/emails/site_files/js/index.js', 'utf8');
 const findFunction = (name) => {
     const start = script.indexOf('    function ' + name + '(');

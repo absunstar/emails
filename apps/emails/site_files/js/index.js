@@ -215,6 +215,16 @@
         const time = Number(value || 0);
         if (!time) return '';
         const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000));
+        const lang = String(document.documentElement.lang || 'en').toLowerCase();
+        if (lang !== 'en' && typeof Intl.RelativeTimeFormat === 'function') {
+            const formatter = new Intl.RelativeTimeFormat(lang, { numeric: 'auto', style: 'short' });
+            if (seconds < 60) return formatter.format(-seconds, 'second');
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return formatter.format(-minutes, 'minute');
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return formatter.format(-hours, 'hour');
+            return formatter.format(-Math.floor(hours / 24), 'day');
+        }
         if (seconds < 10) return 'now';
         if (seconds < 60) return seconds + 's ago';
         const minutes = Math.floor(seconds / 60);

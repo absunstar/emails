@@ -11,3 +11,30 @@
  .sb-navbar .sb-browser-account{max-width:118px;min-width:0;padding:5px 6px}
  body:has(.sb-navbar){margin-top:calc(var(--email-nav-height, 88px) + 10px)!important}
 }
+/* Arabic interface uses concise control labels and keeps the email workspace's original grid. */
+html[dir="rtl"] .mailbox-sidebar-head{min-height:74px;align-items:center;gap:8px}
+html[dir="rtl"] .mailbox-title-wrap{min-width:0;flex:1;gap:8px}
+html[dir="rtl"] .mailbox-title-wrap>div{min-width:0;flex:1}
+html[dir="rtl"] .mailbox-sidebar-title{font-size:21px!important;line-height:1.28!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[dir="rtl"] .mailbox-sidebar-subtitle{font-size:12px!important;line-height:1.4!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[dir="rtl"] .mailbox-tier{flex-shrink:0}
+html[dir="rtl"] .mailbox-search{padding-inline-start:35px!important;padding-inline-end:10px!important}
+html[dir="rtl"] .mailbox-search-icon{inset-inline-start:11px;inset-inline-end:auto}
+html[dir="rtl"] .mailbox-address-select{min-width:0}
+html[dir="rtl"] .mailbox-address-copy{min-width:0;max-width:100%}
+html[dir="rtl"] .mailbox-address-copy strong{direction:ltr;unicode-bidi:isolate;text-align:right;display:block}
+html[dir="rtl"] .mailbox-address-copy small{unicode-bidi:plaintext;text-align:start}
+html[dir="rtl"] .mail-address-grid .sb-btn{min-width:0;line-height:1.35}
+html[dir="rtl"] .mail-address-grid .sb-btn span{overflow-wrap:normal}
+html[dir="rtl"] .mail-address-grid .mail-copy-btn{white-space:nowrap}
+html[dir="rtl"] .mailbox-main-heading>div{min-width:0}
+html[dir="rtl"] .mail-message-card{min-width:0}
+html[dir="rtl"] .mail-message-copy{min-width:0}
+html[dir="rtl"] .mail-message-subject{unicode-bidi:plaintext;direction:ltr;text-align:right;overflow-wrap:anywhere}
+html[dir="rtl"] .mail-sender-name,html[dir="rtl"] .mail-sender-email{direction:ltr;unicode-bidi:isolate}
+html[dir="rtl"] .mail-sender-email{display:inline-block}
+html[dir="rtl"] .mail-message-date{direction:ltr;unicode-bidi:isolate}
+html[dir="rtl"] .otp-copy-value{direction:ltr;unicode-bidi:isolate;text-align:start}
+html[dir="rtl"] .otp-copy-label,html[dir="rtl"] .otp-copy-action{text-transform:none}
+@media(max-width:820px){html[dir="rtl"] .mailbox-sidebar-title{font-size:19px!important}}
+@media(max-width:500px){html[dir="rtl"] .mail-address-grid .sb-btn{font-size:12px!important}html[dir="rtl"] .mail-message-subject{text-align:start}}

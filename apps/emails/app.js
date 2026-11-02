@@ -7,6 +7,7 @@ const { createEmailService, extractAddresses, normalizeEmail } = require('./core
 const { isAdminRequest, isBrowserSession, hasVipAccess, isTrustedBrowserId, browserRequestID } = require('./core/access');
 const { requestDomain, apiDomain, addressBelongsToDomain, messageBelongsToDomain, mailboxForDomain } = require('./core/domain');
 const { getClientContext } = require('./core/client-context');
+const chatTransactional=require('./core/chat-transactional-auth');
 const { createBrowserAuth } = require('./core/browser-auth');
 const { analyzeEmailHtml, sanitizeEmailHtml, qrSvg } = require('./core/message-tools');
 const { createEmailAbusePolicy } = require('./core/abuse-policy');
@@ -1697,6 +1698,27 @@ module.exports = function init(site) {
             res.json({ done: true, result });
         } catch (error) {
             res.json({ done: false, error: error?.message || String(error) });
+        }
+    });
+
+    // Scoped machine-to-machine verification emails; never accepts admin
+    // credentials or an arbitrary From address. Use TLS from remote servers.
+    onPost('/api/emails/transactional/chat-send', async(req,res)=>{
+        if(!chatTransactional.allowed(req,site.cwd)){
+            res.status(401);return res.json({done:false,error:'UNAUTHORIZED'});
+        }
+        let mail;
+        try{mail=chatTransactional.parse(body(req))}
+        catch(e){res.status(400);return res.json({done:false,error:e.message})}
+        if(!outboundAllowed(req,'api')){
+            res.status(429);return res.json({done:false,error:'SEND_LIMIT_REACHED'});
+        }
+        try{
+            const result=await service.send(mail);
+            res.json({done:true,id:result.guid||result.messageId||''});
+        }catch(e){
+            site.log('[chat-transactional] delivery error '+String(e.code||'DELIVERY_FAILED'));
+            res.status(502);res.json({done:false,error:'MAIL_DELIVERY_FAILED'});
         }
     });
 

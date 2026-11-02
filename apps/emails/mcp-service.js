@@ -3,6 +3,7 @@
 const { normalizeAddressList } = require('./core/email-service');
 const { normalizeHostname } = require('./core/domain');
 const { analyzeEmailHtml } = require('./core/message-tools');
+const { checkSenderDkim } = require('./core/outbound-sender-preflight');
 
 async function runWithConcurrency(items, concurrency, worker) {
     const results = new Array(items.length);
@@ -273,7 +274,13 @@ function createEmailMcpService(options) {
 
         async deliverabilityPreflight(args, scope) {
             enforceAdminRate(scope, false);
-            return deliverabilityRequired().preflightReport(args.from || '', args.to || args.recipients || []);
+            const result = deliverabilityRequired().preflightReport(args.from || '', args.to || args.recipients || []);
+            if (!result.allowed || !args.from) return result;
+            const senderIdentity = await checkSenderDkim(args.from);
+            if (!senderIdentity.ready) {
+                return { ...result, allowed: false, reason: 'sender_authentication_not_ready', senderIdentity };
+            }
+            return { ...result, senderIdentity };
         },
 
         async deliverabilityConfigGet(scope) {

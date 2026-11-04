@@ -1363,7 +1363,7 @@ module.exports = function init(site) {
             text: where.text,
             html: where.html,
             search: where.search,
-            folder: where.folder,
+            folder: data.exactTo === true && !admin(req) ? 'inbox' : where.folder,
             limit,
             includeBody: !!(data.select && (data.select.text || data.select.html)),
             includeVerificationCodes: data.includeVerificationCodes === true && data.exactTo === true,

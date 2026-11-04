@@ -15,5 +15,10 @@ try{
   assert.throws(()=>parse(bad));
  }
  assert.equal(parse({to:'valid@example.test',subject:'Verify',text:'Hello'}).listUnsubscribe,false);
+ assert.equal(parse({to:'valid@example.test',subject:'Verify',text:'Hello',html:'<div style="color:#123">Hello</div>'}).html.includes('<div'),true);
+ for(const payload of ['<script>alert(1)</script>','<img src="x" onerror="alert(1)">','<a href="javascript:bad()">Click</a>']){
+  assert.throws(()=>parse({to:'valid@example.test',subject:'Verify',text:'Hello',html:payload}),/UNSAFE_HTML/);
+ }
+ assert.throws(()=>parse({to:'valid@example.test',subject:'Verify',text:'Hello',html:'x'.repeat(55001)}),/INVALID_HTML/);
  console.log('CHAT_TRANSACTIONAL_AUTH_PASS');
 }finally{fs.rmSync(dir,{recursive:true,force:true})}

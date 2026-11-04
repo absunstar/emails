@@ -486,6 +486,7 @@ function createEmailService(options) {
                 for (const doc of source) {
                     if (context.domain && !messageBelongsToDomain(doc, context.domain)) continue;
                     if (!normalizeAddressList([doc.to, doc.cc]).includes(email)) continue;
+                    if (doc.folder !== 'inbox') continue;
                     if (!officialVisible(doc, context) || (!context.allowVip && isVipMessage(doc))) continue;
                     matching.push(doc);
                 }
@@ -512,6 +513,7 @@ function createEmailService(options) {
                     ? store.messageValuesForRecipient(email)
                     : store.messageValues();
                 for (const doc of source) {
+                    if (doc.folder !== 'inbox') continue;
                     if (typeof store.messageValuesForRecipient !== 'function' && !normalizeAddressList([doc.to, doc.cc]).includes(email)) continue;
                     const protectedMessage = !officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip);
                     if (protectedMessage) {

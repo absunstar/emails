@@ -660,6 +660,8 @@
         const filter = mode === 'free' ? state.inboxFilter : 'all';
         const query = mode === 'free' ? String(q('[data-inbox-search]')?.value || '').trim().toLowerCase() : '';
         const list = (state.inboxMode === 'unified' ? state.unifiedList : state.list).filter((mail) => {
+            // Sent copies must never appear as received inbox messages.
+            if (mail.folder && mail.folder !== 'inbox') return false;
             if (query && ![mail.from, mail.to, mail.subject].some((value) => String(value || '').toLowerCase().includes(query))) return false;
             if (filter === 'codes' && !(mail.verificationCode || matchOtpCode(mail.subject))) return false;
             if (filter === 'attachments' && !mail.hasAttachments && !(Array.isArray(mail.attachments) && mail.attachments.length)) return false;
@@ -751,7 +753,7 @@
     async function loadAll(where, limit, options) {
         if (state.busy && (mode !== 'free' || options?.background)) return false;
         const generation = ++state.loadGeneration;
-        const requestWhere = where || {};
+        const requestWhere = mode === 'free' ? { ...(where || {}), folder:'inbox' } : (where || {});
         state.busy = true;
         setError('');
         state.currentWhere = requestWhere;

@@ -13,11 +13,15 @@ function allowed(req,root){
  return a.length===b.length&&crypto.timingSafeEqual(a,b);
 }
 function parse(data){
- const to=String(data?.to||'').trim(),subject=String(data?.subject||''),text=String(data?.text||'');
+ const to=String(data?.to||'').trim(),subject=String(data?.subject||''),text=String(data?.text||''),html=data?.html===undefined?'':data.html;
  if(typeof data?.to!=='string'||!/^[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}$/i.test(to)||to.length>254)throw Error('INVALID_RECIPIENT');
  if(typeof data?.subject!=='string'||subject.length<1||subject.length>180||/[\r\n]/.test(subject))throw Error('INVALID_SUBJECT');
  if(typeof data?.text!=='string'||text.length<1||text.length>25000)throw Error('INVALID_CONTENT');
  if(data.from&&data.from!==FROM)throw Error('SENDER_NOT_ALLOWED');
- return {from:FROM,to,subject,text,listUnsubscribe:false};
+ if(typeof html!=='string'||html.length>55000)throw Error('INVALID_HTML');
+ // Restricted account-verification HTML only. The API key is not a generic
+ // arbitrary-HTML sending authority.
+ if(/<(?:script|iframe|object|embed|form|video|audio|svg|math)\b|\bon[a-z]+\s*=|javascript\s*:|data\s*:/i.test(html))throw Error('UNSAFE_HTML');
+ return {from:FROM,to,subject,text,html,listUnsubscribe:false};
 }
 module.exports={allowed,credentials,parse,FROM};

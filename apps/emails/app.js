@@ -847,10 +847,13 @@ module.exports = function init(site) {
         }
     });
 
+    // The default /privacy route must use the same native word renderer as /<lang>/privacy.
     site.onGET({
         name: ['privacy'],
         path: __dirname + '/site_files/html/privacy.html',
-        compress: false,
+        parser: 'html css js',
+        compress: true,
+        overwrite: true,
     });
 
 

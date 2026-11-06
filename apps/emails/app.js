@@ -333,6 +333,7 @@ module.exports = function init(site) {
         return '';
     }
     const scheduler = site.emailScheduler || null;
+    const campaignEngine = site.emailCampaignEngine || null;
     site.emailOperationsManager = site.emailOperationsManager || createEmailBackupStorageManager({
         emailService: service,
         monitor: site.emailRuntimeMonitor,
@@ -755,6 +756,14 @@ module.exports = function init(site) {
             sourceReq.once('aborted', cleanup);
         }
         if (raw && typeof raw.once === 'function') raw.once('close', cleanup);
+    });
+
+    site.onGET({ name: 'campaigns', overwrite: true }, (req, res) => {
+        if (!adminBrowser(req)) {
+            res.status(403);
+            return res.sendHTML('<!doctype html><html><body style="font-family:Arial;background:#08111f;color:#fff;display:grid;place-items:center;min-height:100vh"><div><h1>Admin access required</h1><p>Email Campaigns is available only from an authorized Social Browser environment.</p></div></body></html>');
+        }
+        return site.emailTemplateRenderer.renderResponse(req, res, __dirname + '/site_files/html/campaigns.html');
     });
 
     site.onGET({ name: 'admin', overwrite: true }, (req, res) => {
@@ -1865,6 +1874,57 @@ module.exports = function init(site) {
         if (!triage) return res.json({done:false,error:'Official inbox triage unavailable'});
         try { res.json({done:true,result:triage.list(body(req))}); }
         catch (error) { res.json({done:false,error:error?.message || String(error)}); }
+    });
+
+    onPost('/api/emails/admin/campaigns/status', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
+        res.json({ done: true, status: campaignEngine.status() });
+    });
+    onPost('/api/emails/admin/campaigns/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
+        try { res.json({ done: true, result: campaignEngine.list(body(req)) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/campaigns/get', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
+        try { res.json({ done: true, campaign: campaignEngine.get(String(body(req).id || '')) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/campaigns/create', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
+        try { res.json({ done: true, campaign: campaignEngine.create(body(req)) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/campaigns/update', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
+        const data = body(req);
+        try { res.json({ done: true, campaign: campaignEngine.update(String(data.id || ''), data) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    for (const [action, method] of [['start','start'],['pause','pause'],['resume','resume'],['stop','stop']]) {
+        onPost('/api/emails/admin/campaigns/' + action, async (req, res) => {
+            if (!admin(req)) return adminDenied(res);
+            if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
+            try { res.json({ done: true, campaign: campaignEngine[method](String(body(req).id || '')) }); }
+            catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+        });
+    }
+    onPost('/api/emails/admin/campaigns/delete', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
+        try { res.json({ done: true, result: campaignEngine.remove(String(body(req).id || '')) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/campaigns/report', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
+        try { res.json({ done: true, report: campaignEngine.report(String(body(req).id || '')) }); }
+        catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/schedules/status', async (req, res) => {

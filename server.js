@@ -12,6 +12,7 @@ const { createEmailAbusePolicy } = require('./apps/emails/core/abuse-policy');
 const { acceptedEnvelopeRecipients } = require('./apps/emails/core/smtp-recipient');
 const { createEmailMcpService } = require('./apps/emails/mcp-service');
 const { createEmailScheduler } = require('./apps/emails/core/email-scheduler');
+const { createEmailCampaignEngine } = require('./apps/emails/core/email-campaign-engine');
 const { OfficialInboxTriage } = require('./apps/emails/core/official-inbox-triage');
 const { createEmailDeliverabilityEngine } = require('./apps/emails/core/deliverability-engine');
 const { createEmailRuntimeMonitor } = require('./apps/emails/core/runtime-monitor');
@@ -387,6 +388,13 @@ site.emailScheduler = site.emailScheduler || createEmailScheduler({
     intervalMs: Number(process.env.EMAIL_SCHEDULE_TICK_MS || 5000),
 }).start();
 site.emailRuntimeMonitor.component('scheduler', 'running', site.emailScheduler.status());
+site.emailCampaignEngine = site.emailCampaignEngine || createEmailCampaignEngine({
+    emailService: site.emailService,
+    baseDir: process.env.EMAIL_CAMPAIGN_DIR || path.join(site.cwd, 'localStorage', 'email-campaigns'),
+    logger: (message) => site.log(message),
+    intervalMs: Number(process.env.EMAIL_CAMPAIGN_TICK_MS || 1000),
+}).startEngine();
+site.emailRuntimeMonitor.component('campaigns', 'running', site.emailCampaignEngine.status());
 site.officialInboxTriage = new OfficialInboxTriage({ emailService: site.emailService, scheduler: site.emailScheduler, autoAckSupport: true, baseDir: path.join(site.cwd, 'localStorage', 'official-inbox-queue'), logger: (message) => site.log(message) }).start();
 site.emailOperationsManager.setScheduler(site.emailScheduler).start();
 site.emailRuntimeMonitor.component('storage', site.emailOperationsManager.status().storage.level, { backupCount: site.emailOperationsManager.listBackups().count });
@@ -424,6 +432,7 @@ require('./apps/emails/app')(site);
 site.onShutdown(async () => {
     try { await site.emailMcpServer?.close?.(); } catch (_) {}
     try { await site.emailScheduler?.stop?.(); } catch (_) {}
+    try { await site.emailCampaignEngine?.stopEngine?.(); } catch (_) {}
     try { await site.emailOperationsManager?.stop?.(); } catch (_) {}
     try { await new Promise((resolve) => smtpServer.close(() => resolve())); } catch (_) {}
 });

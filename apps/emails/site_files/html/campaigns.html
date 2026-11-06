@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="##session.language.id##" dir="##session.language.dir##" class="##session.language.id##">
+<head x-import="head.html"><link rel="stylesheet" href="/css/email-campaigns.css"></head>
+<body class="mail-campaign-body">
+<nav x-import="navbar/index.html" class="sitebar"></nav>
+<main class="mail-campaign-shell" data-email-campaign-app>
+  <header class="mail-campaign-hero">
+    <div>
+      <small>STANDALONE EMAIL CAMPAIGNS</small>
+      <h1>Email Campaigns</h1>
+      <p>Create campaigns, define recipients and variables, control exact send timing, pause/resume safely, and review live reports.</p>
+    </div>
+    <div class="mail-campaign-hero-actions">
+      <a class="sb-btn sb-btn-ghost" href="/admin">Mail Admin</a>
+      <button class="sb-btn sb-btn-ghost" data-campaign-action="refresh">Refresh</button>
+      <button class="sb-btn" data-campaign-action="new">New Campaign</button>
+    </div>
+  </header>
+
+  <section class="mail-campaign-metrics" data-campaign-metrics></section>
+
+  <section class="mail-campaign-grid">
+    <aside class="mail-campaign-list-panel">
+      <div class="mail-campaign-panel-head">
+        <div><small>CAMPAIGNS</small><h2>All Campaigns</h2></div>
+        <select class="sb-select" data-campaign-filter>
+          <option value="">All</option><option value="draft">Draft</option><option value="scheduled">Scheduled</option>
+          <option value="running">Running</option><option value="paused">Paused</option><option value="completed">Completed</option><option value="stopped">Stopped</option>
+        </select>
+      </div>
+      <div class="mail-campaign-list" data-campaign-list></div>
+      <div class="mail-campaign-empty" data-campaign-empty hidden>No campaigns yet.</div>
+    </aside>
+
+    <section class="mail-campaign-detail">
+      <div class="mail-campaign-detail-empty" data-campaign-detail-empty>
+        <h2>Select a campaign</h2><p>Choose a campaign from the left, or create a new one.</p>
+      </div>
+      <div data-campaign-detail hidden>
+        <div class="mail-campaign-detail-head">
+          <div><small data-campaign-id></small><h2 data-campaign-name></h2><p data-campaign-description></p></div>
+          <div class="mail-campaign-controls" data-campaign-controls></div>
+        </div>
+        <div class="mail-campaign-progress"><span data-campaign-progress-bar></span></div>
+        <div class="mail-campaign-report-cards" data-campaign-report-cards></div>
+        <div class="mail-campaign-info-grid" data-campaign-info></div>
+        <div class="mail-campaign-section">
+          <div class="mail-campaign-section-head"><h3>Delivery activity</h3><button class="sb-btn sb-btn-ghost" data-campaign-action="report">Refresh report</button></div>
+          <div class="mail-campaign-table-wrap"><table class="mail-campaign-table"><thead><tr><th>Recipient</th><th>Status</th><th>Message</th><th>Attempts</th><th>Finished</th><th>Error</th></tr></thead><tbody data-campaign-jobs></tbody></table></div>
+        </div>
+        <div class="mail-campaign-section">
+          <div class="mail-campaign-section-head"><h3>Campaign log</h3></div>
+          <div class="mail-campaign-events" data-campaign-events></div>
+        </div>
+      </div>
+    </section>
+  </section>
+</main>
+
+<div id="campaignEditorModal" class="modal" hidden>
+  <div class="modal-content mail-campaign-editor">
+    <div class="modal-header">
+      <div><small>CAMPAIGN BUILDER</small><h2 data-campaign-editor-title>New Campaign</h2></div>
+      <button class="sb-modal-close" type="button" data-modal-close="#campaignEditorModal">×</button>
+    </div>
+    <div class="modal-body">
+      <form data-campaign-form>
+        <section class="mail-campaign-form-section">
+          <h3>1. Campaign</h3>
+          <div class="sb-form-grid">
+            <div class="sb-field"><label>Name</label><input class="sb-input" name="name" required></div>
+            <div class="sb-field"><label>From</label><input class="sb-input" type="email" name="from" required></div>
+            <div class="sb-field wide"><label>Description</label><input class="sb-input" name="description"></div>
+            <div class="sb-field wide"><label>Reply-To</label><input class="sb-input" type="email" name="replyTo"></div>
+          </div>
+        </section>
+
+        <section class="mail-campaign-form-section">
+          <h3>2. Recipients & Variables</h3>
+          <p>Paste one email per line, or CSV rows. First row may contain headers such as <code>email,name,company</code>.</p>
+          <textarea class="sb-textarea mail-campaign-recipients" name="recipients" placeholder="email,name,company&#10;alice@example.com,Alice,Acme&#10;bob@example.com,Bob,Example"></textarea>
+        </section>
+
+        <section class="mail-campaign-form-section">
+          <div class="mail-campaign-section-head"><h3>3. Messages</h3><button type="button" class="sb-btn sb-btn-ghost" data-campaign-action="add-message">Add message</button></div>
+          <div data-campaign-messages></div>
+          <label class="mail-campaign-radio-row"><span>Message behavior</span>
+            <select class="sb-select" name="messageMode"><option value="rotate">Rotate / A-B between recipients</option><option value="sequence">Send every message to every recipient</option></select>
+          </label>
+        </section>
+
+        <section class="mail-campaign-form-section">
+          <h3>4. Start & Schedule</h3>
+          <div class="mail-campaign-start-options">
+            <label><input type="radio" name="startMode" value="now" checked> <span>Start immediately</span></label>
+            <label><input type="radio" name="startMode" value="later"> <span>Start at a specific date & time</span></label>
+          </div>
+          <div class="sb-form-grid" data-campaign-start-later hidden>
+            <div class="sb-field"><label>Start date & time</label><input class="sb-input" type="datetime-local" name="startAt"></div>
+            <div class="sb-field"><label>Time zone</label><input class="sb-input" name="timezone" value="Africa/Cairo"></div>
+          </div>
+        </section>
+
+        <section class="mail-campaign-form-section">
+          <h3>5. Sending Pace</h3>
+          <div class="sb-form-grid">
+            <div class="sb-field"><label>Mode</label><select class="sb-select" name="paceMode" data-campaign-pace-mode>
+              <option value="fixed">Fixed interval</option><option value="random">Random interval</option><option value="rate">Emails per hour</option><option value="batch">Batch mode</option>
+            </select></div>
+            <div class="sb-field" data-pace="fixed batch"><label>Delay between emails (seconds)</label><input class="sb-input" type="number" min="0" name="intervalSeconds" value="30"></div>
+            <div class="sb-field" data-pace="random"><label>Minimum seconds</label><input class="sb-input" type="number" min="0" name="minSeconds" value="30"></div>
+            <div class="sb-field" data-pace="random"><label>Maximum seconds</label><input class="sb-input" type="number" min="0" name="maxSeconds" value="60"></div>
+            <div class="sb-field" data-pace="rate"><label>Emails / hour</label><input class="sb-input" type="number" min="1" name="perHour" value="100"></div>
+            <div class="sb-field" data-pace="batch"><label>Batch size</label><input class="sb-input" type="number" min="1" name="batchSize" value="100"></div>
+            <div class="sb-field" data-pace="batch"><label>Pause between batches (seconds)</label><input class="sb-input" type="number" min="0" name="batchPauseSeconds" value="600"></div>
+          </div>
+          <div class="mail-campaign-estimate" data-campaign-estimate>Estimated duration will appear here.</div>
+        </section>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="sb-btn sb-btn-ghost" type="button" data-modal-close="#campaignEditorModal">Cancel</button>
+      <button class="sb-btn" type="button" data-campaign-action="save">Create Campaign</button>
+    </div>
+  </div>
+</div>
+
+<div x-import="scripts.html"></div>
+<script x-import="emails/campaigns.js"></script>
+</body>
+</html>

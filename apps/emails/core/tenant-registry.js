@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { normalizeHostname } = require('./domain');
+const { verifyMailDomain } = require('./domain-verifier');
 
 function ensureDir(dir){ fs.mkdirSync(dir,{recursive:true}); }
 function clone(v){ return JSON.parse(JSON.stringify(v)); }
@@ -64,8 +65,31 @@ class MailTenantRegistry{
     if(!this.data.organizations.some(x=>x.id===orgId)) throw new Error('Organization not found');
     const d=domain(input.domain); if(!d) throw new Error('Valid domain is required');
     if(this.data.domains.some(x=>x.domain===d)) throw new Error('Domain already exists');
-    const row={id:id('domain_'),organizationId:orgId,domain:d,status:'pending',dkimSelector:String(input.dkimSelector||'default').trim()||'default',verification:{mx:'unknown',spf:'unknown',dkim:'unknown',dmarc:'unknown'},notes:String(input.notes||''),createdAt:now(),updatedAt:now()};
+    const row={id:id('domain_'),organizationId:orgId,domain:d,status:'pending',dkimSelector:String(input.dkimSelector||process.env.DKIM_SELECTOR||'mail').trim()||'mail',verification:{mx:'unknown',spf:'unknown',dkim:'unknown',dmarc:'unknown'},notes:String(input.notes||''),createdAt:now(),updatedAt:now()};
     this.data.domains.push(row); this._save(); return clone(row);
+  }
+  async verifyDomain(idv, options={}){
+    const row=this.data.domains.find(x=>x.id===idv); if(!row) throw new Error('Domain not found');
+    const result=await verifyMailDomain(row.domain,{selector:row.dkimSelector||'default',...options});
+    row.status=result.status;
+    row.verification={
+      mx:result.checks.mx.status, spf:result.checks.spf.status, dkim:result.checks.dkim.status, dmarc:result.checks.dmarc.status,
+      checkedAt:result.checkedAt, recommendations:result.recommendations, details:result.checks
+    };
+    row.updatedAt=now(); this._save(); return {domain:clone(row),verification:result};
+  }
+  senderReadiness(idv){
+    const sender=this.data.senders.find(x=>x.id===idv); if(!sender) throw new Error('Sender identity not found');
+    const d=this.data.domains.find(x=>x.id===sender.domainId);
+    const reasons=[];
+    if(sender.status==='disabled') reasons.push('sender_disabled');
+    if(sender.status==='warming') reasons.push('sender_warming');
+    if(!d) reasons.push('domain_missing');
+    else {
+      if(d.status!=='verified') reasons.push('domain_not_verified');
+      for(const key of ['spf','dkim','dmarc']) if(d.verification?.[key]!=='pass') reasons.push(key+'_not_ready');
+    }
+    return {ready:reasons.length===0,sender:clone(sender),domain:d?clone(d):null,reasons};
   }
   updateDomain(idv,patch={}){
     const row=this.data.domains.find(x=>x.id===idv); if(!row) throw new Error('Domain not found');

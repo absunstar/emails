@@ -185,10 +185,12 @@ function createEmailMcpService(options) {
         async domainsList(args, scope) { enforceAdminRate(scope, false); return { domains: tenantsRequired().listDomains(args || {}) }; },
         async domainAdd(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().addDomain(args); },
         async domainUpdate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().updateDomain(args.id, args); },
+        async domainVerify(args, scope) { enforceAdminRate(scope, false); return tenantsRequired().verifyDomain(args.id); },
         async domainDelete(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().removeDomain(args.id); },
         async sendersList(args, scope) { enforceAdminRate(scope, false); return { senders: tenantsRequired().listSenders(args || {}) }; },
         async senderAdd(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().addSender(args); },
         async senderUpdate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().updateSender(args.id, args); },
+        async senderReadiness(args, scope) { enforceAdminRate(scope, false); return tenantsRequired().senderReadiness(args.id); },
         async senderDelete(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().removeSender(args.id); },
 
         async instanceGet(scope) {

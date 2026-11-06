@@ -1905,6 +1905,12 @@ module.exports = function init(site) {
         try { return res.json({ done: true, domain: site.emailTenants.addDomain(body(req)) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
+    onPost('/api/emails/admin/domains/verify', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, result: await site.emailTenants.verifyDomain(String(body(req).id||'')) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
     onPost('/api/emails/admin/domains/update', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         const data=body(req); try { return res.json({ done: true, domain: site.emailTenants.updateDomain(String(data.id||''), data) }); }
@@ -1925,6 +1931,12 @@ module.exports = function init(site) {
         try { return res.json({ done: true, sender: site.emailTenants.addSender(body(req)) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
+    onPost('/api/emails/admin/senders/readiness', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, readiness: site.emailTenants.senderReadiness(String(body(req).id||'')) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
     onPost('/api/emails/admin/senders/update', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         const data=body(req); try { return res.json({ done: true, sender: site.emailTenants.updateSender(String(data.id||''), data) }); }

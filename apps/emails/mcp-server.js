@@ -11,7 +11,7 @@ const DEFAULT_MCP_SECRET = String(process.env.EMAIL_MCP_DEFAULT_SECRET || 'SOCIA
 const SERVER_INFO = {
     name: String(process.env.EMAIL_MCP_NAME || 'social-browser-email').trim() || 'social-mail',
     title: String(process.env.EMAIL_MCP_TITLE || 'Social Browser Email Manager').trim() || 'Social Mail MCP',
-    version: '4.6.0',
+    version: '4.7.0',
 };
 
 const SERVER_INSTRUCTIONS = [
@@ -166,10 +166,12 @@ const TOOLS = [
     tool('email_domains_list', 'List managed domains', 'List registered mail domains, optionally scoped to an organization or status.', { organizationId:{type:'string'}, status:{type:'string'} }),
     tool('email_domain_add', 'Add managed domain', 'Register a mail domain under an organization.', { organizationId:{type:'string'}, domain:{type:'string',minLength:3}, dkimSelector:{type:'string'}, notes:{type:'string'} }, ['domain'], {readOnlyHint:false}),
     tool('email_domain_update', 'Update managed domain', 'Update domain lifecycle/verification metadata.', { id:{type:'string',minLength:1}, status:{type:'string',enum:['pending','verified','warning','disabled']}, dkimSelector:{type:'string'}, notes:{type:'string'}, verification:{type:'object'} }, ['id'], {readOnlyHint:false}),
+    tool('email_domain_verify', 'Verify managed domain DNS', 'Resolve and evaluate MX, SPF, DKIM and DMARC for a registered domain, persist the latest verification state, and return repair recommendations.', { id:{type:'string',minLength:1} }, ['id']),
     tool('email_domain_delete', 'Delete managed domain', 'Delete a domain after sender identities have been removed.', { id:{type:'string',minLength:1}, confirm:{type:'boolean'} }, ['id','confirm'], {readOnlyHint:false,destructiveHint:true}),
     tool('email_senders_list', 'List sender identities', 'List sender identities by organization/domain/status.', { organizationId:{type:'string'}, domainId:{type:'string'}, status:{type:'string'} }),
     tool('email_sender_add', 'Add sender identity', 'Register a sender identity on a managed domain.', { domainId:{type:'string'}, email:{type:'string',minLength:3}, displayName:{type:'string'}, replyTo:{type:'string'}, status:{type:'string',enum:['active','disabled','warming']}, tags:{type:'array',items:{type:'string'}} }, ['email'], {readOnlyHint:false}),
     tool('email_sender_update', 'Update sender identity', 'Update display name, reply-to, status or tags for a sender identity.', { id:{type:'string',minLength:1}, displayName:{type:'string'}, replyTo:{type:'string'}, status:{type:'string',enum:['active','disabled','warming']}, tags:{type:'array',items:{type:'string'}} }, ['id'], {readOnlyHint:false}),
+    tool('email_sender_readiness', 'Check sender readiness', 'Check whether a sender identity is active and its registered domain has passing SPF, DKIM and DMARC verification.', { id:{type:'string',minLength:1} }, ['id']),
     tool('email_sender_delete', 'Delete sender identity', 'Delete a sender identity.', { id:{type:'string',minLength:1}, confirm:{type:'boolean'} }, ['id','confirm'], {readOnlyHint:false,destructiveHint:true}),
     tool('email_instance_get', 'Get mail instance configuration', 'Read the portable self-hosted instance identity, branding, public origin, SMTP hostname, mail domains, feature flags, and MCP endpoint identity. Sensitive credentials are not returned.', {}),
     tool('email_instance_update', 'Update mail instance configuration', 'Persist portable instance configuration for white-label/self-hosted deployments. Changes to network, SMTP, MCP identity, or runtime providers generally require a service restart.', { config: { type: 'object' } }, ['config'], { readOnlyHint: false }),
@@ -608,7 +610,7 @@ function validateToolArguments(name, raw) {
         if (!args.config || typeof args.config !== 'object' || Array.isArray(args.config)) return fail('config must be an object');
         return { ok: true, args: { config: args.config } };
     }
-    if (['email_organization_update','email_domain_update','email_sender_update'].includes(name)) {
+    if (['email_organization_update','email_domain_update','email_sender_update','email_domain_verify','email_sender_readiness'].includes(name)) {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
         return { ok:true, args:{...args,id:args.id.trim()} };
     }
@@ -1169,10 +1171,12 @@ async function executeTool(name, args, service, scope) {
     else if (name === 'email_domains_list') output = await service.domainsList(args, scope);
     else if (name === 'email_domain_add') output = await service.domainAdd(args, scope);
     else if (name === 'email_domain_update') output = await service.domainUpdate(args, scope);
+    else if (name === 'email_domain_verify') output = await service.domainVerify(args, scope);
     else if (name === 'email_domain_delete') output = await service.domainDelete(args, scope);
     else if (name === 'email_senders_list') output = await service.sendersList(args, scope);
     else if (name === 'email_sender_add') output = await service.senderAdd(args, scope);
     else if (name === 'email_sender_update') output = await service.senderUpdate(args, scope);
+    else if (name === 'email_sender_readiness') output = await service.senderReadiness(args, scope);
     else if (name === 'email_sender_delete') output = await service.senderDelete(args, scope);
     else if (name === 'email_instance_get') output = await service.instanceGet(scope);
     else if (name === 'email_instance_update') output = await service.instanceUpdate(args, scope);

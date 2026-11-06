@@ -109,6 +109,7 @@ function normalizeMessage(message) {
         html: typeof message.html === 'string' ? message.html : '',
         replyTo: String(message.replyTo || '').trim(),
         inReplyTo: String(message.inReplyTo || '').trim(),
+        organizationId: String(message.organizationId || '').trim(),
     };
 }
 
@@ -241,7 +242,7 @@ class EmailScheduler {
             task.attempts = Number(task.attempts || 0) + 1;
             this._save(task);
             try {
-                const result = await this.emailService.send(task.message);
+                const result = await this.emailService.send(Object.assign({}, task.message, { organizationId: String(task.organizationId || task.message?.organizationId || '').trim() }));
                 task = this._read(id) || task;
                 task.status = 'sent';
                 task.sentAt = new Date().toISOString();
@@ -291,7 +292,7 @@ class EmailScheduler {
     async schedule(args, scope) {
         args = args || {};
         const when = parseWhen(args);
-        const message = normalizeMessage(args.message || args);
+        const message = normalizeMessage(Object.assign({}, args.message || args, { organizationId: String(args.organizationId || scope?.organizationId || '').trim() }));
         if (!message.from) throw new Error('from is required');
         if (!(Array.isArray(message.to) ? message.to.length : message.to)) throw new Error('to is required');
         if (!message.text && !message.html) throw new Error('text or html is required');
@@ -316,6 +317,7 @@ class EmailScheduler {
             createdAt: now,
             updatedAt: now,
             createdBy: String(scope?.client || 'mcp-agent').slice(0, 160),
+            organizationId: String(args.organizationId || scope?.organizationId || '').trim(),
             lastAttemptAt: null,
             sentAt: null,
             failedAt: null,
@@ -344,6 +346,7 @@ class EmailScheduler {
                 timezone: base.timezone,
                 maxRetries: args.maxRetries,
                 retryDelaySeconds: args.retryDelaySeconds,
+                organizationId: String(args.organizationId || scope?.organizationId || '').trim(),
             }, scope);
             tasks.push(item);
         }
@@ -357,7 +360,9 @@ class EmailScheduler {
         const before = args.before ? Date.parse(args.before) : NaN;
         const limit = Math.max(1, Math.min(Number(args.limit || 100), 500));
         const includeBody = !!args.includeBody;
+        const organizationId = String(args.organizationId || '').trim();
         let tasks = this._all();
+        if (organizationId) tasks = tasks.filter((task) => String(task.organizationId || '') === organizationId);
         if (status) tasks = tasks.filter((task) => task.status === status);
         if (Number.isFinite(after)) tasks = tasks.filter((task) => Date.parse(task.sendAtUtc) >= after);
         if (Number.isFinite(before)) tasks = tasks.filter((task) => Date.parse(task.sendAtUtc) <= before);
@@ -367,9 +372,9 @@ class EmailScheduler {
         return { count: tasks.length, total, tasks };
     }
 
-    get(id, includeBody) {
+    get(id, includeBody, organizationId) {
         const task = this._read(id);
-        if (!task) throw new Error('Scheduled email not found');
+        if (!task || (organizationId && String(task.organizationId || '') !== String(organizationId))) throw new Error('Scheduled email not found');
         return publicTask(task, includeBody !== false);
     }
 
@@ -377,7 +382,7 @@ class EmailScheduler {
         if (!this._acquire(id)) throw new Error('Scheduled email is busy. Try again.');
         try {
             let task = this._read(id);
-            if (!task) throw new Error('Scheduled email not found');
+            if (!task || (args?.organizationId && String(task.organizationId || '') !== String(args.organizationId))) throw new Error('Scheduled email not found');
             if (task.status === 'sent' || task.status === 'sending') throw new Error('A sent or currently sending schedule cannot be edited');
             if (task.failureCategory === 'policy_blocked' || task.failureCategory === 'delivery_unknown') throw new Error('Blocked or delivery-unconfirmed tasks cannot be reactivated by editing');
             if (args.message) {
@@ -415,11 +420,11 @@ class EmailScheduler {
         }
     }
 
-    async cancel(id) {
+    async cancel(id, args) {
         if (!this._acquire(id)) throw new Error('Scheduled email is busy. Try again.');
         try {
             const task = this._read(id);
-            if (!task) throw new Error('Scheduled email not found');
+            if (!task || (args?.organizationId && String(task.organizationId || '') !== String(args.organizationId))) throw new Error('Scheduled email not found');
             if (task.status === 'sent') throw new Error('A sent schedule cannot be cancelled');
             if (task.status === 'sending') throw new Error('This schedule is currently sending');
             task.status = 'cancelled';
@@ -433,7 +438,9 @@ class EmailScheduler {
         }
     }
 
-    async sendNow(id) {
+    async sendNow(id, args) {
+        const task = this._read(id);
+        if (!task || (args?.organizationId && String(task.organizationId || '') !== String(args.organizationId))) throw new Error('Scheduled email not found');
         return this._execute(id, true);
     }
 
@@ -441,7 +448,7 @@ class EmailScheduler {
         if (!this._acquire(id)) throw new Error('Scheduled email is busy. Try again.');
         try {
             const task = this._read(id);
-            if (!task) throw new Error('Scheduled email not found');
+            if (!task || (args?.organizationId && String(task.organizationId || '') !== String(args.organizationId))) throw new Error('Scheduled email not found');
             if (!['failed', 'cancelled'].includes(task.status)) throw new Error('Only failed or cancelled schedules can be retried');
             if (task.failureCategory === 'policy_blocked') throw new Error('Policy-blocked messages cannot be retried through the queue');
             if (task.failureCategory === 'delivery_unknown') throw new Error('Delivery-unconfirmed messages require independent reconciliation before retry');
@@ -507,8 +514,9 @@ class EmailScheduler {
         return { deleted, skipped, count: deleted.length };
     }
 
-    status() {
-        const tasks = this._all();
+    status(args) {
+        const organizationId = String(args?.organizationId || '').trim();
+        const tasks = this._all().filter((task) => !organizationId || String(task.organizationId || '') === organizationId);
         const counts = {};
         for (const task of tasks) counts[task.status] = Number(counts[task.status] || 0) + 1;
         const scheduled = tasks.filter((task) => task.status === 'scheduled').sort((a, b) => Date.parse(a.nextAttemptAt || a.sendAtUtc) - Date.parse(b.nextAttemptAt || b.sendAtUtc));

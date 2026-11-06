@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const path = require('path');
 const EventEmitter = require('events');
 const { EmailFileStore } = require('./json-store');
-const { messageBelongsToDomain } = require('./domain');
+const { messageBelongsToDomain, addressDomain } = require('./domain');
 const { buildEml } = require('./message-tools');
 const { detectVerificationCode } = require('./verification-code');
 
@@ -143,6 +143,7 @@ function createEmailService(options) {
     const deliverability = options.deliverability || null;
     const unsubscribe = options.unsubscribe || null;
     const monitor = options.monitor || null;
+    const tenantRegistry = options.tenantRegistry || null;
     const events = new EventEmitter();
     events.setMaxListeners(0);
     if (typeof sendmail !== 'function') throw new Error('sendmail function is required');
@@ -172,6 +173,13 @@ function createEmailService(options) {
     }
     function officialVisible(doc, context) {
         return !isOfficialMessage(doc) || context?.isAdmin === true;
+    }
+
+    function tenantVisible(doc, context) {
+        const domains = Array.isArray(context?.organizationDomains) ? context.organizationDomains.filter(Boolean) : [];
+        if (context?.organizationId && !domains.length) return false;
+        if (!domains.length) return true;
+        return domains.some((domain) => messageBelongsToDomain(doc, domain));
     }
 
 
@@ -204,6 +212,7 @@ function createEmailService(options) {
             : store.messageValues();
         for (const meta of source) {
             if (domain && !messageBelongsToDomain(meta, domain)) continue;
+            if (!tenantVisible(meta, context)) continue;
             if (!matchesSearch(meta, metadataArgs)) continue;
             if (bodySearch) {
                 // Fast path: subject/from/to/cc can satisfy a generic query without
@@ -246,6 +255,13 @@ function createEmailService(options) {
         if (!recipients.length) throw new Error('No valid recipient address found');
         const fromAddresses = normalizeAddressList(args.from);
         if (!fromAddresses.length) throw new Error('No valid sender address found');
+        const organizationId = String(args.organizationId || '').trim();
+        if (organizationId) {
+            if (!tenantRegistry || !tenantRegistry.getOrganization(organizationId)) throw new Error('Organization not found');
+            const allowedDomains = new Set(tenantRegistry.organizationDomains(organizationId));
+            const senderDomain = addressDomain(fromAddresses[0]);
+            if (!senderDomain || !allowedDomains.has(senderDomain)) throw new Error('Sender domain does not belong to the selected organization');
+        }
         const ccRecipients = normalizeAddressList(args.cc);
         if (abusePolicy && typeof abusePolicy.checkOutbound === 'function') {
             for (const recipient of recipients.concat(ccRecipients)) {
@@ -255,7 +271,7 @@ function createEmailService(options) {
         }
         const allRecipients = recipients.concat(ccRecipients);
         if (deliverability && typeof deliverability.preflight === 'function') {
-            const decision = deliverability.preflight(fromAddresses[0], allRecipients);
+            const decision = deliverability.preflight(fromAddresses[0], allRecipients, { organizationId: String(args.organizationId || '').trim() });
             if (!decision.allowed) {
                 const error = new Error(decision.reason || 'Outbound message paused by deliverability policy');
                 error.code = decision.code || 'DELIVERABILITY_BLOCKED';
@@ -280,6 +296,7 @@ function createEmailService(options) {
             html: args.html || '',
             replyTo: args.replyTo || '',
             inReplyTo: args.inReplyTo || '',
+            organizationId: String(args.organizationId || '').trim(),
             date: new Date().toISOString(),
         };
         await store.saveMessage(doc);
@@ -435,7 +452,7 @@ function createEmailService(options) {
                 error.code = 'DOMAIN_SCOPE';
                 throw error;
             }
-            if (!officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) {
+            if (!tenantVisible(doc, context) || !officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) {
                 const error = new Error('VIP email access is required');
                 error.code = 'VIP_REQUIRED';
                 throw error;
@@ -460,7 +477,7 @@ function createEmailService(options) {
                     outsideDomain.push(guid);
                     continue;
                 }
-                if (!officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) {
+                if (!tenantVisible(doc, context) || !officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) {
                     blockedVip.push(guid);
                     continue;
                 }
@@ -485,6 +502,7 @@ function createEmailService(options) {
                 const matching = [];
                 for (const doc of source) {
                     if (context.domain && !messageBelongsToDomain(doc, context.domain)) continue;
+                if (!tenantVisible(doc, context)) continue;
                     if (!normalizeAddressList([doc.to, doc.cc]).includes(email)) continue;
                     if (doc.folder !== 'inbox') continue;
                     if (!officialVisible(doc, context) || (!context.allowVip && isVipMessage(doc))) continue;
@@ -571,6 +589,7 @@ function createEmailService(options) {
                 text: args.text || '',
                 html: args.html || '',
                 inReplyTo: original.messageId || '',
+                organizationId: String(context?.organizationId || '').trim(),
             }, 'email_reply');
         },
 
@@ -586,6 +605,7 @@ function createEmailService(options) {
                 subject,
                 text,
                 html,
+                organizationId: String(context?.organizationId || '').trim(),
             }, 'email_forward');
         },
 
@@ -594,6 +614,7 @@ function createEmailService(options) {
             const doc = await store.getMessage(guid);
             if (!doc) return null;
             if (context.domain && !messageBelongsToDomain(doc, context.domain)) return null;
+            if (!tenantVisible(doc, context)) return null;
             if (!officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) throw new Error('VIP email access is required');
             const allowed = {};
             for (const key of ['subject', 'text', 'html', 'folder', 'read', 'status', 'favorite']) {
@@ -621,7 +642,7 @@ function createEmailService(options) {
                     outsideDomain.push(guid);
                     continue;
                 }
-                if (!officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) {
+                if (!tenantVisible(doc, context) || !officialVisible(doc, context) || (isVipMessage(doc) && !context.allowVip)) {
                     blockedVip.push(guid);
                     continue;
                 }
@@ -635,7 +656,7 @@ function createEmailService(options) {
         async delete(guid, context) {
             requireAdmin(context);
             const doc = await store.getMessage(guid);
-            if (!doc || (context.domain && !messageBelongsToDomain(doc, context.domain))) return { deleted: false, guid: String(guid), notFound: true };
+            if (!doc || (context.domain && !messageBelongsToDomain(doc, context.domain)) || !tenantVisible(doc, context)) return { deleted: false, guid: String(guid), notFound: true };
             const result = await store.deleteMessage(guid);
             await store.audit('email_delete', { guid: String(guid), deleted: !!result.deleted, admin: true });
             return { deleted: !!result.deleted, guid: String(guid), notFound: !!result.notFound };
@@ -646,11 +667,12 @@ function createEmailService(options) {
             const unique = Array.from(new Set((guids || []).map(String)));
             let selected = unique;
             const outsideDomain = [];
-            if (context.domain) {
+            if (context.domain || (Array.isArray(context.organizationDomains) && context.organizationDomains.length)) {
                 selected = [];
                 for (const guid of unique) {
                     const doc = await store.getMessage(guid);
-                    if (doc && messageBelongsToDomain(doc, context.domain)) selected.push(guid);
+                    const domainAllowed = !context.domain || (doc && messageBelongsToDomain(doc, context.domain));
+                    if (doc && domainAllowed && tenantVisible(doc, context)) selected.push(guid);
                     else if (doc) outsideDomain.push(guid);
                 }
             }
@@ -730,6 +752,7 @@ function createEmailService(options) {
             let failed = 0;
             for (const doc of store.messageValues()) {
                 if (context.domain && !messageBelongsToDomain(doc, context.domain)) continue;
+                if (!tenantVisible(doc, context)) continue;
                 const vip = isVipMessage(doc);
                 if (vip) vipCount += 1;
                 if (vip && !context.allowVip) continue;
@@ -741,9 +764,10 @@ function createEmailService(options) {
                 if (Array.isArray(doc.attachments) && doc.attachments.length) attachments += 1;
                 if (doc.status === 'failed') failed += 1;
             }
+            const scoped = !!context.organizationId;
             return {
                 total,
-                storedTotal: store.messages.size,
+                storedTotal: scoped ? total : store.messages.size,
                 vipCount,
                 read,
                 unread,
@@ -751,9 +775,11 @@ function createEmailService(options) {
                 attachments,
                 failed,
                 folders,
-                maxMessages: store.maxMessages,
+                maxMessages: scoped ? null : store.maxMessages,
                 storage: 'json-files-only',
-                dataDir: store.baseDir,
+                dataDir: scoped ? undefined : store.baseDir,
+                scoped,
+                organizationId: scoped ? context.organizationId : null,
             };
         },
     };

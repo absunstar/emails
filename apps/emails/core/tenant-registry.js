@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { normalizeHostname } = require('./domain');
+const { normalizeHostname, mailDomainFromHostname } = require('./domain');
 const { verifyMailDomain } = require('./domain-verifier');
 
 function ensureDir(dir){ fs.mkdirSync(dir,{recursive:true}); }
@@ -32,7 +32,11 @@ class MailTenantRegistry{
       org={id:id('org_'),name,slug:'default',status:'active',isDefault:true,createdAt:now(),updatedAt:now()};
       this.data.organizations.push(org);
     }
-    const domains=this.instanceConfig?.get?.().network?.mailDomains||[];
+    const configured = this.instanceConfig?.get?.().network?.mailDomains || [];
+    const envDomains = [process.env.DKIM_ALLOWED_DOMAINS, process.env.LOCAL_MAIL_DOMAINS]
+      .filter(Boolean).flatMap(value => String(value).split(/[\s,]+/)).filter(Boolean);
+    const smtpHost = this.instanceConfig?.get?.().network?.smtpHostname || '';
+    const domains=[...new Set([...configured, ...envDomains, mailDomainFromHostname(smtpHost)].map(domain).filter(Boolean))];
     for(const d0 of domains){
       const d=domain(d0); if(!d)continue;
       if(!this.data.domains.some(x=>x.domain===d)){
@@ -172,6 +176,9 @@ class MailTenantRegistry{
     const readyMembers=members.filter(x=>x.ready);
     return {ready:pool.status==='active'&&readyMembers.length===pool.senderIds.length,pool:clone(pool),members,readyCount:readyMembers.length,total:members.length};
   }
+  organizationDomains(organizationId){ return this.data.domains.filter(x=>x.organizationId===organizationId).map(x=>x.domain); }
+  organizationSenders(organizationId){ return this.data.senders.filter(x=>x.organizationId===organizationId).map(x=>x.email); }
+  getOrganization(idv){ return clone(this.data.organizations.find(x=>x.id===idv)||null); }
   resolveOrganizationByDomain(d){ const row=this.data.domains.find(x=>x.domain===domain(d)); return row?clone(this.data.organizations.find(x=>x.id===row.organizationId)||null):null; }
   resolveSender(addr){ const a=email(addr); const row=this.data.senders.find(x=>x.email===a); return clone(row||null); }
 }

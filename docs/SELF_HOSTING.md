@@ -43,3 +43,13 @@ The Mail Admin console includes **Instance Settings** for network identity, mana
 ## Organizations, domains and sender identities
 
 The instance includes a persistent tenant registry at `localStorage/email-tenants/registry.json`. A default organization is created automatically for backwards compatibility. Additional organizations can own independent mail domains and sender identities. Use the Mail Admin **Domains & Senders** screen or the Mail MCP organization/domain/sender tools to manage the registry.
+
+## Tenant isolation
+
+Organizations are enforced as data scopes, not only UI filters. When `organizationId` is supplied, message search/read/update/delete/stats are restricted to domains owned by that organization. An organization with no domains is fail-closed and sees no messages.
+
+Schedules persist `organizationId` and list/get/update/cancel/send-now/retry enforce the same owner scope. Suppressions are namespaced by organization, so an unsubscribe, complaint, hard bounce, or manual suppression in one organization does not suppress the same recipient in another organization. Campaign ID operations and reports validate campaign ownership when an organization scope is present.
+
+Outbound messages with an `organizationId` must use a From domain owned by that organization. Campaigns, schedules and MCP sends propagate the organization scope to the final Email Service guard.
+
+Mail Admin has an Organization scope selector. Instance Settings, Security & Policies, Backup/Restore/Storage configuration, and global deliverability configuration remain instance-wide Super Admin controls and are unavailable while the Admin workspace is scoped to one organization. Tenant-scoped deliverability views expose only owned-domain counters.

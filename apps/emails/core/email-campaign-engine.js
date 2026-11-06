@@ -284,6 +284,7 @@ class EmailCampaignEngine {
             }
             const result = await this.emailService.send({
                 from: sendFrom, to: item.recipient, replyTo: c.replyTo || msg.replyTo || '',
+                organizationId: c.organizationId || '',
                 subject: template(msg.subject, vars), text: template(msg.text, vars), html: template(msg.html, vars),
             });
             item.status = 'sent'; item.guid = result?.guid || ''; item.error = ''; item.finishedAt = new Date().toISOString();
@@ -309,10 +310,11 @@ class EmailCampaignEngine {
         } catch (error) { this.logger('Email campaign tick error: ' + (error?.message || error)); }
         finally { this.busy = false; }
     }
-    status() {
-        const all=this._all(); const counts={};
+    status(input) {
+        const organizationId = String(input?.organizationId || '').trim();
+        const all=this._all().filter(c => !organizationId || String(c.organizationId || '') === organizationId); const counts={};
         for(const c of all) counts[c.status]=(counts[c.status]||0)+1;
-        return { enabled:true, total:all.length, counts, intervalMs:this.intervalMs, storage:this.dir };
+        return { enabled:true, organizationId: organizationId || null, total:all.length, counts, intervalMs:this.intervalMs, storage:this.dir };
     }
     startEngine() { if(this.timer) return this; this.tick().catch(()=>{}); this.timer=setInterval(()=>this.tick().catch(()=>{}),this.intervalMs); if(this.timer.unref) this.timer.unref(); return this; }
     stopEngine() { if(this.timer) clearInterval(this.timer); this.timer=null; return this; }

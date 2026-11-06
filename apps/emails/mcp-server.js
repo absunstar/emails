@@ -11,7 +11,7 @@ const DEFAULT_MCP_SECRET = String(process.env.EMAIL_MCP_DEFAULT_SECRET || 'SOCIA
 const SERVER_INFO = {
     name: String(process.env.EMAIL_MCP_NAME || 'social-browser-email').trim() || 'social-mail',
     title: String(process.env.EMAIL_MCP_TITLE || 'Social Browser Email Manager').trim() || 'Social Mail MCP',
-    version: '4.9.0',
+    version: '5.0.0',
 };
 
 const SERVER_INSTRUCTIONS = [
@@ -47,6 +47,7 @@ const SEARCH_PROPERTIES = {
     after: { type: 'string', description: 'ISO-8601 lower date bound.' },
     before: { type: 'string', description: 'ISO-8601 upper date bound.' },
     domain: { type: 'string', description: 'Optional mail-domain scope. Omit for global manager access.' },
+    organizationId: { type: 'string', description: 'Optional organization/tenant scope. When set, access is restricted to domains owned by that organization.' },
     offset: { type: 'integer', minimum: 0, default: 0 },
     sortBy: { type: 'string', enum: ['date', 'id', 'from', 'to', 'subject', 'folder', 'status'], default: 'date' },
     sortDir: { type: 'string', enum: ['asc', 'desc'], default: 'desc' },
@@ -191,16 +192,16 @@ const TOOLS = [
         limit: { type: 'integer', minimum: 1, maximum: 500, default: 50 },
         includeBody: { type: 'boolean', default: false },
     })),
-    tool('email_read', 'Read email', 'Read one complete stored message by guid, including text, HTML and attachment metadata.', { guid: GUID }, ['guid']),
-    tool('email_read_many', 'Read multiple emails', 'Read multiple complete stored messages by guid.', { guids: { type: 'array', minItems: 1, maxItems: 100, uniqueItems: true, items: GUID } }, ['guids']),
+    tool('email_read', 'Read email', 'Read one complete stored message by guid, including text, HTML and attachment metadata.', { guid: GUID, organizationId: STRING }, ['guid']),
+    tool('email_read_many', 'Read multiple emails', 'Read multiple complete stored messages by guid.', { guids: { type: 'array', minItems: 1, maxItems: 100, uniqueItems: true, items: GUID }, organizationId: STRING }, ['guids']),
     tool('email_mailbox_statuses', 'Mailbox statuses', 'Return counts and latest-message metadata for up to 100 mailbox addresses.', { addresses: { type: 'array', minItems: 1, maxItems: 100, uniqueItems: true, items: { type: 'string', minLength: 3 } } }, ['addresses']),
-    tool('email_stats', 'Email statistics', 'Return global or domain-scoped totals, unread, favorites, attachments, failed sends, folders, VIP and storage information.', { domain: STRING }),
+    tool('email_stats', 'Email statistics', 'Return global, domain-scoped, or organization-scoped totals, unread, favorites, attachments, failed sends, folders, VIP and storage information.', { domain: STRING, organizationId: STRING }),
     tool('email_send', 'Send email now', 'Send one real email immediately. Use this only when the user wants delivery now. For any future or relative time request use email_schedule. Security, suppression, deliverability, and outbound limits apply.', MESSAGE_SEND_PROPERTIES, ['from', 'to'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }, { anyOf: [{ required: ['text'] }, { required: ['html'] }] }),
     tool('email_send_bulk', 'Send multiple emails', 'Send up to the configured bulk limit (safe default 100, hard cap 1000) with bounded concurrency. Every actual message counts against the MCP hourly send limit.', {
         messages: { type: 'array', minItems: 1, maxItems: 1000, items: { type: 'object', additionalProperties: false, properties: MESSAGE_SEND_PROPERTIES, required: ['from', 'to'], anyOf: [{ required: ['text'] }, { required: ['html'] }] } },
         concurrency: { type: 'integer', minimum: 1, maximum: 10, default: 3 },
     }, ['messages'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
-    tool('email_campaign_status', 'Campaign engine status', 'Return persistent campaign engine status and counts by lifecycle state.', {}),
+    tool('email_campaign_status', 'Campaign engine status', 'Return persistent campaign engine status and counts by lifecycle state, optionally scoped to one organization.', { organizationId: STRING }),
     tool('email_campaigns_list', 'List email campaigns', 'List persistent campaigns with status, progress, pacing summary, recipient count, message count, and start time.', {
         status: { type: 'string', enum: ['draft', 'scheduled', 'running', 'paused', 'completed', 'stopped'] },
         organizationId: { type: 'string' },
@@ -208,6 +209,7 @@ const TOOLS = [
     }),
     tool('email_campaign_get', 'Get email campaign', 'Read one campaign in full, including recipients, messages, queue jobs, variables, pacing, lifecycle state, progress, and event log.', {
         id: { type: 'string', minLength: 1 },
+        organizationId: STRING,
     }, ['id']),
     tool('email_campaign_create', 'Create email campaign', 'Create a persistent standalone email campaign. The campaign is created as draft; call email_campaign_start to run or schedule it. Supports recipient variables, rotate/A-B, sequence, assigned one-to-one messages, and fixed/random/rate/batch pacing.', CAMPAIGN_CREATE_PROPERTIES, ['name', 'recipients', 'messages'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
     tool('email_campaign_update', 'Update email campaign', 'Update mutable campaign settings such as name, pacing, or start time while the campaign is draft, paused, or scheduled.', {
@@ -215,21 +217,24 @@ const TOOLS = [
         name: { type: 'string', minLength: 1, maxLength: 240 },
         startAt: { type: 'string' },
         pacing: CAMPAIGN_PACING,
+        organizationId: STRING,
     }, ['id'], { readOnlyHint: false }),
-    tool('email_campaign_start', 'Start email campaign', 'Start a draft/scheduled campaign. If its startAt is in the future it remains scheduled until that time; otherwise it starts running.', { id: { type: 'string', minLength: 1 } }, ['id'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
-    tool('email_campaign_pause', 'Pause email campaign', 'Pause a running or scheduled campaign while preserving queue progress.', { id: { type: 'string', minLength: 1 } }, ['id'], { readOnlyHint: false }),
-    tool('email_campaign_resume', 'Resume email campaign', 'Resume a paused campaign from its saved queue position.', { id: { type: 'string', minLength: 1 } }, ['id'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
-    tool('email_campaign_stop', 'Stop email campaign', 'Stop a campaign permanently. Pending jobs remain recorded for reporting but will no longer send.', { id: { type: 'string', minLength: 1 } }, ['id'], { readOnlyHint: false, destructiveHint: true }),
-    tool('email_campaign_delete', 'Delete email campaign', 'Permanently delete a non-running campaign and its persistent campaign record. Stop a running/scheduled campaign first.', { id: { type: 'string', minLength: 1 }, confirm: { type: 'boolean' } }, ['id', 'confirm'], { readOnlyHint: false, destructiveHint: true }),
-    tool('email_campaign_report', 'Email campaign report', 'Return campaign progress, delivery totals, failures/delivery-unknown rows, timestamps, and lifecycle event log.', { id: { type: 'string', minLength: 1 } }, ['id']),
+    tool('email_campaign_start', 'Start email campaign', 'Start a draft/scheduled campaign. If its startAt is in the future it remains scheduled until that time; otherwise it starts running.', { id: { type: 'string', minLength: 1 }, organizationId: STRING }, ['id'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
+    tool('email_campaign_pause', 'Pause email campaign', 'Pause a running or scheduled campaign while preserving queue progress.', { id: { type: 'string', minLength: 1 }, organizationId: STRING }, ['id'], { readOnlyHint: false }),
+    tool('email_campaign_resume', 'Resume email campaign', 'Resume a paused campaign from its saved queue position.', { id: { type: 'string', minLength: 1 }, organizationId: STRING }, ['id'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
+    tool('email_campaign_stop', 'Stop email campaign', 'Stop a campaign permanently. Pending jobs remain recorded for reporting but will no longer send.', { id: { type: 'string', minLength: 1 }, organizationId: STRING }, ['id'], { readOnlyHint: false, destructiveHint: true }),
+    tool('email_campaign_delete', 'Delete email campaign', 'Permanently delete a non-running campaign and its persistent campaign record. Stop a running/scheduled campaign first.', { id: { type: 'string', minLength: 1 }, organizationId: STRING, confirm: { type: 'boolean' } }, ['id', 'confirm'], { readOnlyHint: false, destructiveHint: true }),
+    tool('email_campaign_report', 'Email campaign report', 'Return campaign progress, delivery totals, failures/delivery-unknown rows, timestamps, and lifecycle event log.', { id: { type: 'string', minLength: 1 }, organizationId: STRING }, ['id']),
     tool('email_campaign_jobs', 'Email campaign recipient jobs', 'Page through recipient-level campaign queue jobs, optionally filtered by delivery state. Use this instead of loading a very large campaign when you only need recipient execution details.', {
         id: { type: 'string', minLength: 1 },
+        organizationId: STRING,
         status: { type: 'string', enum: ['pending', 'sending', 'sent', 'failed', 'delivery_unknown', 'skipped'] },
         offset: { type: 'integer', minimum: 0, default: 0 },
         limit: { type: 'integer', minimum: 1, maximum: 1000, default: 100 },
     }, ['id']),
     tool('email_campaign_events', 'Email campaign event log', 'Page through a campaign lifecycle log including create, update, start, pause, resume, stop, and completion events.', {
         id: { type: 'string', minLength: 1 },
+        organizationId: STRING,
         offset: { type: 'integer', minimum: 0, default: 0 },
         limit: { type: 'integer', minimum: 1, maximum: 1000, default: 100 },
     }, ['id']),
@@ -237,6 +242,7 @@ const TOOLS = [
     tool('email_schedule_bulk', 'Schedule multiple emails safely', 'Schedule a future batch. Prefer sendAt and use spacingSeconds to stagger deliveries. Deliverability controls can further defer individual messages to protect domain/provider reputation.', Object.assign({}, SCHEDULE_WHEN_PROPERTIES, SCHEDULE_RETRY_PROPERTIES, {
         messages: { type: 'array', minItems: 1, maxItems: 1000, items: { type: 'object', additionalProperties: false, properties: MESSAGE_SEND_PROPERTIES, required: ['from', 'to'], anyOf: [{ required: ['text'] }, { required: ['html'] }] } },
         spacingSeconds: { type: 'integer', minimum: 0, maximum: 86400, default: 0 },
+        organizationId: STRING,
     }), ['messages'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }, { anyOf: [{ required: ['sendAt'] }, { required: ['date', 'time', 'timezoneOffset'] }] }),
     tool('email_schedules_list', 'List scheduled emails', 'List scheduled, sending, sent, failed, or cancelled email jobs. Message bodies are omitted by default.', {
         status: { type: 'string', enum: ['scheduled', 'sending', 'sent', 'failed', 'cancelled'] },
@@ -244,20 +250,23 @@ const TOOLS = [
         before: { type: 'string', description: 'Optional ISO-8601 upper send-time bound.' },
         limit: { type: 'integer', minimum: 1, maximum: 500, default: 100 },
         includeBody: { type: 'boolean', default: false },
+        organizationId: STRING,
     }),
-    tool('email_schedule_get', 'Get scheduled email', 'Read one scheduled email job including its complete stored message body and execution state.', { id: { type: 'string', minLength: 1 }, includeBody: { type: 'boolean', default: true } }, ['id']),
+    tool('email_schedule_get', 'Get scheduled email', 'Read one scheduled email job including its complete stored message body and execution state.', { id: { type: 'string', minLength: 1 }, includeBody: { type: 'boolean', default: true }, organizationId: STRING }, ['id']),
     tool('email_schedule_update', 'Update scheduled email', 'Edit the message and/or scheduled date/time before it is sent. Updating a failed or cancelled job reactivates it.', Object.assign({}, SCHEDULE_WHEN_PROPERTIES, SCHEDULE_RETRY_PROPERTIES, {
         id: { type: 'string', minLength: 1 },
+        organizationId: STRING,
         message: { type: 'object', additionalProperties: false, properties: MESSAGE_SEND_PROPERTIES },
     }), ['id'], { readOnlyHint: false }),
-    tool('email_schedule_cancel', 'Cancel scheduled email', 'Cancel a scheduled email before it is sent.', { id: { type: 'string', minLength: 1 } }, ['id'], { readOnlyHint: false, destructiveHint: true }),
-    tool('email_schedule_send_now', 'Send scheduled email now', 'Immediately execute a scheduled or failed email job instead of waiting for its planned time. Normal outbound limits still apply.', { id: { type: 'string', minLength: 1 } }, ['id'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
-    tool('email_schedule_retry', 'Retry scheduled email', 'Reactivate a failed or cancelled scheduled email. Optionally choose a new future date/time; otherwise it is queued immediately.', Object.assign({}, SCHEDULE_WHEN_PROPERTIES, { id: { type: 'string', minLength: 1 }, resetAttempts: { type: 'boolean', default: true } }), ['id'], { readOnlyHint: false }),
-    tool('email_scheduler_status', 'Email scheduler status', 'Return persistent scheduler counts and the next queued email without changing anything.', {}),
-    tool('email_deliverability_status', 'Deliverability status', 'Inspect current warm-up allowance, global/domain/provider sending counters, bounce/complaint signals, and any open circuit breakers before large or repeated sending.', {}),
+    tool('email_schedule_cancel', 'Cancel scheduled email', 'Cancel a scheduled email before it is sent.', { id: { type: 'string', minLength: 1 }, organizationId: STRING }, ['id'], { readOnlyHint: false, destructiveHint: true }),
+    tool('email_schedule_send_now', 'Send scheduled email now', 'Immediately execute a scheduled or failed email job instead of waiting for its planned time. Normal outbound limits still apply.', { id: { type: 'string', minLength: 1 }, organizationId: STRING }, ['id'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
+    tool('email_schedule_retry', 'Retry scheduled email', 'Reactivate a failed or cancelled scheduled email. Optionally choose a new future date/time; otherwise it is queued immediately.', Object.assign({}, SCHEDULE_WHEN_PROPERTIES, { id: { type: 'string', minLength: 1 }, organizationId: STRING, resetAttempts: { type: 'boolean', default: true } }), ['id'], { readOnlyHint: false }),
+    tool('email_scheduler_status', 'Email scheduler status', 'Return persistent scheduler counts and the next queued email, optionally scoped to one organization.', { organizationId: STRING }),
+    tool('email_deliverability_status', 'Deliverability status', 'Inspect deliverability counters, optionally scoped to one organization. Organization scope returns only owned-domain metrics.', { organizationId: STRING }),
     tool('email_deliverability_preflight', 'Check recipients before sending', 'Dry-run deliverability checks without consuming quota. Use before a campaign or when deciding whether immediate sending is appropriate. Reports suppression, pacing, provider/domain limits, warm-up limits, or circuit-breaker pauses.', {
         from: { type: 'string' },
         to: MESSAGE_SEND_PROPERTIES.to,
+        organizationId: STRING,
     }, ['to']),
     tool('email_deliverability_config_get', 'Get deliverability configuration', 'Read safe outbound deliverability settings including global/domain/provider limits, pacing, warm-up ramp and circuit-breaker thresholds.', {}),
     tool('email_deliverability_config_update', 'Update deliverability configuration', 'Update deliverability safeguards. Do not use this to bypass suppression, complaints, bounces, or provider protections merely to increase volume.', { config: { type: 'object' } }, ['config'], { readOnlyHint: false }),
@@ -265,20 +274,24 @@ const TOOLS = [
         type: { type: 'string', enum: ['unsubscribe', 'complaint', 'hard_bounce', 'manual'] },
         query: { type: 'string' },
         limit: { type: 'integer', minimum: 1, maximum: 1000, default: 100 },
+        organizationId: STRING,
     }),
     tool('email_suppression_add', 'Suppress recipient', 'Add a recipient to the persistent do-not-send suppression list. Use unsubscribe for opt-outs, complaint for spam complaints, hard_bounce for permanent delivery failures, or manual for an explicit administrative stop.', {
         email: { type: 'string', minLength: 3 },
         type: { type: 'string', enum: ['unsubscribe', 'complaint', 'hard_bounce', 'manual'] },
         reason: { type: 'string', maxLength: 1000 },
+        organizationId: STRING,
     }, ['email', 'type'], { readOnlyHint: false }),
     tool('email_suppression_remove', 'Remove recipient suppression', 'Remove a suppression only when there is a legitimate reason to resume sending, such as a corrected hard-bounce address or a renewed opt-in. Do not remove complaint or unsubscribe suppression just to increase volume.', {
         email: { type: 'string', minLength: 3 },
+        organizationId: STRING,
     }, ['email'], { readOnlyHint: false }),
     tool('email_delivery_feedback_report', 'Report delivery feedback', 'Record external delivery feedback so the engine can protect sender reputation. Hard bounces, complaints and unsubscribes automatically suppress the recipient; complaint/bounce rates can open automatic sending circuit breakers.', {
         email: { type: 'string', minLength: 3 },
         type: { type: 'string', enum: ['delivered', 'hard_bounce', 'soft_bounce', 'complaint', 'unsubscribe'] },
         reason: { type: 'string', maxLength: 1000 },
         source: { type: 'string', maxLength: 160 },
+        organizationId: STRING,
     }, ['email', 'type'], { readOnlyHint: false }),
     tool('email_operations_status', 'Backup and storage status', 'Inspect backup health, disk quota, retention state, low-space mode, recent operational alerts, and storage history.', {}),
     tool('email_backup_create', 'Create verified backup', 'Create a persistent server-side snapshot of messages, attachments, schedules, deliverability state, suppressions, VIP data, policies, and storage configuration. The backup is checksummed and can be validated before restore.', {
@@ -320,26 +333,28 @@ const TOOLS = [
     tool('email_operations_history', 'Storage history', 'Read recent persisted storage samples for quota and disk trend analysis.', {
         limit: { type: 'integer', minimum: 1, maximum: 576, default: 144 },
     }),
-    tool('email_reply', 'Reply to email', 'Reply to a stored message by guid.', { guid: GUID, from: { type: 'string', minLength: 3 }, text: STRING, html: STRING }, ['guid', 'from'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }, { anyOf: [{ required: ['text'] }, { required: ['html'] }] }),
-    tool('email_forward', 'Forward email', 'Forward a stored message to one or more recipients.', { guid: GUID, from: { type: 'string', minLength: 3 }, to: MESSAGE_SEND_PROPERTIES.to, text: STRING, html: STRING }, ['guid', 'from', 'to'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
+    tool('email_reply', 'Reply to email', 'Reply to a stored message by guid.', { guid: GUID, organizationId: STRING, from: { type: 'string', minLength: 3 }, text: STRING, html: STRING }, ['guid', 'from'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }, { anyOf: [{ required: ['text'] }, { required: ['html'] }] }),
+    tool('email_forward', 'Forward email', 'Forward a stored message to one or more recipients.', { guid: GUID, organizationId: STRING, from: { type: 'string', minLength: 3 }, to: MESSAGE_SEND_PROPERTIES.to, text: STRING, html: STRING }, ['guid', 'from', 'to'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
     tool('email_update', 'Update email', 'Update message read, favorite, folder, status, subject, text, or HTML fields.', {
         guid: GUID,
+        organizationId: STRING,
         patch: { type: 'object', additionalProperties: false, properties: { read: { type: 'boolean' }, favorite: { type: 'boolean' }, folder: STRING, status: STRING, subject: STRING, text: STRING, html: STRING } },
     }, ['guid', 'patch'], { readOnlyHint: false }),
     tool('email_update_bulk', 'Bulk update emails', 'Apply read, favorite, folder, or status changes to up to 5000 explicitly selected messages.', {
         guids: GUIDS_5000,
+        organizationId: STRING,
         patch: { type: 'object', additionalProperties: false, properties: { read: { type: 'boolean' }, favorite: { type: 'boolean' }, folder: STRING, status: STRING } },
     }, ['guids', 'patch'], { readOnlyHint: false }),
-    tool('email_set_read', 'Mark read or unread', 'Set read state for up to 5000 explicitly selected messages.', { guids: GUIDS_5000, read: { type: 'boolean' } }, ['guids', 'read'], { readOnlyHint: false }),
-    tool('email_attachment_read', 'Download attachment', 'Read one attachment and return its metadata plus base64 content. Use maxBytes to bound response size.', { guid: GUID, attachmentId: GUID, maxBytes: { type: 'integer', minimum: 1, maximum: 26214400, default: 20971520 } }, ['guid', 'attachmentId']),
-    tool('email_eml_export', 'Export EML', 'Build and return a complete RFC-style EML file as base64.', { guid: GUID, maxBytes: { type: 'integer', minimum: 1, maximum: 41943040, default: 26214400 } }, ['guid']),
-    tool('email_analyze', 'Analyze message privacy', 'Analyze message HTML for remote images, tracking pixels, external links and attachments, and return remote asset URLs without loading them.', { guid: GUID }, ['guid']),
+    tool('email_set_read', 'Mark read or unread', 'Set read state for up to 5000 explicitly selected messages.', { guids: GUIDS_5000, organizationId: STRING, read: { type: 'boolean' } }, ['guids', 'read'], { readOnlyHint: false }),
+    tool('email_attachment_read', 'Download attachment', 'Read one attachment and return its metadata plus base64 content. Use maxBytes to bound response size.', { guid: GUID, organizationId: STRING, attachmentId: GUID, maxBytes: { type: 'integer', minimum: 1, maximum: 26214400, default: 20971520 } }, ['guid', 'attachmentId']),
+    tool('email_eml_export', 'Export EML', 'Build and return a complete RFC-style EML file as base64.', { guid: GUID, organizationId: STRING, maxBytes: { type: 'integer', minimum: 1, maximum: 41943040, default: 26214400 } }, ['guid']),
+    tool('email_analyze', 'Analyze message privacy', 'Analyze message HTML for remote images, tracking pixels, external links and attachments, and return remote asset URLs without loading them.', { guid: GUID, organizationId: STRING }, ['guid']),
     tool('email_vip_list', 'List VIP mailboxes', 'List protected/VIP email entries.', {}),
     tool('email_vip_set', 'Set VIP state', 'Protect or unprotect one mailbox address.', { email: { type: 'string', minLength: 3 }, vip: { type: 'boolean', default: true } }, ['email'], { readOnlyHint: false }),
     tool('email_folders_list', 'List folders', 'List custom administrator folders.', {}),
     tool('email_folder_create', 'Create folder', 'Create a custom administrator folder.', { name: { type: 'string', minLength: 1, maxLength: 60 } }, ['name'], { readOnlyHint: false }),
-    tool('email_delete', 'Delete email', 'Permanently delete one stored email by guid.', { guid: GUID }, ['guid'], { readOnlyHint: false, destructiveHint: true }),
-    tool('email_delete_bulk', 'Delete multiple emails', 'Permanently delete up to 5000 explicitly selected messages.', { guids: GUIDS_5000 }, ['guids'], { readOnlyHint: false, destructiveHint: true }),
+    tool('email_delete', 'Delete email', 'Permanently delete one stored email by guid.', { guid: GUID, organizationId: STRING }, ['guid'], { readOnlyHint: false, destructiveHint: true }),
+    tool('email_delete_bulk', 'Delete multiple emails', 'Permanently delete up to 5000 explicitly selected messages.', { guids: GUIDS_5000, organizationId: STRING }, ['guids'], { readOnlyHint: false, destructiveHint: true }),
     tool('email_delete_matching', 'Delete matching emails', 'Preview or delete messages matching advanced search filters. confirm=true is required for deletion.', Object.assign({}, SEARCH_PROPERTIES, { confirm: { type: 'boolean', default: false }, maxDelete: { type: 'integer', minimum: 1, maximum: 5000, default: 100 } }), ['confirm'], { readOnlyHint: false, destructiveHint: true }),
     tool('email_policy_get', 'Get security policy', 'Return the complete abuse-protection configuration, defaults, storage path and current activity status.', {}),
     tool('email_policy_export', 'Export security policy', 'Export the complete current Security & Policies configuration as JSON-ready structured data.', {}),
@@ -429,7 +444,7 @@ function validateGuids(value, max) {
 
 function validateSearch(source, maxLimit) {
     const result = Object.assign({}, objectArgs(source));
-    for (const key of ['query', 'from', 'to', 'toExact', 'subject', 'text', 'html', 'folder', 'status', 'after', 'before', 'domain']) {
+    for (const key of ['query', 'from', 'to', 'toExact', 'subject', 'text', 'html', 'folder', 'status', 'after', 'before', 'domain', 'organizationId']) {
         if (result[key] !== undefined && typeof result[key] !== 'string') return fail(key + ' must be a string');
     }
     for (const key of ['read', 'favorite', 'hasAttachments']) if (result[key] !== undefined && typeof result[key] !== 'boolean') return fail(key + ' must be boolean');
@@ -468,6 +483,7 @@ function validateSend(source) {
             html: typeof source.html === 'string' ? source.html : '',
             replyTo: typeof source.replyTo === 'string' ? source.replyTo.trim() : '',
             inReplyTo: typeof source.inReplyTo === 'string' ? source.inReplyTo.trim() : '',
+            organizationId: String(source.organizationId || '').trim(),
         },
     };
 }
@@ -498,7 +514,10 @@ function validateScheduleRetryFields(args) {
 
 function validateToolArguments(name, raw) {
     const args = objectArgs(raw);
-    if (name === 'email_capabilities' || name === 'email_instance_get' || name === 'email_tenants_status' || name === 'email_organizations_list' || name === 'email_vip_list' || name === 'email_folders_list' || name === 'email_policy_get' || name === 'email_policy_export' || name === 'email_policy_status' || name === 'email_scheduler_status' || name === 'email_campaign_status' || name === 'email_deliverability_status' || name === 'email_deliverability_config_get' || name === 'email_operations_status' || name === 'email_backups_list' || name === 'email_storage_report' || name === 'email_storage_config_get' || name === 'email_storage_message_limit_get') return { ok: true, args: {} };
+    if (name === 'email_capabilities' || name === 'email_instance_get' || name === 'email_tenants_status' || name === 'email_organizations_list' || name === 'email_vip_list' || name === 'email_folders_list' || name === 'email_policy_get' || name === 'email_policy_export' || name === 'email_policy_status' || name === 'email_deliverability_config_get' || name === 'email_operations_status' || name === 'email_backups_list' || name === 'email_storage_report' || name === 'email_storage_config_get' || name === 'email_storage_message_limit_get') return { ok: true, args: {} };
+    if (name === 'email_scheduler_status' || name === 'email_campaign_status' || name === 'email_deliverability_status') {
+        return { ok: true, args: { organizationId: String(args.organizationId || '').trim() } };
+    }
     if (name === 'email_search') {
         const checked = validateSearch(args, 500);
         if (!checked.ok) return checked;
@@ -507,11 +526,11 @@ function validateToolArguments(name, raw) {
     }
     if (name === 'email_stats') {
         if (args.domain !== undefined && typeof args.domain !== 'string') return fail('domain must be a string');
-        return { ok: true, args: { domain: args.domain || '' } };
+        return { ok: true, args: { domain: args.domain || '', organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_read' || name === 'email_delete' || name === 'email_analyze') {
         if (typeof args.guid !== 'string' || !args.guid.trim()) return fail('guid is required');
-        return { ok: true, args: { guid: args.guid.trim() } };
+        return { ok: true, args: { guid: args.guid.trim(), organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_read_many' || name === 'email_delete_bulk' || name === 'email_set_read' || name === 'email_update_bulk') {
         const max = name === 'email_read_many' ? 100 : 5000;
@@ -519,14 +538,14 @@ function validateToolArguments(name, raw) {
         if (!checked.ok) return checked;
         if (name === 'email_set_read') {
             if (typeof args.read !== 'boolean') return fail('read must be boolean');
-            return { ok: true, args: { guids: checked.guids, read: args.read } };
+            return { ok: true, args: { guids: checked.guids, read: args.read, organizationId: String(args.organizationId || '').trim() } };
         }
         if (name === 'email_update_bulk') {
             const patch = validatePatch(args.patch, true);
             if (!patch.ok) return patch;
-            return { ok: true, args: { guids: checked.guids, patch: patch.patch } };
+            return { ok: true, args: { guids: checked.guids, patch: patch.patch, organizationId: String(args.organizationId || '').trim() } };
         }
-        return { ok: true, args: { guids: checked.guids } };
+        return { ok: true, args: { guids: checked.guids, organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_mailbox_statuses') {
         if (!Array.isArray(args.addresses) || args.addresses.length < 1 || args.addresses.length > 100 || !args.addresses.every((x) => typeof x === 'string' && x.trim())) return fail('addresses must contain 1 to 100 email strings');
@@ -550,7 +569,7 @@ function validateToolArguments(name, raw) {
         const to = args.to;
         const validTo = typeof to === 'string' ? !!to.trim() : (Array.isArray(to) && to.length >= 1 && to.length <= 50 && to.every((x) => typeof x === 'string' && x.trim()));
         if (!validTo) return fail('to must be a non-empty email string or array of 1 to 50 email strings');
-        return { ok: true, args: { from: String(args.from || ''), to } };
+        return { ok: true, args: { from: String(args.from || ''), to, organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_deliverability_config_update') {
         if (!args.config || typeof args.config !== 'object' || Array.isArray(args.config)) return fail('config must be an object');
@@ -562,28 +581,28 @@ function validateToolArguments(name, raw) {
         if (!allowed.includes(type)) return fail('invalid suppression type');
         const limit = args.limit === undefined ? 100 : Number(args.limit);
         if (!Number.isInteger(limit) || limit < 1 || limit > 1000) return fail('limit must be 1 to 1000');
-        return { ok: true, args: { type, query: String(args.query || ''), limit } };
+        return { ok: true, args: { type, query: String(args.query || ''), limit, organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_suppression_add') {
         if (typeof args.email !== 'string' || !args.email.trim()) return fail('email is required');
         const type = String(args.type || '').trim().toLowerCase();
         if (!['unsubscribe', 'complaint', 'hard_bounce', 'manual'].includes(type)) return fail('invalid suppression type');
-        return { ok: true, args: { email: args.email.trim(), type, reason: String(args.reason || '').slice(0, 1000) } };
+        return { ok: true, args: { email: args.email.trim(), type, reason: String(args.reason || '').slice(0, 1000), organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_suppression_remove') {
         if (typeof args.email !== 'string' || !args.email.trim()) return fail('email is required');
-        return { ok: true, args: { email: args.email.trim() } };
+        return { ok: true, args: { email: args.email.trim(), organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_delivery_feedback_report') {
         if (typeof args.email !== 'string' || !args.email.trim()) return fail('email is required');
         const type = String(args.type || '').trim().toLowerCase();
         if (!['delivered', 'hard_bounce', 'soft_bounce', 'complaint', 'unsubscribe'].includes(type)) return fail('invalid feedback type');
-        return { ok: true, args: { email: args.email.trim(), type, reason: String(args.reason || '').slice(0, 1000), source: String(args.source || '').slice(0, 160) } };
+        return { ok: true, args: { email: args.email.trim(), type, reason: String(args.reason || '').slice(0, 1000), source: String(args.source || '').slice(0, 160), organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_backup_create') return { ok: true, args: { label: String(args.label || '').slice(0, 160), reason: String(args.reason || 'mcp-manual').slice(0, 160) } };
     if (name === 'email_backup_validate' || name === 'email_restore_preview') {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
-        return { ok: true, args: { id: args.id.trim() } };
+        return { ok: true, args: { id: args.id.trim(), organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_restore_execute') {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
@@ -672,14 +691,14 @@ function validateToolArguments(name, raw) {
             const statuses = ['', 'pending', 'sending', 'sent', 'failed', 'delivery_unknown', 'skipped'];
             const status = String(args.status || '').trim();
             if (!statuses.includes(status)) return fail('invalid campaign job status');
-            return { ok: true, args: { id: args.id.trim(), status, offset, limit } };
+            return { ok: true, args: { id: args.id.trim(), organizationId: String(args.organizationId || '').trim(), status, offset, limit } };
         }
-        return { ok: true, args: { id: args.id.trim(), offset, limit } };
+        return { ok: true, args: { id: args.id.trim(), organizationId: String(args.organizationId || '').trim(), offset, limit } };
     }
     if (name === 'email_campaign_delete') {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
         if (args.confirm !== true) return fail('confirm=true is required');
-        return { ok: true, args: { id: args.id.trim(), confirm: true } };
+        return { ok: true, args: { id: args.id.trim(), organizationId: String(args.organizationId || '').trim(), confirm: true } };
     }
     if (name === 'email_campaign_create') {
         if (typeof args.name !== 'string' || !args.name.trim()) return fail('name is required');
@@ -707,7 +726,7 @@ function validateToolArguments(name, raw) {
     }
     if (name === 'email_campaign_update') {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
-        const out = { id: args.id.trim() };
+        const out = { id: args.id.trim(), organizationId: String(args.organizationId || '').trim() };
         if (args.name !== undefined) {
             if (typeof args.name !== 'string' || !args.name.trim()) return fail('name must be non-empty');
             out.name = args.name.trim();
@@ -717,7 +736,7 @@ function validateToolArguments(name, raw) {
             if (!args.pacing || typeof args.pacing !== 'object' || Array.isArray(args.pacing)) return fail('pacing must be an object');
             out.pacing = args.pacing;
         }
-        if (Object.keys(out).length === 1) return fail('provide name, startAt, and/or pacing');
+        if (!('name' in out) && !('startAt' in out) && !('pacing' in out)) return fail('provide name, startAt, and/or pacing');
         return { ok: true, args: out };
     }
     if (name === 'email_schedule') {
@@ -749,7 +768,7 @@ function validateToolArguments(name, raw) {
         if (!retryFields.ok) return retryFields;
         const spacingSeconds = args.spacingSeconds === undefined ? 0 : Number(args.spacingSeconds);
         if (!Number.isInteger(spacingSeconds) || spacingSeconds < 0 || spacingSeconds > 86400) return fail('spacingSeconds must be 0 to 86400');
-        return { ok: true, args: { messages, sendAt: hasSendAt ? args.sendAt.trim() : '', date: typeof args.date === 'string' ? args.date.trim() : '', time: typeof args.time === 'string' ? args.time.trim() : '', timezoneOffset: typeof args.timezoneOffset === 'string' ? args.timezoneOffset.trim() : '', timezone: typeof args.timezone === 'string' ? args.timezone.trim() : '', spacingSeconds, maxRetries: args.maxRetries === undefined ? 3 : Number(args.maxRetries), retryDelaySeconds: args.retryDelaySeconds === undefined ? 300 : Number(args.retryDelaySeconds) } };
+        return { ok: true, args: { messages, organizationId: String(args.organizationId || '').trim(), sendAt: hasSendAt ? args.sendAt.trim() : '', date: typeof args.date === 'string' ? args.date.trim() : '', time: typeof args.time === 'string' ? args.time.trim() : '', timezoneOffset: typeof args.timezoneOffset === 'string' ? args.timezoneOffset.trim() : '', timezone: typeof args.timezone === 'string' ? args.timezone.trim() : '', spacingSeconds, maxRetries: args.maxRetries === undefined ? 3 : Number(args.maxRetries), retryDelaySeconds: args.retryDelaySeconds === undefined ? 300 : Number(args.retryDelaySeconds) } };
     }
     if (name === 'email_schedules_list') {
         const statuses = ['', 'scheduled', 'sending', 'sent', 'failed', 'cancelled'];
@@ -758,16 +777,16 @@ function validateToolArguments(name, raw) {
         const limit = args.limit === undefined ? 100 : Number(args.limit);
         if (!Number.isInteger(limit) || limit < 1 || limit > 500) return fail('limit must be 1 to 500');
         if (args.includeBody !== undefined && typeof args.includeBody !== 'boolean') return fail('includeBody must be boolean');
-        return { ok: true, args: { status, after: String(args.after || ''), before: String(args.before || ''), limit, includeBody: !!args.includeBody } };
+        return { ok: true, args: { status, after: String(args.after || ''), before: String(args.before || ''), limit, includeBody: !!args.includeBody, organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_schedule_get' || name === 'email_schedule_cancel' || name === 'email_schedule_send_now') {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
         if (name === 'email_schedule_get' && args.includeBody !== undefined && typeof args.includeBody !== 'boolean') return fail('includeBody must be boolean');
-        return { ok: true, args: { id: args.id.trim(), ...(name === 'email_schedule_get' ? { includeBody: args.includeBody !== false } : {}) } };
+        return { ok: true, args: { id: args.id.trim(), organizationId: String(args.organizationId || '').trim(), ...(name === 'email_schedule_get' ? { includeBody: args.includeBody !== false } : {}) } };
     }
     if (name === 'email_schedule_update') {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
-        const out = { id: args.id.trim() };
+        const out = { id: args.id.trim(), organizationId: String(args.organizationId || '').trim() };
         if (args.message !== undefined) {
             if (!args.message || typeof args.message !== 'object' || Array.isArray(args.message)) return fail('message must be an object');
             out.message = args.message;
@@ -782,26 +801,26 @@ function validateToolArguments(name, raw) {
     }
     if (name === 'email_schedule_retry') {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
-        return { ok: true, args: { id: args.id.trim(), sendAt: typeof args.sendAt === 'string' ? args.sendAt.trim() : '', date: typeof args.date === 'string' ? args.date.trim() : '', time: typeof args.time === 'string' ? args.time.trim() : '', timezoneOffset: typeof args.timezoneOffset === 'string' ? args.timezoneOffset.trim() : '', timezone: typeof args.timezone === 'string' ? args.timezone.trim() : '', resetAttempts: args.resetAttempts !== false } };
+        return { ok: true, args: { id: args.id.trim(), organizationId: String(args.organizationId || '').trim(), sendAt: typeof args.sendAt === 'string' ? args.sendAt.trim() : '', date: typeof args.date === 'string' ? args.date.trim() : '', time: typeof args.time === 'string' ? args.time.trim() : '', timezoneOffset: typeof args.timezoneOffset === 'string' ? args.timezoneOffset.trim() : '', timezone: typeof args.timezone === 'string' ? args.timezone.trim() : '', resetAttempts: args.resetAttempts !== false } };
     }
     if (name === 'email_reply') {
         if (typeof args.guid !== 'string' || !args.guid.trim()) return fail('guid is required');
         if (typeof args.from !== 'string' || !args.from.trim()) return fail('from is required');
         if ((!args.text || typeof args.text !== 'string') && (!args.html || typeof args.html !== 'string')) return fail('text or html is required');
-        return { ok: true, args: { guid: args.guid.trim(), from: args.from.trim(), text: typeof args.text === 'string' ? args.text : '', html: typeof args.html === 'string' ? args.html : '' } };
+        return { ok: true, args: { guid: args.guid.trim(), organizationId: String(args.organizationId || '').trim(), from: args.from.trim(), text: typeof args.text === 'string' ? args.text : '', html: typeof args.html === 'string' ? args.html : '' } };
     }
     if (name === 'email_forward') {
         if (typeof args.guid !== 'string' || !args.guid.trim()) return fail('guid is required');
         if (typeof args.from !== 'string' || !args.from.trim()) return fail('from is required');
         const toValid = (typeof args.to === 'string' && args.to.trim()) || (Array.isArray(args.to) && args.to.length > 0 && args.to.length <= 50);
         if (!toValid) return fail('to is required');
-        return { ok: true, args: { guid: args.guid.trim(), from: args.from.trim(), to: args.to, text: typeof args.text === 'string' ? args.text : '', html: typeof args.html === 'string' ? args.html : '' } };
+        return { ok: true, args: { guid: args.guid.trim(), organizationId: String(args.organizationId || '').trim(), from: args.from.trim(), to: args.to, text: typeof args.text === 'string' ? args.text : '', html: typeof args.html === 'string' ? args.html : '' } };
     }
     if (name === 'email_update') {
         if (typeof args.guid !== 'string' || !args.guid.trim()) return fail('guid is required');
         const patch = validatePatch(args.patch, false);
         if (!patch.ok) return patch;
-        return { ok: true, args: { guid: args.guid.trim(), patch: patch.patch } };
+        return { ok: true, args: { guid: args.guid.trim(), patch: patch.patch, organizationId: String(args.organizationId || '').trim() } };
     }
     if (name === 'email_attachment_read' || name === 'email_eml_export') {
         if (typeof args.guid !== 'string' || !args.guid.trim()) return fail('guid is required');
@@ -810,7 +829,7 @@ function validateToolArguments(name, raw) {
         const fallback = name === 'email_attachment_read' ? 20971520 : 26214400;
         const maxBytes = args.maxBytes === undefined ? fallback : Number(args.maxBytes);
         if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > maximum) return fail('maxBytes is out of range');
-        return { ok: true, args: { guid: args.guid.trim(), ...(name === 'email_attachment_read' ? { attachmentId: args.attachmentId.trim() } : {}), maxBytes } };
+        return { ok: true, args: { guid: args.guid.trim(), organizationId: String(args.organizationId || '').trim(), ...(name === 'email_attachment_read' ? { attachmentId: args.attachmentId.trim() } : {}), maxBytes } };
     }
     if (name === 'email_vip_set') {
         if (typeof args.email !== 'string' || !args.email.trim()) return fail('email is required');
@@ -1185,6 +1204,7 @@ function makeScope(req, session) {
 }
 
 async function executeTool(name, args, service, scope) {
+    scope = Object.assign({}, scope || {}, { organizationId: String(args?.organizationId || scope?.organizationId || '').trim() });
     let output;
     if (name === 'email_capabilities') output = await service.capabilities(scope);
     else if (name === 'email_tenants_status') output = await service.tenantsStatus(scope);

@@ -20,7 +20,7 @@ async function run() {
     assert(appJs.includes("'*test*|*admin*|*dev*'"), 'Admin browser patterns must include test, admin and dev');
     assert(appJs.includes('function adminBrowser(req)'), 'Dedicated x-browser admin gate is missing');
     assert(appJs.includes("site.onGET({ name: 'admin', overwrite: true }"), 'Admin page must use a guarded route');
-    assert(appJs.includes('if (!adminBrowser(req))'), 'Admin HTML route is not guarded by the browser header rule');
+    assert(appJs.includes('if (!admin(req))'), 'Admin HTML route must require an authorized admin session or trusted browser');
     assert(appJs.includes("'/api/emails/admin/summary'"), 'Admin bootstrap API is missing');
     assert(appJs.includes("'/api/emails/admin/list'"), 'Admin list API is missing');
     assert(appJs.includes("'/api/emails/admin/send'"), 'Admin send API is missing');
@@ -31,7 +31,7 @@ async function run() {
     assert(appJs.includes("'/api/emails/admin/vip'"), 'Admin VIP API is missing');
     assert(appJs.includes("'/api/emails/admin/folder/create'"), 'Admin folder creation API is missing');
     assert(appJs.includes('sortBy:'), 'Admin server-side sorting is missing');
-    assert(appJs.includes('admin(req) ? adminGlobalContext'), 'Admin assets must bypass public domain scoping');
+    assert(appJs.includes('admin(req) ? adminRequestContext'), 'Admin assets must use the authorized organization-aware admin context');
     assert(serviceJs.includes('favorite: !!doc.favorite'), 'Favorite state is not exposed by the email service');
     assert(serviceJs.includes('args.hasAttachments'), 'Attachment filtering is missing');
     assert(serviceJs.includes('store.messageValues()'), '10k-scale search must scan message references without cloning all stored messages');

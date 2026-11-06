@@ -38,6 +38,7 @@ const emailService = createEmailService({
     logger: () => {},
     abusePolicy: policy,
     deliverability,
+    tenantRegistry,
 });
 const scheduler = createEmailScheduler({
     emailService,

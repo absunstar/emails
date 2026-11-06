@@ -42,10 +42,18 @@ function createEmailMcpService(options) {
 
     function readContext(args) {
         const domain = requestedDomain(args);
+        const organizationId = String(args?.organizationId || '').trim();
+        let organizationDomains = [];
+        if (organizationId) {
+            const registry = tenantsRequired();
+            if (!registry.getOrganization(organizationId)) throw new Error('Organization not found');
+            organizationDomains = registry.organizationDomains(organizationId);
+        }
         return {
             isAdmin: true,
             allowVip: true,
             ...(domain ? { domain } : {}),
+            ...(organizationId ? { organizationId, organizationDomains } : {}),
             source: 'mcp-manager',
             maxLimit: 5000,
         };
@@ -108,6 +116,17 @@ function createEmailMcpService(options) {
         return tenantRegistry;
     }
 
+    function scopedOrganizationId(args, scope) {
+        return String(args?.organizationId || scope?.organizationId || '').trim();
+    }
+
+    function campaignForScope(id, args, scope) {
+        const campaign = campaignsRequired().get(id);
+        const organizationId = scopedOrganizationId(args, scope);
+        if (organizationId && String(campaign.organizationId || '') !== organizationId) throw new Error('Campaign not found');
+        return campaign;
+    }
+
     function policyListName(name) {
         const policy = policyRequired();
         const value = String(name || '').trim();
@@ -164,7 +183,7 @@ function createEmailMcpService(options) {
                 vipCount: emailService.listVip().length,
                 policyEnabled: !!policy?.enabled,
                 capabilities: [
-                    'portable-instance-config', 'white-label-branding', 'multi-domain-instance', 'configurable-mcp-identity', 'organizations', 'domain-registry', 'sender-identities', 'sender-pools',
+                    'portable-instance-config', 'white-label-branding', 'multi-domain-instance', 'configurable-mcp-identity', 'organizations', 'domain-registry', 'sender-identities', 'sender-pools', 'tenant-isolation', 'organization-scoped-messages', 'organization-scoped-schedules', 'organization-scoped-suppressions', 'organization-scoped-deliverability',
                     'global-search', 'advanced-filters', 'pagination', 'sorting', 'read', 'read-many', 'favorites', 'folders', 'bulk-update',
                     'send', 'bulk-send', 'reply', 'forward', 'attachments', 'eml-export', 'remote-image-analysis', 'tracking-pixel-analysis',
                     'vip-management', 'delete', 'bulk-delete', 'delete-matching', 'mailbox-statuses', 'statistics',
@@ -224,12 +243,12 @@ function createEmailMcpService(options) {
 
         async read(guid, scope) {
             enforceAdminRate(scope, false);
-            return emailService.read(guid, adminContext());
+            return emailService.read(guid, adminContext(scope));
         },
 
         async readMany(guids, scope) {
             enforceAdminRate(scope, false);
-            return emailService.readMany(guids, adminContext());
+            return emailService.readMany(guids, adminContext(scope));
         },
 
         async mailboxStatuses(args, scope) {
@@ -245,7 +264,7 @@ function createEmailMcpService(options) {
 
         async send(args, scope) {
             enforceOutboundRate(scope, 'mcp');
-            return emailService.send(args);
+            return emailService.send(Object.assign({}, args, { organizationId: String(args?.organizationId || scope?.organizationId || '').trim() }));
         },
 
         async sendBulk(args, scope) {
@@ -256,7 +275,7 @@ function createEmailMcpService(options) {
             const concurrency = Math.max(1, Math.min(Number(args.concurrency || 3), 10));
             const results = await runWithConcurrency(items, concurrency, async (message) => {
                 enforceOutboundRate(scope, 'mcp');
-                return emailService.send(message);
+                return emailService.send(Object.assign({}, message, { organizationId: String(message?.organizationId || args?.organizationId || scope?.organizationId || '').trim() }));
             });
             const sent = results.filter((item) => item.ok).length;
             const failed = results.length - sent;
@@ -266,32 +285,32 @@ function createEmailMcpService(options) {
 
         async reply(args, scope) {
             enforceOutboundRate(scope, 'mcp');
-            return emailService.reply(args, adminContext());
+            return emailService.reply(args, adminContext(args.organizationId ? args : scope));
         },
 
         async forward(args, scope) {
             enforceOutboundRate(scope, 'mcp');
-            return emailService.forward(args, adminContext());
+            return emailService.forward(args, adminContext(args.organizationId ? args : scope));
         },
 
         async schedule(args, scope) {
             enforceAdminRate(scope, false);
-            return schedulerRequired().schedule(args, scope);
+            return schedulerRequired().schedule(args, Object.assign({}, scope || {}, { organizationId: String(args?.organizationId || scope?.organizationId || '').trim() }));
         },
 
         async scheduleBulk(args, scope) {
             enforceAdminRate(scope, true);
-            return schedulerRequired().scheduleBulk(args, scope);
+            return schedulerRequired().scheduleBulk(args, Object.assign({}, scope || {}, { organizationId: String(args?.organizationId || scope?.organizationId || '').trim() }));
         },
 
         async schedulesList(args, scope) {
             enforceAdminRate(scope, false);
-            return schedulerRequired().list(args || {});
+            return schedulerRequired().list(Object.assign({}, args || {}, { organizationId: String(args?.organizationId || scope?.organizationId || '').trim() }));
         },
 
         async scheduleGet(args, scope) {
             enforceAdminRate(scope, false);
-            return schedulerRequired().get(args.id, args.includeBody !== false);
+            return schedulerRequired().get(args.id, args.includeBody !== false, String(args.organizationId || scope?.organizationId || '').trim());
         },
 
         async scheduleUpdate(args, scope) {
@@ -301,12 +320,12 @@ function createEmailMcpService(options) {
 
         async scheduleCancel(args, scope) {
             enforceAdminRate(scope, false);
-            return schedulerRequired().cancel(args.id);
+            return schedulerRequired().cancel(args.id, { organizationId: String(args.organizationId || scope?.organizationId || '').trim() });
         },
 
         async scheduleSendNow(args, scope) {
             enforceAdminRate(scope, false);
-            return schedulerRequired().sendNow(args.id);
+            return schedulerRequired().sendNow(args.id, { organizationId: String(args.organizationId || scope?.organizationId || '').trim() });
         },
 
         async scheduleRetry(args, scope) {
@@ -316,12 +335,12 @@ function createEmailMcpService(options) {
 
         async schedulerStatus(scope) {
             enforceAdminRate(scope, false);
-            return schedulerRequired().status();
+            return schedulerRequired().status({ organizationId: String(scope?.organizationId || '').trim() });
         },
 
         async campaignStatus(scope) {
             enforceAdminRate(scope, false);
-            return campaignsRequired().status();
+            return campaignsRequired().status({ organizationId: String(scope?.organizationId || '').trim() });
         },
 
         async campaignsList(args, scope) {
@@ -331,7 +350,7 @@ function createEmailMcpService(options) {
 
         async campaignGet(args, scope) {
             enforceAdminRate(scope, false);
-            return campaignsRequired().get(args.id);
+            return campaignForScope(args.id, args, scope);
         },
 
         async campaignCreate(args, scope) {
@@ -343,6 +362,7 @@ function createEmailMcpService(options) {
 
         async campaignUpdate(args, scope) {
             enforceAdminRate(scope, false);
+            campaignForScope(args.id, args, scope);
             const campaign = campaignsRequired().update(args.id, args);
             await emailService.store.audit('mcp_campaign_update', { campaignId: campaign.id, status: campaign.status });
             return campaign;
@@ -350,6 +370,7 @@ function createEmailMcpService(options) {
 
         async campaignStart(args, scope) {
             enforceAdminRate(scope, false);
+            campaignForScope(args.id, args, scope);
             const campaign = campaignsRequired().start(args.id);
             await emailService.store.audit('mcp_campaign_start', { campaignId: campaign.id, status: campaign.status });
             return campaign;
@@ -357,6 +378,7 @@ function createEmailMcpService(options) {
 
         async campaignPause(args, scope) {
             enforceAdminRate(scope, false);
+            campaignForScope(args.id, args, scope);
             const campaign = campaignsRequired().pause(args.id);
             await emailService.store.audit('mcp_campaign_pause', { campaignId: campaign.id });
             return campaign;
@@ -364,6 +386,7 @@ function createEmailMcpService(options) {
 
         async campaignResume(args, scope) {
             enforceAdminRate(scope, false);
+            campaignForScope(args.id, args, scope);
             const campaign = campaignsRequired().resume(args.id);
             await emailService.store.audit('mcp_campaign_resume', { campaignId: campaign.id });
             return campaign;
@@ -371,6 +394,7 @@ function createEmailMcpService(options) {
 
         async campaignStop(args, scope) {
             enforceAdminRate(scope, false);
+            campaignForScope(args.id, args, scope);
             const campaign = campaignsRequired().stop(args.id);
             await emailService.store.audit('mcp_campaign_stop', { campaignId: campaign.id });
             return campaign;
@@ -378,6 +402,7 @@ function createEmailMcpService(options) {
 
         async campaignDelete(args, scope) {
             enforceAdminRate(scope, false);
+            campaignForScope(args.id, args, scope);
             const result = campaignsRequired().remove(args.id);
             await emailService.store.audit('mcp_campaign_delete', { campaignId: args.id });
             return result;
@@ -385,12 +410,13 @@ function createEmailMcpService(options) {
 
         async campaignReport(args, scope) {
             enforceAdminRate(scope, false);
+            campaignForScope(args.id, args, scope);
             return campaignsRequired().report(args.id);
         },
 
         async campaignJobs(args, scope) {
             enforceAdminRate(scope, false);
-            const campaign = campaignsRequired().get(args.id);
+            const campaign = campaignForScope(args.id, args, scope);
             const status = String(args.status || '').trim();
             const queue = Array.isArray(campaign.queue) ? campaign.queue : [];
             const filtered = status ? queue.filter((item) => String(item.status || '') === status) : queue;
@@ -409,7 +435,7 @@ function createEmailMcpService(options) {
 
         async campaignEvents(args, scope) {
             enforceAdminRate(scope, false);
-            const campaign = campaignsRequired().get(args.id);
+            const campaign = campaignForScope(args.id, args, scope);
             const events = Array.isArray(campaign.events) ? campaign.events : [];
             const offset = Math.max(0, Number(args.offset || 0));
             const limit = Math.max(1, Math.min(1000, Number(args.limit || 100)));
@@ -425,7 +451,16 @@ function createEmailMcpService(options) {
 
         async deliverabilityStatus(scope) {
             enforceAdminRate(scope, false);
-            return deliverabilityRequired().status();
+            const organizationId = String(scope?.organizationId || '').trim();
+            const status = deliverabilityRequired().status();
+            if (!organizationId) return status;
+            const domainsAllowed = new Set(tenantsRequired().organizationDomains(organizationId));
+            const domains = (status.domains || []).filter((item) => domainsAllowed.has(item.domain));
+            const global = domains.reduce((acc, item) => {
+                for (const key of ['hourAttempts','dayAttempts','sent','failed','hardBounces','softBounces','complaints','unsubscribes']) acc[key] += Number(item[key] || 0);
+                return acc;
+            }, { hourAttempts:0, dayAttempts:0, sent:0, failed:0, hardBounces:0, softBounces:0, complaints:0, unsubscribes:0 });
+            return Object.assign({}, status, { organizationId, global, domains, providers: [] });
         },
 
         async deliverabilityPreflight(args, scope) {
@@ -453,26 +488,27 @@ function createEmailMcpService(options) {
 
         async suppressionsList(args, scope) {
             enforceAdminRate(scope, true);
-            return deliverabilityRequired().listSuppressions(args || {});
+            return deliverabilityRequired().listSuppressions(Object.assign({}, args || {}, { organizationId: String(args?.organizationId || scope?.organizationId || '').trim() }));
         },
 
         async suppressionAdd(args, scope) {
             enforceAdminRate(scope, false);
-            const item = deliverabilityRequired().addSuppression(args.email, args.type, args.reason || '', 'mcp-manager');
+            const organizationId = String(args.organizationId || scope?.organizationId || '').trim();
+            const item = deliverabilityRequired().addSuppression(args.email, args.type, args.reason || '', 'mcp-manager', organizationId);
             await emailService.store.audit('mcp_email_suppression_add', { email: item.email, type: item.type });
             return { added: true, item };
         },
 
         async suppressionRemove(args, scope) {
             enforceAdminRate(scope, false);
-            const result = deliverabilityRequired().removeSuppression(args.email);
+            const result = deliverabilityRequired().removeSuppression(args.email, String(args.organizationId || scope?.organizationId || '').trim());
             await emailService.store.audit('mcp_email_suppression_remove', { email: result.email, removed: result.removed });
             return result;
         },
 
         async deliveryFeedbackReport(args, scope) {
             enforceAdminRate(scope, false);
-            const result = deliverabilityRequired().reportFeedback(args || {});
+            const result = deliverabilityRequired().reportFeedback(Object.assign({}, args || {}, { organizationId: String(args?.organizationId || scope?.organizationId || '').trim() }));
             await emailService.store.audit('mcp_delivery_feedback', { email: result.email, type: result.type, suppressed: result.suppressed });
             return result;
         },
@@ -569,7 +605,7 @@ function createEmailMcpService(options) {
 
         async update(args, scope) {
             enforceAdminRate(scope, false);
-            return emailService.update(args.guid, args.patch || {}, adminContext());
+            return emailService.update(args.guid, args.patch || {}, adminContext(args.organizationId ? args : scope));
         },
 
         async updateBulk(args, scope) {
@@ -578,7 +614,7 @@ function createEmailMcpService(options) {
             const updated = [];
             const notFound = [];
             for (const guid of guids) {
-                const doc = await emailService.update(guid, args.patch || {}, adminContext());
+                const doc = await emailService.update(guid, args.patch || {}, adminContext(args.organizationId ? args : scope));
                 if (doc) updated.push(guid);
                 else notFound.push(guid);
             }
@@ -587,17 +623,17 @@ function createEmailMcpService(options) {
 
         async setRead(guids, read, scope) {
             enforceAdminRate(scope, false);
-            return emailService.setRead(guids, read, adminContext());
+            return emailService.setRead(guids, read, adminContext(scope));
         },
 
         async delete(guid, scope) {
             enforceAdminRate(scope, false);
-            return emailService.delete(guid, adminContext());
+            return emailService.delete(guid, adminContext(scope));
         },
 
         async deleteMany(guids, scope) {
             enforceAdminRate(scope, true);
-            return emailService.deleteMany(guids, adminContext());
+            return emailService.deleteMany(guids, adminContext(scope));
         },
 
         async deleteMatching(args, scope) {
@@ -607,7 +643,7 @@ function createEmailMcpService(options) {
 
         async attachmentRead(args, scope) {
             enforceAdminRate(scope, true);
-            const result = await emailService.readAttachment(args.guid, args.attachmentId, adminContext());
+            const result = await emailService.readAttachment(args.guid, args.attachmentId, adminContext(args.organizationId ? args : scope));
             const maxBytes = Math.max(1, Math.min(Number(args.maxBytes || 20 * 1024 * 1024), 25 * 1024 * 1024));
             if (result.content.length > maxBytes) throw new Error('Attachment exceeds maxBytes. Size: ' + result.content.length);
             return {
@@ -621,7 +657,7 @@ function createEmailMcpService(options) {
 
         async emlExport(args, scope) {
             enforceAdminRate(scope, true);
-            const result = await emailService.exportEml(args.guid, adminContext());
+            const result = await emailService.exportEml(args.guid, adminContext(args.organizationId ? args : scope));
             const maxBytes = Math.max(1, Math.min(Number(args.maxBytes || 25 * 1024 * 1024), 40 * 1024 * 1024));
             if (result.content.length > maxBytes) throw new Error('EML exceeds maxBytes. Size: ' + result.content.length);
             return {

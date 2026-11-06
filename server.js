@@ -148,6 +148,7 @@ site.emailService = createEmailService({
     deliverability: site.emailDeliverability,
     unsubscribe: site.emailUnsubscribe,
     monitor: site.emailRuntimeMonitor,
+    tenantRegistry: site.emailTenants,
 });
 site.emailStore = site.emailService.store;
 site.emailOperationsManager = createEmailBackupStorageManager({

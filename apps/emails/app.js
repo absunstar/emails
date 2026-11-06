@@ -639,6 +639,26 @@ module.exports = function init(site) {
         }, extra || {});
     }
 
+    function adminRequestContext(req, extra) {
+        const data = body(req);
+        const organizationId = String(data.organizationId || req?.query?.organizationId || '').trim();
+        const scoped = {};
+        if (organizationId) {
+            const organization = site.emailTenants?.getOrganization?.(organizationId);
+            if (!organization) throw new Error('Organization not found');
+            scoped.organizationId = organizationId;
+            scoped.organizationDomains = site.emailTenants.organizationDomains(organizationId);
+        }
+        return adminGlobalContext(Object.assign({}, scoped, extra || {}));
+    }
+
+    function rejectOrganizationScopeForInstance(req, res, feature) {
+        const organizationId = String(body(req).organizationId || req?.query?.organizationId || '').trim();
+        if (!organizationId) return false;
+        res.json({ done: false, error: (feature || 'This endpoint') + ' is instance-wide and is unavailable inside an organization-scoped workspace.' });
+        return true;
+    }
+
     function cleanFolder(value) {
         const folder = String(value || '').trim().replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').slice(0, 60);
         return folder || 'inbox';
@@ -1479,7 +1499,7 @@ module.exports = function init(site) {
                 if (requestedAccess.reason === 'purchase') res.status(requestedAccess.status || 403);
                 return res.sendHTML(notice.html);
             }
-            const result = await service.read(guid, admin(req) ? adminGlobalContext({ maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, req.query?.email, req.query?.to, req.query?.from)));
+            const result = await service.read(guid, admin(req) ? adminRequestContext(req, { maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, req.query?.email, req.query?.to, req.query?.from)));
             const doc = result.message;
             const protectedMailbox = proOnlyMailboxFromMessage(doc);
             if (protectedMailbox && protectedMailbox !== normalizedMailbox) {
@@ -1523,7 +1543,7 @@ module.exports = function init(site) {
                     requestedAccess.error || 'VIP Temp Mail Pro required'
                 );
             }
-            const result = await service.readAttachment(guid, id, admin(req) ? adminGlobalContext({ maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, mailbox)));
+            const result = await service.readAttachment(guid, id, admin(req) ? adminRequestContext(req, { maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, mailbox)));
             const filename = safeFilename(result.meta.filename, 'attachment.bin');
             res.set('Content-Type', result.meta.contentType || 'application/octet-stream');
             res.set('Content-Disposition', (result.meta.contentDisposition === 'inline' ? 'inline' : 'attachment') + '; filename="' + filename.replace(/"/g, '') + '"');
@@ -1553,7 +1573,7 @@ module.exports = function init(site) {
                     requestedAccess.error || 'VIP Temp Mail Pro required'
                 );
             }
-            const result = await service.exportEml(guid, admin(req) ? adminGlobalContext({ maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, mailbox)));
+            const result = await service.exportEml(guid, admin(req) ? adminRequestContext(req, { maxLimit: 1 }) : readContext(req, { maxLimit: 1 }, apiDomain(req, mailbox)));
             const subject = safeFilename(result.message.subject || 'email', 'email');
             res.set('Content-Type', 'message/rfc822');
             res.set('Content-Disposition', 'attachment; filename="' + subject.replace(/"/g, '') + '.eml"');
@@ -1608,15 +1628,22 @@ module.exports = function init(site) {
     onPost('/api/emails/admin/summary', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         try {
-            const stats = await service.stats(adminGlobalContext());
+            const context = adminRequestContext(req);
+            const stats = await service.stats(context);
+            const allowedDomains = new Set(context.organizationDomains || []);
+            const inScope = (value) => !context.organizationId || Array.from(allowedDomains).some((domain) => addressBelongsToDomain(value, domain));
+            const vip = service.listVip().filter((item) => inScope(item.email));
+            const mailboxTiers = service.listMailboxTiers().filter((item) => inScope(item.email));
+            const folders = context.organizationId ? Object.keys(stats.folders || {}) : service.listAdminFolders();
             res.json({
                 done: true,
                 browserID: browserRequestID(req),
                 stats,
-                vip: service.listVip(),
-                mailboxTiers: service.listMailboxTiers(),
-                folders: service.listAdminFolders(),
+                vip,
+                mailboxTiers,
+                folders,
                 storage: 'json-files-only',
+                organizationId: context.organizationId || null,
             });
         } catch (error) {
             res.json({ done: false, error: error?.message || String(error) });
@@ -1647,7 +1674,7 @@ module.exports = function init(site) {
             includeBody: false,
         };
         try {
-            const result = await service.search(args, adminGlobalContext({ maxLimit: 5000 }));
+            const result = await service.search(args, adminRequestContext(req, { maxLimit: 5000 }));
             res.json({
                 done: true,
                 list: result.messages,
@@ -1683,7 +1710,7 @@ module.exports = function init(site) {
         const guid = String(body(req).guid || '');
         if (!guid) return res.json({ done: false, error: 'Email guid is required' });
         try {
-            const doc = (await service.read(guid, adminGlobalContext())).message;
+            const doc = (await service.read(guid, adminRequestContext(req))).message;
             doc.privacy = analyzeEmailHtml(doc.html || '');
             doc.vip = service.isVipMessage(doc);
             res.json({ done: true, doc });
@@ -1703,7 +1730,7 @@ module.exports = function init(site) {
         if (data.folder !== undefined) patch.folder = cleanFolder(data.folder);
         if (data.status !== undefined) patch.status = String(data.status || '').trim().slice(0, 40);
         try {
-            const doc = await service.update(guid, patch, adminGlobalContext());
+            const doc = await service.update(guid, patch, adminRequestContext(req));
             res.json({ done: !!doc, doc, error: doc ? undefined : 'Email not found' });
         } catch (error) {
             res.json({ done: false, error: error?.message || String(error) });
@@ -1724,7 +1751,7 @@ module.exports = function init(site) {
             const updated = [];
             const notFound = [];
             for (const guid of guids) {
-                const doc = await service.update(guid, patch, adminGlobalContext());
+                const doc = await service.update(guid, patch, adminRequestContext(req));
                 if (doc) updated.push(guid);
                 else notFound.push(guid);
             }
@@ -1739,7 +1766,7 @@ module.exports = function init(site) {
         const guid = String(body(req).guid || '');
         if (!guid) return res.json({ done: false, error: 'Email guid is required' });
         try {
-            const result = await service.delete(guid, adminGlobalContext());
+            const result = await service.delete(guid, adminRequestContext(req));
             res.json({ done: !!result.deleted, result, error: result.notFound ? 'Email not found' : undefined });
         } catch (error) {
             res.json({ done: false, error: error?.message || String(error) });
@@ -1751,7 +1778,7 @@ module.exports = function init(site) {
         const guids = Array.from(new Set((Array.isArray(body(req).guids) ? body(req).guids : []).map(String))).slice(0, 5000);
         if (!guids.length) return res.json({ done: false, error: 'Select at least one email' });
         try {
-            const result = await service.deleteMany(guids, adminGlobalContext());
+            const result = await service.deleteMany(guids, adminRequestContext(req));
             res.json({ done: true, result });
         } catch (error) {
             res.json({ done: false, error: error?.message || String(error) });
@@ -1806,11 +1833,11 @@ module.exports = function init(site) {
         if (!data.guid || (!data.text && !data.html)) return res.json({ done: false, error: 'Reply content is required' });
         if (!outboundAllowed(req, 'admin')) return res.json({ done: false, error: 'Admin sending limit reached. Try again later.' });
         try {
-            const original = (await service.read(String(data.guid), adminGlobalContext())).message;
+            const original = (await service.read(String(data.guid), adminRequestContext(req))).message;
             const fallbackFrom = extractAddresses(original.to)[0] || normalizeEmail(original.to);
             const from = normalizeEmail(data.from || fallbackFrom);
             if (!from) return res.json({ done: false, error: 'A valid From address is required' });
-            const result = await service.reply({ guid: String(data.guid), from, text: data.text || '', html: data.html || '' }, adminGlobalContext());
+            const result = await service.reply({ guid: String(data.guid), from, text: data.text || '', html: data.html || '' }, adminRequestContext(req));
             res.json({ done: true, result });
         } catch (error) {
             res.json({ done: false, error: error?.message || String(error) });
@@ -1823,11 +1850,11 @@ module.exports = function init(site) {
         if (!data.guid || !data.to) return res.json({ done: false, error: 'Destination email is required' });
         if (!outboundAllowed(req, 'admin')) return res.json({ done: false, error: 'Admin sending limit reached. Try again later.' });
         try {
-            const original = (await service.read(String(data.guid), adminGlobalContext())).message;
+            const original = (await service.read(String(data.guid), adminRequestContext(req))).message;
             const fallbackFrom = extractAddresses(original.to)[0] || normalizeEmail(original.to);
             const from = normalizeEmail(data.from || fallbackFrom);
             if (!from) return res.json({ done: false, error: 'A valid From address is required' });
-            const result = await service.forward({ guid: String(data.guid), from, to: data.to, text: data.text || '', html: data.html || '' }, adminGlobalContext());
+            const result = await service.forward({ guid: String(data.guid), from, to: data.to, text: data.text || '', html: data.html || '' }, adminRequestContext(req));
             res.json({ done: true, result });
         } catch (error) {
             res.json({ done: false, error: error?.message || String(error) });
@@ -1872,6 +1899,7 @@ module.exports = function init(site) {
 
     onPost('/api/emails/admin/policy/get', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Security policy')) return;
         res.json({ done: true, config: policy.getConfig(), defaults: policy.getDefaults(), status: policy.status(), path: policy.filePath });
     });
 
@@ -1975,12 +2003,14 @@ module.exports = function init(site) {
 
     onPost('/api/emails/admin/instance/get', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Instance settings')) return;
         if (!site.emailInstance) return res.json({ done: false, error: 'Instance configuration is unavailable.' });
         return res.json({ done: true, config: site.emailInstance.getPublic() });
     });
 
     onPost('/api/emails/admin/instance/update', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Instance settings')) return;
         if (!site.emailInstance) return res.json({ done: false, error: 'Instance configuration is unavailable.' });
         try {
             const result = site.emailInstance.update(body(req).config || {});
@@ -1993,6 +2023,7 @@ module.exports = function init(site) {
 
     onPost('/api/emails/admin/policy/update', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Security policy')) return;
         try {
             const data = body(req);
             const config = policy.update(data.config && typeof data.config === 'object' ? data.config : data);
@@ -2005,6 +2036,7 @@ module.exports = function init(site) {
 
     onPost('/api/emails/admin/policy/reset', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Security policy')) return;
         try {
             const config = policy.reset();
             await service.store.audit('admin_policy_reset', { browser: browserRequestID(req) || '', ip: clientIp(req), updatedAt: config.updatedAt });
@@ -2016,6 +2048,7 @@ module.exports = function init(site) {
 
     onPost('/api/emails/admin/policy/test', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Security policy')) return;
         const data = body(req);
         const type = String(data.type || '').toLowerCase();
         const value = String(data.value || '');
@@ -2037,6 +2070,13 @@ module.exports = function init(site) {
         catch (error) { res.json({done:false,error:error?.message || String(error)}); }
     });
 
+    function scopedCampaignForAdmin(req, id) {
+        const campaign = campaignEngine.get(String(id || ''));
+        const organizationId = String(body(req).organizationId || '').trim();
+        if (organizationId && String(campaign.organizationId || '') !== organizationId) throw new Error('Campaign not found');
+        return campaign;
+    }
+
     onPost('/api/emails/admin/campaigns/status', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
@@ -2051,7 +2091,7 @@ module.exports = function init(site) {
     onPost('/api/emails/admin/campaigns/get', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
-        try { res.json({ done: true, campaign: campaignEngine.get(String(body(req).id || '')) }); }
+        try { res.json({ done: true, campaign: scopedCampaignForAdmin(req, body(req).id) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
     onPost('/api/emails/admin/campaigns/create', async (req, res) => {
@@ -2064,34 +2104,34 @@ module.exports = function init(site) {
         if (!admin(req)) return adminDenied(res);
         if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
         const data = body(req);
-        try { res.json({ done: true, campaign: campaignEngine.update(String(data.id || ''), data) }); }
+        try { scopedCampaignForAdmin(req, data.id); res.json({ done: true, campaign: campaignEngine.update(String(data.id || ''), data) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
     for (const [action, method] of [['start','start'],['pause','pause'],['resume','resume'],['stop','stop']]) {
         onPost('/api/emails/admin/campaigns/' + action, async (req, res) => {
             if (!admin(req)) return adminDenied(res);
             if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
-            try { res.json({ done: true, campaign: campaignEngine[method](String(body(req).id || '')) }); }
+            try { scopedCampaignForAdmin(req, body(req).id); res.json({ done: true, campaign: campaignEngine[method](String(body(req).id || '')) }); }
             catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
         });
     }
     onPost('/api/emails/admin/campaigns/delete', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
-        try { res.json({ done: true, result: campaignEngine.remove(String(body(req).id || '')) }); }
+        try { scopedCampaignForAdmin(req, body(req).id); res.json({ done: true, result: campaignEngine.remove(String(body(req).id || '')) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
     onPost('/api/emails/admin/campaigns/report', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!campaignEngine) return res.json({ done: false, error: 'Campaign engine is unavailable.' });
-        try { res.json({ done: true, report: campaignEngine.report(String(body(req).id || '')) }); }
+        try { scopedCampaignForAdmin(req, body(req).id); res.json({ done: true, report: campaignEngine.report(String(body(req).id || '')) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/schedules/status', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
-        res.json({ done: true, status: scheduler.status() });
+        res.json({ done: true, status: scheduler.status(body(req)) });
     });
 
     onPost('/api/emails/admin/schedules/list', async (req, res) => {
@@ -2104,7 +2144,7 @@ module.exports = function init(site) {
     onPost('/api/emails/admin/schedules/get', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
-        try { res.json({ done: true, task: scheduler.get(String(body(req).id || ''), true) }); }
+        try { res.json({ done: true, task: scheduler.get(String(body(req).id || ''), true, String(body(req).organizationId || '').trim()) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
@@ -2112,7 +2152,7 @@ module.exports = function init(site) {
         if (!admin(req)) return adminDenied(res);
         if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
         try {
-            const task = await scheduler.schedule(body(req), { client: 'admin-dashboard' });
+            const task = await scheduler.schedule(body(req), { client: 'admin-dashboard', organizationId: String(body(req).organizationId || '').trim() });
             res.json({ done: true, task });
         } catch (error) {
             res.json({ done: false, error: error?.message || String(error) });
@@ -2134,14 +2174,14 @@ module.exports = function init(site) {
     onPost('/api/emails/admin/schedules/cancel', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
-        try { res.json({ done: true, task: await scheduler.cancel(String(body(req).id || '')) }); }
+        try { res.json({ done: true, task: await scheduler.cancel(String(body(req).id || ''), { organizationId: String(body(req).organizationId || '').trim() }) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/schedules/send-now', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!scheduler) return res.json({ done: false, error: 'Scheduler service is unavailable.' });
-        try { res.json({ done: true, task: await scheduler.sendNow(String(body(req).id || '')) }); }
+        try { res.json({ done: true, task: await scheduler.sendNow(String(body(req).id || ''), { organizationId: String(body(req).organizationId || '').trim() }) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
@@ -2155,9 +2195,21 @@ module.exports = function init(site) {
 
     onPost('/api/emails/admin/deliverability/status', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        const data = body(req);
+        const organizationId = String(data.organizationId || '').trim();
+        let deliveryStatus = deliverability.status();
+        if (organizationId) {
+            const allowedDomains = new Set(site.emailTenants.organizationDomains(organizationId));
+            const domains = (deliveryStatus.domains || []).filter((item) => allowedDomains.has(item.domain));
+            const aggregate = domains.reduce((acc, item) => {
+                for (const key of ['hourAttempts','dayAttempts','sent','failed','hardBounces','softBounces','complaints','unsubscribes']) acc[key] += Number(item[key] || 0);
+                return acc;
+            }, { hourAttempts:0, dayAttempts:0, sent:0, failed:0, hardBounces:0, softBounces:0, complaints:0, unsubscribes:0 });
+            deliveryStatus = Object.assign({}, deliveryStatus, { organizationId, global: aggregate, domains, providers: [] });
+        }
         res.json({
             done: true,
-            status: deliverability.status(),
+            status: deliveryStatus,
             config: deliverability.getConfig(),
             feedbackWebhookEnabled: !!String(process.env.EMAIL_FEEDBACK_TOKEN || '').trim(),
             feedbackEndpoint: '/api/emails/feedback',
@@ -2169,6 +2221,7 @@ module.exports = function init(site) {
 
     onPost('/api/emails/admin/deliverability/config', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Deliverability configuration')) return;
         const data = body(req);
         try {
             const config = data.config ? deliverability.updateConfig(data.config) : deliverability.getConfig();
@@ -2182,7 +2235,7 @@ module.exports = function init(site) {
     onPost('/api/emails/admin/deliverability/preflight', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         const data = body(req);
-        try { res.json({ done: true, result: deliverability.preflightReport(data.from || '', data.to || data.recipients || []) }); }
+        try { res.json({ done: true, result: deliverability.preflightReport(data.from || '', data.to || data.recipients || [], { organizationId: String(data.organizationId || '').trim() }) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
@@ -2196,7 +2249,7 @@ module.exports = function init(site) {
         if (!admin(req)) return adminDenied(res);
         const data = body(req);
         try {
-            const item = deliverability.addSuppression(data.email, data.type || 'manual', data.reason || '', 'admin-dashboard');
+            const item = deliverability.addSuppression(data.email, data.type || 'manual', data.reason || '', 'admin-dashboard', String(data.organizationId || '').trim());
             await service.store.audit('admin_suppression_add', { email: item.email, type: item.type });
             res.json({ done: true, item });
         } catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
@@ -2205,7 +2258,7 @@ module.exports = function init(site) {
     onPost('/api/emails/admin/deliverability/suppressions/remove', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         try {
-            const result = deliverability.removeSuppression(body(req).email);
+            const result = deliverability.removeSuppression(body(req).email, String(body(req).organizationId || '').trim());
             await service.store.audit('admin_suppression_remove', result);
             res.json({ done: true, result });
         } catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
@@ -2215,7 +2268,7 @@ module.exports = function init(site) {
         if (!admin(req)) return adminDenied(res);
         const data = body(req);
         try {
-            const result = deliverability.reportFeedback({ email: data.email, type: data.type, reason: data.reason || '', source: 'admin-dashboard' });
+            const result = deliverability.reportFeedback({ email: data.email, type: data.type, reason: data.reason || '', source: 'admin-dashboard', organizationId: String(data.organizationId || '').trim() });
             runtimeMonitor.increment('feedbackEvents');
             await service.store.audit('admin_delivery_feedback', result);
             res.json({ done: true, result, status: deliverability.status() });
@@ -2234,12 +2287,14 @@ module.exports = function init(site) {
 
     onPost('/api/emails/admin/operations/status', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, status: operationsManager.status() }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/operations/config', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try {
             const data = body(req);
             const config = data.config ? operationsManager.updateConfig(data.config) : operationsManager.getConfig();
@@ -2250,30 +2305,35 @@ module.exports = function init(site) {
 
     onPost('/api/emails/admin/operations/backup/create', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, result: await operationsManager.createBackup(body(req)) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/operations/backups/list', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, result: operationsManager.listBackups() }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/operations/backup/validate', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, result: await operationsManager.validateBackup(String(body(req).id || '')) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/operations/restore/preview', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, result: await operationsManager.restorePreview(String(body(req).id || ''), body(req)) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/operations/restore/execute', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         const data = body(req);
         try { res.json({ done: true, result: await operationsManager.restore(String(data.id || ''), data) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
@@ -2281,36 +2341,42 @@ module.exports = function init(site) {
 
     onPost('/api/emails/admin/operations/storage/report', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, report: operationsManager.storageReport() }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/operations/cleanup/preview', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, result: operationsManager.cleanupPreview(body(req)) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/operations/cleanup/execute', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, result: await operationsManager.cleanupExecute(body(req)) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/operations/maintenance/run', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, result: await operationsManager.runMaintenance(body(req)) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/operations/alerts', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, result: operationsManager.alerts(body(req)) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/operations/history', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
+        if (rejectOrganizationScopeForInstance(req, res, 'Backup & Storage')) return;
         try { res.json({ done: true, history: operationsManager.historyList(body(req).limit || 144) }); }
         catch (error) { res.json({ done: false, error: error?.message || String(error) }); }
     });

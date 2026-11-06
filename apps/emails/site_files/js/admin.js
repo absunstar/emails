@@ -45,6 +45,7 @@
         tenantDomains: [],
         tenantSenders: [],
         senderPools: [],
+        organizationId: '',
     };
 
     const q = (selector, base) => (base || document).querySelector(selector);
@@ -63,6 +64,12 @@
 
     function writeLocal(key, value) {
         try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+    }
+
+    function requireInstanceWideWorkspace(feature) {
+        if (!state.organizationId) return true;
+        toast((feature || 'This control') + ' is instance-wide. Switch Organization scope to “All organizations” before changing it.', 'warning', 'Instance-wide control', { duration: 4200 });
+        return false;
     }
 
     function svg(name) {
@@ -102,7 +109,9 @@
     }
 
     async function post(url, data) {
-        const response = await ui.post(url, data || {});
+        const payload = Object.assign({}, data || {});
+        if (state.organizationId && payload.organizationId === undefined) payload.organizationId = state.organizationId;
+        const response = await ui.post(url, payload);
         if (!response || response.done === false) throw new Error(response?.error || 'Request failed');
         return response;
     }
@@ -258,12 +267,17 @@
             qa('[data-admin-stat="' + key + '"]').forEach((el) => { el.textContent = value.toLocaleString(); });
             qa('[data-admin-side-count="' + key + '"]').forEach((el) => { el.textContent = value.toLocaleString(); });
         });
-        const max = Math.max(1, Number(stats.maxMessages || 100000));
         const stored = Math.max(0, Number(stats.storedTotal || stats.total || 0));
         const storageText = q('[data-admin-storage-text]');
         const storageBar = q('[data-admin-storage-bar]');
-        if (storageText) storageText.textContent = stored.toLocaleString() + ' / ' + max.toLocaleString();
-        if (storageBar) storageBar.style.width = Math.min(100, stored / max * 100) + '%';
+        if (state.organizationId) {
+            if (storageText) storageText.textContent = stored.toLocaleString() + ' scoped messages';
+            if (storageBar) storageBar.style.width = '0%';
+        } else {
+            const max = Math.max(1, Number(stats.maxMessages || 100000));
+            if (storageText) storageText.textContent = stored.toLocaleString() + ' / ' + max.toLocaleString();
+            if (storageBar) storageBar.style.width = Math.min(100, stored / max * 100) + '%';
+        }
     }
 
     function folderEntries() {
@@ -300,6 +314,32 @@
             select.innerHTML = '<option value="all">All folders</option>' + entries.map((item) => '<option value="' + escape(item.name) + '">' + escape(item.name) + ' (' + item.count + ')</option>').join('');
             if (Array.from(select.options).some((option) => option.value === current)) select.value = current;
         }
+    }
+
+    async function loadOrganizationScopeOptions() {
+        const response = await ui.post('/api/emails/admin/organizations/list', {});
+        if (!response || response.done === false) throw new Error(response?.error || 'Unable to load organizations');
+        state.organizations = response.organizations || [];
+        const select = q('[data-admin-org-scope]');
+        if (select) {
+            const saved = readLocal('socialTempMail.admin.organizationId', '');
+            select.innerHTML = '<option value="">All organizations</option>' + state.organizations.filter(x => x.status !== 'disabled').map(x => '<option value="' + escape(x.id) + '">' + escape(x.name) + '</option>').join('');
+            const valid = state.organizations.some(x => x.id === saved && x.status !== 'disabled');
+            state.organizationId = valid ? saved : '';
+            select.value = state.organizationId;
+        }
+    }
+
+    async function changeOrganizationScope(value) {
+        state.organizationId = String(value || '');
+        writeLocal('socialTempMail.admin.organizationId', state.organizationId);
+        state.offset = 0;
+        state.selected.clear();
+        state.current = null;
+        const detail = q('[data-admin-message-detail]'); if (detail) detail.hidden = true;
+        await loadAdminSummary();
+        await loadMessages();
+        toast(state.organizationId ? 'Admin workspace is now scoped to the selected organization.' : 'Showing all organizations.', 'info', 'Organization scope');
     }
 
     async function loadAdminSummary() {
@@ -1013,6 +1053,7 @@
     }
 
     async function saveDeliverability(button) {
+        if (!requireInstanceWideWorkspace('Deliverability configuration')) return;
         setBusy(button, true, 'Saving…');
         try {
             const response = await post('/api/emails/admin/deliverability/config', { config: readDeliverabilitySettings() });
@@ -1210,6 +1251,7 @@
     }
 
     async function openOperations(button) {
+        if (!requireInstanceWideWorkspace('Backup & Storage')) return;
         setBusy(button, true, 'Opening…');
         try {
             await loadOperations({ silent: true });
@@ -1440,6 +1482,7 @@
     }
 
     async function openInstance(button) {
+        if (!requireInstanceWideWorkspace('Instance Settings')) return;
         setBusy(button, true, 'Loading…');
         try {
             await loadInstanceConfig();
@@ -1620,6 +1663,7 @@
     }
 
     async function openPolicy(button) {
+        if (!requireInstanceWideWorkspace('Security & Policies')) return;
         setBusy(button, true, 'Loading…');
         try {
             await loadPolicy();
@@ -2113,6 +2157,8 @@
             return;
         }
         const poolOrg = event.target.closest('[data-pool-org]'); if (poolOrg) { renderPoolSenderOptions(); return; }
+        const orgScope = event.target.closest('[data-admin-org-scope]');
+        if (orgScope) { changeOrganizationScope(orgScope.value).catch((error) => toast(error.message || 'Unable to switch organization.', 'error', 'Scope failed')); return; }
         const scheduleFilter = event.target.closest('[data-schedule-filter]');
         if (scheduleFilter) {
             loadSchedules({ silent: true });
@@ -2181,6 +2227,7 @@
             applyColumnVisibility();
             updateSortIndicators();
             setAutoRefresh(state.autoRefresh, false);
+            await loadOrganizationScopeOptions();
             await loadAdminSummary();
             await loadMessages();
         } catch (error) {

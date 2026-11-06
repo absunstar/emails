@@ -216,10 +216,11 @@ class EmailDeliverabilityEngine {
         writeJsonAtomic(this.statePath, this.state);
     }
 
-    _suppressionPath(email) {
+    _suppressionPath(email, organizationId) {
         const normalized = normalizeEmail(email);
         if (!normalized) throw new Error('Valid email is required');
-        const hash = crypto.createHash('sha256').update(normalized).digest('hex');
+        const org = String(organizationId || '').trim();
+        const hash = crypto.createHash('sha256').update((org ? org + '\n' : '') + normalized).digest('hex');
         return path.join(this.suppressionsDir, hash.slice(0, 2), hash + '.json');
     }
 
@@ -319,14 +320,14 @@ class EmailDeliverabilityEngine {
         return this.getConfig();
     }
 
-    getSuppression(email) {
+    getSuppression(email, organizationId) {
         const normalized = normalizeEmail(email);
         if (!normalized) return null;
-        const item = readJson(this._suppressionPath(normalized), null);
+        const item = readJson(this._suppressionPath(normalized, organizationId), null);
         return item && item.email === normalized ? item : null;
     }
 
-    addSuppression(email, type, reason, source) {
+    addSuppression(email, type, reason, source, organizationId) {
         const normalized = normalizeEmail(email);
         if (!normalized) throw new Error('Valid email is required');
         const normalizedType = String(type || 'manual').trim().toLowerCase();
@@ -338,19 +339,20 @@ class EmailDeliverabilityEngine {
             type: normalizedType,
             reason: String(reason || '').slice(0, 1000),
             source: String(source || 'manual').slice(0, 160),
+            organizationId: String(organizationId || '').trim(),
             createdAt: new Date().toISOString(),
         };
-        writeJsonAtomic(this._suppressionPath(normalized), item);
+        writeJsonAtomic(this._suppressionPath(normalized, organizationId), item);
         return clone(item);
     }
 
-    removeSuppression(email) {
+    removeSuppression(email, organizationId) {
         const normalized = normalizeEmail(email);
         if (!normalized) throw new Error('Valid email is required');
-        const filePath = this._suppressionPath(normalized);
+        const filePath = this._suppressionPath(normalized, organizationId);
         const existed = fs.existsSync(filePath);
         if (existed) fs.unlinkSync(filePath);
-        return { removed: existed, email: normalized };
+        return { removed: existed, email: normalized, organizationId: String(organizationId || '').trim() };
     }
 
     listSuppressions(args) {
@@ -359,6 +361,7 @@ class EmailDeliverabilityEngine {
         const query = String(args.query || '').trim().toLowerCase();
         const limit = Math.max(1, Math.min(Number(args.limit || 100), 1000));
         const offset = Math.max(0, Number(args.offset || 0));
+        const organizationId = String(args.organizationId || '').trim();
         const all = [];
         if (!fs.existsSync(this.suppressionsDir)) return { count: 0, total: 0, offset, limit, items: [] };
         const prefixes = fs.readdirSync(this.suppressionsDir);
@@ -370,6 +373,8 @@ class EmailDeliverabilityEngine {
                 if (!name.endsWith('.json')) continue;
                 const item = readJson(path.join(dir, name), null);
                 if (!item || !item.email) continue;
+                if (organizationId && String(item.organizationId || '') !== organizationId) continue;
+                if (!organizationId && item.organizationId) continue;
                 if (type && item.type !== type) continue;
                 if (query && ![item.email, item.domain, item.type, item.reason, item.source].some((value) => String(value || '').toLowerCase().includes(query))) continue;
                 all.push(item);
@@ -380,7 +385,7 @@ class EmailDeliverabilityEngine {
         return { count: items.length, total: all.length, offset, limit, items };
     }
 
-    preflight(from, recipients) {
+    preflight(from, recipients, context) {
         const now = Date.now();
         const list = normalizeEmails(recipients);
         if (!list.length) return { allowed: false, code: 'DELIVERABILITY_INVALID_RECIPIENT', reason: 'No valid recipient address found', permanent: true };
@@ -388,7 +393,7 @@ class EmailDeliverabilityEngine {
         if (this.config.suppression.enabled) {
             const blockedTypes = new Set(this.config.suppression.blockTypes || []);
             for (const email of list) {
-                const suppression = this.getSuppression(email);
+                const suppression = this.getSuppression(email, context?.organizationId);
                 if (suppression && blockedTypes.has(suppression.type)) {
                     return { allowed: false, code: 'DELIVERABILITY_SUPPRESSED', reason: 'Recipient is suppressed: ' + suppression.type, permanent: true, recipient: email, suppression };
                 }
@@ -531,12 +536,12 @@ class EmailDeliverabilityEngine {
             else if (type === 'complaint') counter.complaints += 1;
             else if (type === 'unsubscribe') counter.unsubscribes += 1;
         }
-        if (type === 'hard_bounce' || type === 'complaint' || type === 'unsubscribe') this.addSuppression(email, type, args.reason || '', args.source || 'feedback');
+        if (type === 'hard_bounce' || type === 'complaint' || type === 'unsubscribe') this.addSuppression(email, type, args.reason || '', args.source || 'feedback', args.organizationId);
         this._maybeOpenCircuit(global, 'Global', now);
         this._maybeOpenCircuit(domainCounter, 'Domain ' + domain, now);
         this._maybeOpenCircuit(providerCounter, 'Provider ' + providerName, now);
         this._saveState();
-        return { recorded: true, email, domain, provider: providerName, type, suppressed: ['hard_bounce', 'complaint', 'unsubscribe'].includes(type) };
+        return { recorded: true, email, organizationId: String(args.organizationId || '').trim(), domain, provider: providerName, type, suppressed: ['hard_bounce', 'complaint', 'unsubscribe'].includes(type) };
     }
 
     ingestFeedback(message) {
@@ -561,12 +566,12 @@ class EmailDeliverabilityEngine {
         return Object.assign({ detected: true }, this.reportFeedback({ email: recipientMatch[1], type, reason: 'Detected from inbound delivery-status notification', source: 'inbound-dsn' }));
     }
 
-    preflightReport(from, recipients) {
+    preflightReport(from, recipients, context) {
         const list = normalizeEmails(recipients);
         if (!list.length) return { allowed: false, reason: 'No valid recipient address found' };
         const snapshot = clone(this.state);
         try {
-            const result = this.preflight(from, list);
+            const result = this.preflight(from, list, context);
             this.state = snapshot;
             this._saveState();
             return Object.assign({ dryRun: true }, result);

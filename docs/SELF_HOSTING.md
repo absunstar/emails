@@ -53,3 +53,31 @@ Schedules persist `organizationId` and list/get/update/cancel/send-now/retry enf
 Outbound messages with an `organizationId` must use a From domain owned by that organization. Campaigns, schedules and MCP sends propagate the organization scope to the final Email Service guard.
 
 Mail Admin has an Organization scope selector. Instance Settings, Security & Policies, Backup/Restore/Storage configuration, and global deliverability configuration remain instance-wide Super Admin controls and are unavailable while the Admin workspace is scoped to one organization. Tenant-scoped deliverability views expose only owned-domain counters.
+
+## Tenant-bound identity and RBAC
+
+Tenant isolation is enforced at the identity layer with organization-bound access keys. Access-key secrets are returned once when created and only a SHA-256 hash is persisted in the tenant registry.
+
+Roles:
+
+- `organization_admin`: read/write mail operations, campaigns, schedules, deliverability, domains, senders, sender pools, and access-key management for one organization. It cannot change instance-wide configuration.
+- `operator`: mail/campaign/schedule operations plus tenant/sender/deliverability read access. It cannot manage tenant identities, access keys, or instance-wide settings.
+- `viewer`: read-only mail, campaign, schedule, deliverability, sender, and tenant views.
+- `super_admin`: instance-wide role used by trusted local admin, trusted Social Browser admin access, configured admin secrets, and the legacy trusted MCP endpoint.
+
+HTTP API clients can authenticate with either:
+
+- `Authorization: Bearer <tenant-access-key>`
+- `X-Email-Api-Key: <tenant-access-key>`
+
+When a tenant access key is used, its `organizationId` is authoritative. Request bodies cannot switch to another organization, and resource IDs such as domains, sender identities, sender pools, campaigns, schedules, and messages are ownership-checked.
+
+### Tenant MCP endpoint
+
+Tenant agents should use the dedicated Streamable HTTP endpoint:
+
+`/mcp/access`
+
+This endpoint always requires a valid tenant access key (or an explicitly configured super-admin bearer token). The legacy secret MCP path remains reserved for trusted super-admin integrations. Tenant MCP sessions are bound to the principal that initialized them, and tools/resources/prompts are filtered by role. Direct calls to hidden write tools are still rejected server-side.
+
+Revoking an access key takes effect immediately for new HTTP and MCP requests.

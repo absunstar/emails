@@ -45,6 +45,7 @@
         tenantDomains: [],
         tenantSenders: [],
         senderPools: [],
+        accessKeys: [],
         organizationId: '',
     };
 
@@ -1421,17 +1422,22 @@
         const poolOrg=q('[data-pool-org]'); if(poolOrg) poolOrg.innerHTML=state.organizations.filter(o=>o.status!=='disabled').map(o=>'<option value="'+escape(o.id)+'">'+escape(o.name)+'</option>').join('');
         renderPoolSenderOptions();
         const poolHost=q('[data-tenant-pool-list]'); if(poolHost) poolHost.innerHTML=state.senderPools.map(pool=>'<tr><td><strong>'+escape(pool.name)+'</strong></td><td>'+escape(orgName(pool.organizationId))+'</td><td>'+escape(pool.mode)+'</td><td>'+escape((pool.senderIds||[]).length)+'</td><td>'+tenantPill(pool.status)+'</td><td><div class="mail-ops-row-actions"><button type="button" data-admin-action="tenant-pool-readiness" data-tenant-id="'+escape(pool.id)+'">Readiness</button><button type="button" class="danger" data-admin-action="tenant-pool-delete" data-tenant-id="'+escape(pool.id)+'">Delete</button></div></td></tr>').join('')||'<tr><td colspan="6">No sender pools.</td></tr>';
+        const keyOrg=q('[data-access-key-org]'); if(keyOrg) keyOrg.innerHTML=state.organizations.filter(o=>o.status!=='disabled').map(o=>'<option value="'+escape(o.id)+'">'+escape(o.name)+'</option>').join('');
+        const keyHost=q('[data-access-key-list]'); if(keyHost) keyHost.innerHTML=state.accessKeys.map(k=>'<tr><td><strong>'+escape(k.name||'Access key')+'</strong></td><td>'+escape(orgName(k.organizationId))+'</td><td>'+escape(k.role||'viewer')+'</td><td><code>'+escape(k.prefix||'')+'…</code></td><td>'+tenantPill(k.status)+'</td><td>'+escape(dateTime(k.lastUsedAt))+'</td><td><div class="mail-ops-row-actions">'+(k.status==='active'?'<button type="button" class="danger" data-admin-action="access-key-revoke" data-tenant-id="'+escape(k.id)+'">Revoke</button>':'—')+'</div></td></tr>').join('')||'<tr><td colspan="7">No access keys.</td></tr>';
     }
 
     async function loadTenants(){
-        const [o,d,se,po]=await Promise.all([post('/api/emails/admin/organizations/list',{}),post('/api/emails/admin/domains/list',{}),post('/api/emails/admin/senders/list',{}),post('/api/emails/admin/sender-pools/list',{})]);
-        state.organizations=o.organizations||[]; state.tenantDomains=d.domains||[]; state.tenantSenders=se.senders||[]; state.senderPools=po.pools||[]; renderTenants(); return {o,d,se,po};
+        const [o,d,se,po,ak]=await Promise.all([post('/api/emails/admin/organizations/list',{}),post('/api/emails/admin/domains/list',{}),post('/api/emails/admin/senders/list',{}),post('/api/emails/admin/sender-pools/list',{}),post('/api/emails/admin/access-keys/list',{}).catch(()=>({accessKeys:[]}))]);
+        state.organizations=o.organizations||[]; state.tenantDomains=d.domains||[]; state.tenantSenders=se.senders||[]; state.senderPools=po.pools||[]; state.accessKeys=ak.accessKeys||[]; renderTenants(); return {o,d,se,po,ak};
     }
     async function openTenants(button){setBusy(button,true,'Loading…');try{await loadTenants();showTenantTab(state.tenantTab);ui.show('#adminTenantsModal');}catch(e){toast(e.message||'Unable to load domain manager.','error','Domains unavailable');}finally{setBusy(button,false);}}
     function renderPoolSenderOptions(){const orgId=q('[data-pool-org]')?.value||'';const host=q('[data-pool-senders]');if(!host)return;host.innerHTML=state.tenantSenders.filter(x=>x.organizationId===orgId&&x.status!=='disabled').map(x=>'<option value="'+escape(x.id)+'">'+escape(x.email)+'</option>').join('');}
     async function addSenderPool(){const organizationId=q('[data-pool-org]')?.value||'';const name=String(q('[data-pool-name]')?.value||'').trim();const mode=q('[data-pool-mode]')?.value||'rotate';const senderIds=Array.from(q('[data-pool-senders]')?.selectedOptions||[]).map(x=>x.value);if(!name)return toast('Enter a pool name.','warning','Name required');if(!senderIds.length)return toast('Select at least one sender identity.','warning','Senders required');await post('/api/emails/admin/sender-pools/add',{organizationId,name,mode,senderIds});q('[data-pool-name]').value='';await loadTenants();toast('Sender pool created.','success');}
     async function poolReadiness(id,button){setBusy(button,true,'Checking…');try{const r=await post('/api/emails/admin/sender-pools/readiness',{id});const rd=r.readiness||{};toast(rd.ready?'All pool senders are ready.':('Ready '+Number(rd.readyCount||0)+' / '+Number(rd.total||0)),rd.ready?'success':'warning',rd.ready?'Pool ready':'Pool not ready',{duration:5000});}catch(e){toast(e.message||'Pool readiness failed.','error','Check failed');}finally{setBusy(button,false);}}
     async function deleteSenderPool(id){if(!window.confirm('Delete this sender pool?'))return;await post('/api/emails/admin/sender-pools/delete',{id});await loadTenants();toast('Sender pool deleted.','success');}
+
+    async function createAccessKey(){const organizationId=q('[data-access-key-org]')?.value||'';const name=String(q('[data-access-key-name]')?.value||'').trim();const role=q('[data-access-key-role]')?.value||'viewer';const r=await post('/api/emails/admin/access-keys/create',{organizationId,name,role});const box=q('[data-access-key-secret]');if(box){box.hidden=false;box.innerHTML='<strong>Copy this secret now — it will not be shown again.</strong><br><code>'+escape(r.secret||'')+'</code><div class="mail-ops-row-actions"><button type="button" data-admin-action="access-key-copy" data-secret="'+escape(r.secret||'')+'">Copy</button></div>';}const input=q('[data-access-key-name]');if(input)input.value='';await loadTenants();toast('Access key created. Copy the secret now.','success','Key created',{duration:5000});}
+    async function revokeAccessKey(id){if(!window.confirm('Revoke this access key immediately?'))return;await post('/api/emails/admin/access-keys/revoke',{id});await loadTenants();toast('Access key revoked.','success');}
 
     async function addOrganization(){const input=q('[data-tenant-new-org]');const name=String(input?.value||'').trim();if(!name)return toast('Enter an organization name.','warning','Name required');await post('/api/emails/admin/organizations/create',{name});input.value='';await loadTenants();toast('Organization created.','success');}
     async function addDomain(){const domain=String(q('[data-tenant-domain-name]')?.value||'').trim();const organizationId=q('[data-tenant-domain-org]')?.value||'';const dkimSelector=String(q('[data-tenant-domain-selector]')?.value||'').trim();if(!domain)return toast('Enter a domain.','warning','Domain required');await post('/api/emails/admin/domains/add',{organizationId,domain,dkimSelector});q('[data-tenant-domain-name]').value='';await loadTenants();toast('Domain registered.','success');}
@@ -1958,6 +1964,9 @@
         if (action === 'tenant-domain-add') return addDomain();
         if (action === 'tenant-sender-add') return addSender();
         if (action === 'tenant-pool-add') return addSenderPool();
+        if (action === 'access-key-create') return createAccessKey();
+        if (action === 'access-key-revoke') return revokeAccessKey(button.dataset.tenantId);
+        if (action === 'access-key-copy') { navigator.clipboard?.writeText(button.dataset.secret||''); return toast('Access key copied.','success','Copied'); }
         if (action === 'tenant-pool-readiness') return poolReadiness(button.dataset.tenantId, button);
         if (action === 'tenant-pool-delete') return deleteSenderPool(button.dataset.tenantId);
         if (action === 'tenant-domain-verify') return verifyTenantDomain(button.dataset.tenantId, button);

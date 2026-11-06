@@ -425,6 +425,7 @@ site.emailMcpServer = startEmailMcpServer({
     service: mcpService,
     secret: mcpSecret,
     bearerToken: process.env.EMAIL_MCP_BEARER_TOKEN || '',
+    tenantRegistry: site.emailTenants,
     host: process.env.EMAIL_MCP_HOST || '127.0.0.1',
     port: Number(process.env.EMAIL_MCP_PORT || 60026),
     onListen(info) {

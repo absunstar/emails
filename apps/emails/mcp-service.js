@@ -176,14 +176,17 @@ function createEmailMcpService(options) {
             const policy = abusePolicy ? abusePolicy.getConfig() : null;
             return {
                 manager: true,
-                scope: 'global-admin',
+                scope: scope?.organizationId ? 'organization' : 'global-admin',
+                organizationId: scope?.organizationId || null,
+                role: scope?.role || 'super_admin',
+                permissions: scope?.permissions || ['*'],
                 storage: 'json-files-only',
                 maxMessages: emailService.store.maxMessages,
                 customFolders: emailService.listAdminFolders(),
                 vipCount: emailService.listVip().length,
                 policyEnabled: !!policy?.enabled,
                 capabilities: [
-                    'portable-instance-config', 'white-label-branding', 'multi-domain-instance', 'configurable-mcp-identity', 'organizations', 'domain-registry', 'sender-identities', 'sender-pools', 'tenant-isolation', 'organization-scoped-messages', 'organization-scoped-schedules', 'organization-scoped-suppressions', 'organization-scoped-deliverability',
+                    'portable-instance-config', 'white-label-branding', 'multi-domain-instance', 'configurable-mcp-identity', 'organizations', 'domain-registry', 'sender-identities', 'sender-pools', 'tenant-access-keys', 'rbac', 'identity-isolation', 'tenant-isolation', 'organization-scoped-messages', 'organization-scoped-schedules', 'organization-scoped-suppressions', 'organization-scoped-deliverability',
                     'global-search', 'advanced-filters', 'pagination', 'sorting', 'read', 'read-many', 'favorites', 'folders', 'bulk-update',
                     'send', 'bulk-send', 'reply', 'forward', 'attachments', 'eml-export', 'remote-image-analysis', 'tracking-pixel-analysis',
                     'vip-management', 'delete', 'bulk-delete', 'delete-matching', 'mailbox-statuses', 'statistics',
@@ -197,25 +200,48 @@ function createEmailMcpService(options) {
             };
         },
 
-        async tenantsStatus(scope) { enforceAdminRate(scope, false); return tenantsRequired().status(); },
-        async organizationsList(scope) { enforceAdminRate(scope, false); return { organizations: tenantsRequired().listOrganizations() }; },
+        async tenantsStatus(scope) {
+            enforceAdminRate(scope, false);
+            const organizationId=String(scope?.organizationId||'').trim();
+            if(!organizationId) return tenantsRequired().status();
+            return { organizationId, organizations:1, domains:tenantsRequired().listDomains({organizationId}).length, senders:tenantsRequired().listSenders({organizationId}).length, senderPools:tenantsRequired().listSenderPools({organizationId}).length, accessKeys:tenantsRequired().listAccessKeys({organizationId}).length };
+        },
+        async organizationsList(scope) {
+            enforceAdminRate(scope, false);
+            const organizationId=String(scope?.organizationId||'').trim();
+            const organizations=organizationId?tenantsRequired().listOrganizations().filter(x=>x.id===organizationId):tenantsRequired().listOrganizations();
+            return { organizations };
+        },
         async organizationCreate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().createOrganization(args); },
-        async organizationUpdate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().updateOrganization(args.id, args); },
-        async domainsList(args, scope) { enforceAdminRate(scope, false); return { domains: tenantsRequired().listDomains(args || {}) }; },
-        async domainAdd(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().addDomain(args); },
-        async domainUpdate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().updateDomain(args.id, args); },
-        async domainVerify(args, scope) { enforceAdminRate(scope, false); return tenantsRequired().verifyDomain(args.id); },
-        async domainDelete(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().removeDomain(args.id); },
-        async sendersList(args, scope) { enforceAdminRate(scope, false); return { senders: tenantsRequired().listSenders(args || {}) }; },
-        async senderPoolsList(args, scope) { enforceAdminRate(scope, false); return { pools: tenantsRequired().listSenderPools(args || {}) }; },
-        async senderPoolAdd(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().addSenderPool(args); },
-        async senderPoolUpdate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().updateSenderPool(args.id, args); },
-        async senderPoolReadiness(args, scope) { enforceAdminRate(scope, false); return tenantsRequired().senderPoolReadiness(args.id); },
-        async senderPoolDelete(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().removeSenderPool(args.id); },
-        async senderAdd(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().addSender(args); },
-        async senderUpdate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().updateSender(args.id, args); },
-        async senderReadiness(args, scope) { enforceAdminRate(scope, false); return tenantsRequired().senderReadiness(args.id); },
-        async senderDelete(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().removeSender(args.id); },
+        async organizationUpdate(args, scope) {
+            enforceAdminRate(scope, true);
+            const organizationId=String(scope?.organizationId||'').trim();
+            if(organizationId && String(args.id||'')!==organizationId) throw new Error('Organization not found');
+            return tenantsRequired().updateOrganization(args.id, args);
+        },
+        async domainsList(args, scope) { enforceAdminRate(scope, false); return { domains: tenantsRequired().listDomains(Object.assign({},args||{},scope?.organizationId?{organizationId:scope.organizationId}:{})) }; },
+        async domainAdd(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().addDomain(Object.assign({},args,scope?.organizationId?{organizationId:scope.organizationId}:{})); },
+        async domainUpdate(args, scope) { enforceAdminRate(scope, true); if(scope?.organizationId) tenantsRequired().assertResourceOrganization('domain',args.id,scope.organizationId); return tenantsRequired().updateDomain(args.id, args); },
+        async domainVerify(args, scope) { enforceAdminRate(scope, false); if(scope?.organizationId) tenantsRequired().assertResourceOrganization('domain',args.id,scope.organizationId); return tenantsRequired().verifyDomain(args.id); },
+        async domainDelete(args, scope) { enforceAdminRate(scope, true); if(scope?.organizationId) tenantsRequired().assertResourceOrganization('domain',args.id,scope.organizationId); return tenantsRequired().removeDomain(args.id); },
+        async sendersList(args, scope) { enforceAdminRate(scope, false); return { senders: tenantsRequired().listSenders(Object.assign({},args||{},scope?.organizationId?{organizationId:scope.organizationId}:{})) }; },
+        async senderPoolsList(args, scope) { enforceAdminRate(scope, false); return { pools: tenantsRequired().listSenderPools(Object.assign({},args||{},scope?.organizationId?{organizationId:scope.organizationId}:{})) }; },
+        async senderPoolAdd(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().addSenderPool(Object.assign({},args,scope?.organizationId?{organizationId:scope.organizationId}:{})); },
+        async senderPoolUpdate(args, scope) { enforceAdminRate(scope, true); if(scope?.organizationId) tenantsRequired().assertResourceOrganization('senderPool',args.id,scope.organizationId); return tenantsRequired().updateSenderPool(args.id, args); },
+        async senderPoolReadiness(args, scope) { enforceAdminRate(scope, false); if(scope?.organizationId) tenantsRequired().assertResourceOrganization('senderPool',args.id,scope.organizationId); return tenantsRequired().senderPoolReadiness(args.id); },
+        async senderPoolDelete(args, scope) { enforceAdminRate(scope, true); if(scope?.organizationId) tenantsRequired().assertResourceOrganization('senderPool',args.id,scope.organizationId); return tenantsRequired().removeSenderPool(args.id); },
+        async senderAdd(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().addSender(Object.assign({},args,scope?.organizationId?{organizationId:scope.organizationId}:{})); },
+        async senderUpdate(args, scope) { enforceAdminRate(scope, true); if(scope?.organizationId) tenantsRequired().assertResourceOrganization('sender',args.id,scope.organizationId); return tenantsRequired().updateSender(args.id, args); },
+        async senderReadiness(args, scope) { enforceAdminRate(scope, false); if(scope?.organizationId) tenantsRequired().assertResourceOrganization('sender',args.id,scope.organizationId); return tenantsRequired().senderReadiness(args.id); },
+        async senderDelete(args, scope) { enforceAdminRate(scope, true); if(scope?.organizationId) tenantsRequired().assertResourceOrganization('sender',args.id,scope.organizationId); return tenantsRequired().removeSender(args.id); },
+        async accessKeysList(args, scope) { enforceAdminRate(scope,false); return { accessKeys:tenantsRequired().listAccessKeys({organizationId:scope?.organizationId||args?.organizationId||undefined,status:args?.status||undefined}) }; },
+        async accessKeyCreate(args, scope) { enforceAdminRate(scope,true); return tenantsRequired().createAccessKey(Object.assign({},args,scope?.organizationId?{organizationId:scope.organizationId}:{})); },
+        async accessKeyRevoke(args, scope) {
+            enforceAdminRate(scope,true);
+            const row=tenantsRequired().listAccessKeys().find(x=>x.id===String(args.id||''));
+            if(!row || (scope?.organizationId && row.organizationId!==scope.organizationId)) throw new Error('Access key not found');
+            return tenantsRequired().revokeAccessKey(args.id);
+        },
 
         async instanceGet(scope) {
             enforceAdminRate(scope, false);

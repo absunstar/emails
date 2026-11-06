@@ -1,6 +1,7 @@
 'use strict';
 
 const http = require('http');
+const { hasPermission, mcpPermission } = require('./core/tenant-access');
 const crypto = require('crypto');
 
 const MODERN_PROTOCOL = '2026-07-28';
@@ -11,7 +12,7 @@ const DEFAULT_MCP_SECRET = String(process.env.EMAIL_MCP_DEFAULT_SECRET || 'SOCIA
 const SERVER_INFO = {
     name: String(process.env.EMAIL_MCP_NAME || 'social-browser-email').trim() || 'social-mail',
     title: String(process.env.EMAIL_MCP_TITLE || 'Social Browser Email Manager').trim() || 'Social Mail MCP',
-    version: '5.0.0',
+    version: '5.1.0',
 };
 
 const SERVER_INSTRUCTIONS = [
@@ -171,6 +172,9 @@ const TOOLS = [
     tool('email_organizations_list', 'List organizations', 'List organizations/tenants configured in this mail instance.', {}),
     tool('email_organization_create', 'Create organization', 'Create a new organization/tenant.', { name:{type:'string',minLength:1}, slug:{type:'string'} }, ['name'], {readOnlyHint:false}),
     tool('email_organization_update', 'Update organization', 'Update organization name or status.', { id:{type:'string',minLength:1}, name:{type:'string'}, status:{type:'string',enum:['active','disabled']} }, ['id'], {readOnlyHint:false}),
+    tool('email_access_keys_list', 'List organization access keys', 'List tenant-bound API/MCP access keys without exposing secrets.', { organizationId:{type:'string'}, status:{type:'string',enum:['active','revoked']} }),
+    tool('email_access_key_create', 'Create organization access key', 'Create a tenant-bound API/MCP key. The secret is returned once and only its hash is persisted.', { organizationId:{type:'string'}, name:{type:'string',minLength:1,maxLength:120}, role:{type:'string',enum:['organization_admin','operator','viewer']} }, ['role'], {readOnlyHint:false}),
+    tool('email_access_key_revoke', 'Revoke organization access key', 'Revoke a tenant-bound API/MCP key immediately.', { id:{type:'string',minLength:1}, confirm:{type:'boolean'} }, ['id','confirm'], {readOnlyHint:false,destructiveHint:true}),
     tool('email_domains_list', 'List managed domains', 'List registered mail domains, optionally scoped to an organization or status.', { organizationId:{type:'string'}, status:{type:'string'} }),
     tool('email_domain_add', 'Add managed domain', 'Register a mail domain under an organization.', { organizationId:{type:'string'}, domain:{type:'string',minLength:3}, dkimSelector:{type:'string'}, notes:{type:'string'} }, ['domain'], {readOnlyHint:false}),
     tool('email_domain_update', 'Update managed domain', 'Update domain lifecycle/verification metadata.', { id:{type:'string',minLength:1}, status:{type:'string',enum:['pending','verified','warning','disabled']}, dkimSelector:{type:'string'}, notes:{type:'string'}, verification:{type:'object'} }, ['id'], {readOnlyHint:false}),
@@ -668,6 +672,16 @@ function validateToolArguments(name, raw) {
         if (args.confirm !== true) return fail('confirm=true is required');
         return { ok:true, args:{id:args.id.trim(),confirm:true} };
     }
+    if (name === 'email_access_keys_list') return { ok:true, args:{ organizationId:String(args.organizationId||'').trim(), status:String(args.status||'').trim() } };
+    if (name === 'email_access_key_create') {
+        if (!['organization_admin','operator','viewer'].includes(String(args.role||''))) return fail('invalid role');
+        return { ok:true, args:{organizationId:String(args.organizationId||'').trim(),name:String(args.name||'').trim().slice(0,120),role:String(args.role)} };
+    }
+    if (name === 'email_access_key_revoke') {
+        if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
+        if (args.confirm !== true) return fail('confirm=true is required');
+        return {ok:true,args:{id:args.id.trim(),confirm:true}};
+    }
     if (['email_domains_list','email_senders_list','email_sender_pools_list'].includes(name)) return { ok:true, args:args||{} };
     if (name === 'email_campaigns_list') {
         const statuses = ['', 'draft', 'scheduled', 'running', 'paused', 'completed', 'stopped'];
@@ -1115,6 +1129,22 @@ function decodePathPart(value) {
     try { return decodeURIComponent(String(value || '')); } catch (_) { return String(value || ''); }
 }
 
+function resourcePermission(uri) {
+    const value=String(uri||'');
+    if (value === 'email-manager://security-policy' || value === 'email-manager://security-status') return 'instance.admin';
+    if (value === 'email-manager://campaigns' || value === 'email-manager://campaign-status' || /^email-manager:\/\/campaign(?:-report)?\//.test(value)) return 'campaign.read';
+    if (value === 'email-manager://schedules' || value === 'email-manager://scheduler-status' || /^email-manager:\/\/schedule\//.test(value)) return 'schedule.read';
+    if (value === 'email-manager://deliverability-status') return 'deliverability.read';
+    return 'mail.read';
+}
+function promptPermission(name) {
+    return String(name||'') === 'security_audit' ? 'instance.admin' : 'mail.read';
+}
+function scopeCan(scope, permission) {
+    const principal = scope?.principal || ((scope?.role || scope?.permissions) ? { role:scope?.role, permissions:scope?.permissions } : { role:'super_admin', permissions:['*'] });
+    return hasPermission(principal, permission);
+}
+
 async function readManagerResource(uri, service, scope) {
     const value = String(uri || '');
     if (value === 'email-manager://capabilities') return jsonResource(value, await service.capabilities(scope));
@@ -1196,21 +1226,41 @@ async function completeArgument(params, service, scope) {
 }
 
 function makeScope(req, session) {
+    const principal = req?._emailPrincipal || { type:'super_admin', role:'super_admin', organizationId:'', permissions:['*'] };
     return {
         ip: clientIp(req),
         client: String(req?.headers?.['user-agent'] || session?.clientInfo?.name || 'mcp-client'),
         sessionId: session?.id || '',
+        principal,
+        role: principal.role || 'super_admin',
+        permissions: principal.permissions || ['*'],
+        organizationId: String(principal.organizationId || '').trim(),
     };
 }
 
 async function executeTool(name, args, service, scope) {
-    scope = Object.assign({}, scope || {}, { organizationId: String(args?.organizationId || scope?.organizationId || '').trim() });
+    args = Object.assign({}, args || {});
+    const principalOrg = String(scope?.principal?.organizationId || scope?.organizationId || '').trim();
+    const requestedOrg = String(args.organizationId || '').trim();
+    if (principalOrg && requestedOrg && requestedOrg !== principalOrg) throw new Error('Organization scope mismatch');
+    if (principalOrg) args.organizationId = principalOrg;
+    scope = Object.assign({}, scope || {}, { organizationId: principalOrg || requestedOrg });
+    const permission = mcpPermission(name);
+    const effectivePrincipal = scope?.principal || ((scope?.role || scope?.permissions) ? { role:scope?.role, permissions:scope?.permissions } : { role:'super_admin', permissions:['*'] });
+    if (!hasPermission(effectivePrincipal, permission)) {
+        const error = new Error('Permission denied: ' + permission);
+        error.code = 'PERMISSION_DENIED';
+        throw error;
+    }
     let output;
     if (name === 'email_capabilities') output = await service.capabilities(scope);
     else if (name === 'email_tenants_status') output = await service.tenantsStatus(scope);
     else if (name === 'email_organizations_list') output = await service.organizationsList(scope);
     else if (name === 'email_organization_create') output = await service.organizationCreate(args, scope);
     else if (name === 'email_organization_update') output = await service.organizationUpdate(args, scope);
+    else if (name === 'email_access_keys_list') output = await service.accessKeysList(args, scope);
+    else if (name === 'email_access_key_create') output = await service.accessKeyCreate(args, scope);
+    else if (name === 'email_access_key_revoke') output = await service.accessKeyRevoke(args, scope);
     else if (name === 'email_domains_list') output = await service.domainsList(args, scope);
     else if (name === 'email_domain_add') output = await service.domainAdd(args, scope);
     else if (name === 'email_domain_update') output = await service.domainUpdate(args, scope);
@@ -1340,7 +1390,7 @@ async function dispatchRpc(body, context) {
     }
     if (method === 'ping') return { payload: jsonRpcResult(id, {}, modern) };
     if (method === 'tools/list') {
-        const result = { tools: clone(TOOLS) };
+        const result = { tools: clone(TOOLS.filter((entry)=>scopeCan(scope,mcpPermission(entry.name)))) };
         if (modern) Object.assign(result, { ttlMs: 60000, cacheScope: 'private' });
         return { payload: jsonRpcResult(id, result, modern) };
     }
@@ -1357,17 +1407,18 @@ async function dispatchRpc(body, context) {
         }
     }
     if (method === 'resources/list') {
-        const result = { resources: clone(RESOURCES) };
+        const result = { resources: clone(RESOURCES.filter((entry)=>scopeCan(scope,resourcePermission(entry.uri)))) };
         if (modern) Object.assign(result, { ttlMs: 60000, cacheScope: 'private' });
         return { payload: jsonRpcResult(id, result, modern) };
     }
     if (method === 'resources/templates/list') {
-        const result = { resourceTemplates: clone(RESOURCE_TEMPLATES) };
+        const result = { resourceTemplates: clone(RESOURCE_TEMPLATES.filter((entry)=>scopeCan(scope,resourcePermission(String(entry.uriTemplate||'').replace('{id}','sample').replace('{guid}','sample').replace('{attachmentId}','sample'))))) };
         if (modern) Object.assign(result, { ttlMs: 60000, cacheScope: 'private' });
         return { payload: jsonRpcResult(id, result, modern) };
     }
     if (method === 'resources/read') {
         if (typeof body?.params?.uri !== 'string' || !body.params.uri) return { payload: jsonRpcError(id, -32602, 'uri is required', undefined, modern) };
+        if (!scopeCan(scope, resourcePermission(body.params.uri))) return { payload: jsonRpcError(id, -32003, 'Permission denied', undefined, modern) };
         try {
             const result = await readManagerResource(body.params.uri, service, scope);
             if (modern) Object.assign(result, { ttlMs: 15000, cacheScope: 'private' });
@@ -1380,18 +1431,20 @@ async function dispatchRpc(body, context) {
         if (!session) return { payload: jsonRpcResult(id, {}, modern) };
         const uri = String(body?.params?.uri || '');
         if (!uri) return { payload: jsonRpcError(id, -32602, 'uri is required', undefined, modern) };
+        if (!scopeCan(scope, resourcePermission(uri))) return { payload: jsonRpcError(id, -32003, 'Permission denied', undefined, modern) };
         if (method === 'resources/subscribe') session.resourceSubscriptions.add(uri);
         else session.resourceSubscriptions.delete(uri);
         return { payload: jsonRpcResult(id, {}, modern) };
     }
     if (method === 'prompts/list') {
-        const result = { prompts: clone(PROMPTS) };
+        const result = { prompts: clone(PROMPTS.filter((prompt)=>scopeCan(scope,promptPermission(prompt.name)))) };
         if (modern) Object.assign(result, { ttlMs: 60000, cacheScope: 'private' });
         return { payload: jsonRpcResult(id, result, modern) };
     }
     if (method === 'prompts/get') {
         const name = String(body?.params?.name || '');
         if (!PROMPTS.some((prompt) => prompt.name === name)) return { payload: jsonRpcError(id, -32602, 'Unknown prompt: ' + name, undefined, modern) };
+        if (!scopeCan(scope, promptPermission(name))) return { payload: jsonRpcError(id, -32003, 'Permission denied', undefined, modern) };
         try {
             return { payload: jsonRpcResult(id, { description: PROMPTS.find((prompt) => prompt.name === name).description, messages: [{ role: 'user', content: { type: 'text', text: promptText(name, body?.params?.arguments) } }] }, modern) };
         } catch (error) {
@@ -1467,17 +1520,26 @@ function createEmailMcpServer(options) {
     const path = options.path || '/mcp/' + encodeURIComponent(secret);
     const ssePath = path.replace(/\/$/, '') + '/sse';
     const messagePath = path.replace(/\/$/, '') + '/message';
+    const tenantPath = options.tenantPath || '/mcp/access';
     const bearerToken = String(options.bearerToken || '').trim();
+    const tenantRegistry = options.tenantRegistry || null;
     const maxBodyBytes = Number(options.maxBodyBytes || 1024 * 1024);
     const sessions = new Map();
     const heartbeatMs = Math.max(5000, Number(options.heartbeatMs || 15000));
     const sessionTtlMs = Math.max(60000, Number(options.sessionTtlMs || 30 * 60 * 1000));
 
-    function authorized(req) {
-        if (!bearerToken) return true;
+    function authorizePrincipal(req, pathname) {
         const auth = String(req.headers.authorization || '');
-        const supplied = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-        return safeEqual(supplied, bearerToken);
+        const direct = String(req.headers['x-email-api-key'] || '').trim();
+        const supplied = direct || (auth.startsWith('Bearer ') ? auth.slice(7).trim() : '');
+        if (bearerToken && supplied && safeEqual(supplied, bearerToken)) return { type:'super_admin', role:'super_admin', organizationId:'', permissions:['*'] };
+        if (supplied && tenantRegistry?.authenticateAccessKey) {
+            const tenant = tenantRegistry.authenticateAccessKey(supplied);
+            if (tenant) return tenant;
+        }
+        if (pathname === tenantPath) return null;
+        if (bearerToken) return null;
+        return { type:'path_secret', role:'super_admin', organizationId:'', permissions:['*'] };
     }
 
     async function parseBody(req, res) {
@@ -1509,7 +1571,14 @@ function createEmailMcpServer(options) {
             }
         }
         let session = findSession(req, url, sessions);
-        if (body.method === 'initialize' && !session) session = createSession(sessions);
+        if (body.method === 'initialize' && !session) session = createSession(sessions, { principal: req._emailPrincipal || null });
+        if (session?.principal) {
+            const a=session.principal,b=req._emailPrincipal||{};
+            if (String(a.type||'')!==String(b.type||'') || String(a.keyId||'')!==String(b.keyId||'') || String(a.organizationId||'')!==String(b.organizationId||'')) {
+                sendJson(res, 403, jsonRpcError(body?.id, -32003, 'MCP session principal mismatch'), {}, options);
+                return;
+            }
+        }
         if (body.method !== 'initialize' && req.headers['mcp-session-id'] && !session) {
             sendJson(res, 404, jsonRpcError(body.id, -32001, 'Unknown MCP session'), {}, options);
             return;
@@ -1581,19 +1650,21 @@ function createEmailMcpServer(options) {
                     protocolVersions: SUPPORTED_PROTOCOLS,
                     transports: ['streamable-http-stateless', 'streamable-http-stateful', 'sse-legacy'],
                     methods: ['POST', 'GET', 'DELETE', 'OPTIONS', 'HEAD'],
-                    endpoints: { streamableHttp: path, legacySse: ssePath, legacyMessage: messagePath },
+                    endpoints: { streamableHttp: path, tenantStreamableHttp: tenantPath, legacySse: ssePath, legacyMessage: messagePath },
                 }, {}, options);
                 return;
             }
-            const recognized = url.pathname === path || url.pathname === ssePath || url.pathname === messagePath;
+            const recognized = url.pathname === path || url.pathname === tenantPath || url.pathname === ssePath || url.pathname === messagePath;
             if (!recognized) {
                 sendJson(res, 404, { error: 'Not Found' }, {}, options);
                 return;
             }
-            if (!authorized(req)) {
+            const principal = authorizePrincipal(req, url.pathname);
+            if (!principal) {
                 sendJson(res, 401, { error: 'Unauthorized' }, { 'WWW-Authenticate': 'Bearer' }, options);
                 return;
             }
+            req._emailPrincipal = principal;
             if (req.method === 'OPTIONS') {
                 sendEmpty(res, 204, { Allow: 'POST, GET, DELETE, OPTIONS, HEAD' }, options);
                 return;
@@ -1694,7 +1765,7 @@ function createEmailMcpServer(options) {
         for (const session of Array.from(sessions.values())) closeSession(session, sessions);
     });
 
-    return { server, path, ssePath, messagePath, sessions, dispatchRpc: (body, ctx) => dispatchRpc(body, Object.assign({ service }, ctx || {})) };
+    return { server, path, tenantPath, ssePath, messagePath, sessions, dispatchRpc: (body, ctx) => dispatchRpc(body, Object.assign({ service }, ctx || {})) };
 }
 
 function startEmailMcpServer(options) {
@@ -1703,7 +1774,7 @@ function startEmailMcpServer(options) {
     const host = options.host || '127.0.0.1';
     const port = Number(options.port || 60026);
     created.server.listen(port, host, () => {
-        if (typeof options.onListen === 'function') options.onListen({ host, port, path: created.path, ssePath: created.ssePath, messagePath: created.messagePath, server: created.server });
+        if (typeof options.onListen === 'function') options.onListen({ host, port, path: created.path, tenantPath: created.tenantPath, ssePath: created.ssePath, messagePath: created.messagePath, server: created.server });
     });
     return created.server;
 }

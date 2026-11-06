@@ -16,6 +16,7 @@ const { createEmailRuntimeMonitor } = require('./core/runtime-monitor');
 const { createEmailBackupStorageManager } = require('./core/backup-storage-manager');
 const { createEmailUnsubscribeService } = require('./core/unsubscribe-service');
 const { createGooglePlayBilling } = require('./core/google-play-billing');
+const { hasPermission, httpPermission } = require('./core/tenant-access');
 const { createEmbedMetrics, publicHost, loadOrCreateEmbedSigningKey } = require('./core/embed-metrics');
 
 module.exports = function init(site) {
@@ -591,10 +592,35 @@ module.exports = function init(site) {
         }
     };
 
-    function body(req) {
+    function rawBody(req) {
         if (req?.body && typeof req.body === 'object' && Object.keys(req.body).length) return req.body;
         if (req?.data && typeof req.data === 'object') return req.data;
         return {};
+    }
+
+    function tenantAccessSecret(req) {
+        const direct = String(req?.headers?.['x-email-api-key'] || '').trim();
+        if (direct) return direct;
+        const auth = String(req?.headers?.authorization || '');
+        return auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+    }
+
+    function requestPrincipal(req) {
+        if (req?._emailPrincipal) return req._emailPrincipal;
+        const secret = tenantAccessSecret(req);
+        const tenant = secret ? site.emailTenants?.authenticateAccessKey?.(secret) : null;
+        if (tenant) return (req._emailPrincipal = tenant);
+        if (isAdminRequest(req) || localAdmin(req) || adminBrowser(req)) {
+            return (req._emailPrincipal = { type: 'super_admin', role: 'super_admin', organizationId: '', permissions: ['*'] });
+        }
+        return null;
+    }
+
+    function body(req) {
+        const source = rawBody(req);
+        const principal = requestPrincipal(req);
+        if (principal?.organizationId) return Object.assign({}, source, { organizationId: principal.organizationId });
+        return source;
     }
 
     const adminBrowserIDs = process.env.EMAIL_ADMIN_BROWSER_IDS || '*test*|*admin*|*dev*';
@@ -613,9 +639,7 @@ module.exports = function init(site) {
     }
 
     function admin(req) {
-        if (isAdminRequest(req)) return true;
-        if (localAdmin(req)) return true;
-        return adminBrowser(req);
+        return !!requestPrincipal(req);
     }
 
     function vipAccess(req) {
@@ -630,6 +654,20 @@ module.exports = function init(site) {
         res.json({ done: false, error: 'Admin permission is required' });
     }
 
+    site.use((req, res, next) => {
+        const pathname = String(req?.url || '').split('?')[0];
+        if (!pathname.startsWith('/api/emails/admin/')) return next();
+        const principal = requestPrincipal(req);
+        if (!principal) return next();
+        if (principal.role === 'super_admin') return next();
+        const permission = httpPermission(pathname, req.method);
+        if (!permission || !hasPermission(principal, permission)) {
+            res.status?.(403);
+            return res.json({ done: false, error: 'Permission denied', permission });
+        }
+        next();
+    });
+
     function adminGlobalContext(extra) {
         return Object.assign({
             isAdmin: true,
@@ -641,7 +679,10 @@ module.exports = function init(site) {
 
     function adminRequestContext(req, extra) {
         const data = body(req);
-        const organizationId = String(data.organizationId || req?.query?.organizationId || '').trim();
+        const principal = requestPrincipal(req);
+        const requestedOrganizationId = String(data.organizationId || req?.query?.organizationId || '').trim();
+        if (principal?.organizationId && requestedOrganizationId && requestedOrganizationId !== principal.organizationId) throw new Error('Organization scope mismatch');
+        const organizationId = String(principal?.organizationId || requestedOrganizationId).trim();
         const scoped = {};
         if (organizationId) {
             const organization = site.emailTenants?.getOrganization?.(organizationId);
@@ -652,8 +693,18 @@ module.exports = function init(site) {
         return adminGlobalContext(Object.assign({}, scoped, extra || {}));
     }
 
+    function principalOrganizationId(req) {
+        return String(requestPrincipal(req)?.organizationId || '').trim();
+    }
+
+    function assertTenantResource(req, kind, id) {
+        const organizationId = principalOrganizationId(req);
+        if (!organizationId) return null;
+        return site.emailTenants.assertResourceOrganization(kind, String(id || ''), organizationId);
+    }
+
     function rejectOrganizationScopeForInstance(req, res, feature) {
-        const organizationId = String(body(req).organizationId || req?.query?.organizationId || '').trim();
+        const organizationId = String(requestPrincipal(req)?.organizationId || body(req).organizationId || req?.query?.organizationId || '').trim();
         if (!organizationId) return false;
         res.json({ done: false, error: (feature || 'This endpoint') + ' is instance-wide and is unavailable inside an organization-scoped workspace.' });
         return true;
@@ -1906,12 +1957,16 @@ module.exports = function init(site) {
     onPost('/api/emails/admin/tenants/status', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!site.emailTenants) return res.json({ done: false, error: 'Tenant registry is unavailable.' });
-        return res.json({ done: true, status: site.emailTenants.status() });
+        const organizationId = principalOrganizationId(req);
+        if (!organizationId) return res.json({ done: true, status: site.emailTenants.status() });
+        return res.json({ done: true, status: { organizationId, organizations: 1, domains: site.emailTenants.listDomains({organizationId}).length, senders: site.emailTenants.listSenders({organizationId}).length, senderPools: site.emailTenants.listSenderPools({organizationId}).length, accessKeys: site.emailTenants.listAccessKeys({organizationId}).length } });
     });
 
     onPost('/api/emails/admin/organizations/list', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        return res.json({ done: true, organizations: site.emailTenants.listOrganizations() });
+        const organizationId = principalOrganizationId(req);
+        const organizations = organizationId ? site.emailTenants.listOrganizations().filter(x=>x.id===organizationId) : site.emailTenants.listOrganizations();
+        return res.json({ done: true, organizations });
     });
     onPost('/api/emails/admin/organizations/create', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
@@ -1920,7 +1975,11 @@ module.exports = function init(site) {
     });
     onPost('/api/emails/admin/organizations/update', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        const data=body(req); try { return res.json({ done: true, organization: site.emailTenants.updateOrganization(String(data.id||''), data) }); }
+        const data=body(req); try {
+            const organizationId = principalOrganizationId(req);
+            if (organizationId && String(data.id||'') !== organizationId) throw new Error('Organization not found');
+            return res.json({ done: true, organization: site.emailTenants.updateOrganization(String(data.id||''), data) });
+        }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
 
@@ -1935,18 +1994,18 @@ module.exports = function init(site) {
     });
     onPost('/api/emails/admin/domains/verify', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        try { return res.json({ done: true, result: await site.emailTenants.verifyDomain(String(body(req).id||'')) }); }
+        try { assertTenantResource(req,'domain',body(req).id); return res.json({ done: true, result: await site.emailTenants.verifyDomain(String(body(req).id||'')) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/domains/update', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        const data=body(req); try { return res.json({ done: true, domain: site.emailTenants.updateDomain(String(data.id||''), data) }); }
+        const data=body(req); try { assertTenantResource(req,'domain',data.id); return res.json({ done: true, domain: site.emailTenants.updateDomain(String(data.id||''), data) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
     onPost('/api/emails/admin/domains/delete', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        try { return res.json({ done: true, result: site.emailTenants.removeDomain(String(body(req).id||'')) }); }
+        try { assertTenantResource(req,'domain',body(req).id); return res.json({ done: true, result: site.emailTenants.removeDomain(String(body(req).id||'')) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
 
@@ -1961,17 +2020,17 @@ module.exports = function init(site) {
     });
     onPost('/api/emails/admin/sender-pools/update', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        const data=body(req); try { return res.json({ done: true, pool: site.emailTenants.updateSenderPool(String(data.id||''), data) }); }
+        const data=body(req); try { assertTenantResource(req,'senderPool',data.id); return res.json({ done: true, pool: site.emailTenants.updateSenderPool(String(data.id||''), data) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
     onPost('/api/emails/admin/sender-pools/readiness', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        try { return res.json({ done: true, readiness: site.emailTenants.senderPoolReadiness(String(body(req).id||'')) }); }
+        try { assertTenantResource(req,'senderPool',body(req).id); return res.json({ done: true, readiness: site.emailTenants.senderPoolReadiness(String(body(req).id||'')) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
     onPost('/api/emails/admin/sender-pools/delete', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        try { return res.json({ done: true, result: site.emailTenants.removeSenderPool(String(body(req).id||'')) }); }
+        try { assertTenantResource(req,'senderPool',body(req).id); return res.json({ done: true, result: site.emailTenants.removeSenderPool(String(body(req).id||'')) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
 
@@ -1986,19 +2045,40 @@ module.exports = function init(site) {
     });
     onPost('/api/emails/admin/senders/readiness', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        try { return res.json({ done: true, readiness: site.emailTenants.senderReadiness(String(body(req).id||'')) }); }
+        try { assertTenantResource(req,'sender',body(req).id); return res.json({ done: true, readiness: site.emailTenants.senderReadiness(String(body(req).id||'')) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
 
     onPost('/api/emails/admin/senders/update', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        const data=body(req); try { return res.json({ done: true, sender: site.emailTenants.updateSender(String(data.id||''), data) }); }
+        const data=body(req); try { assertTenantResource(req,'sender',data.id); return res.json({ done: true, sender: site.emailTenants.updateSender(String(data.id||''), data) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
     onPost('/api/emails/admin/senders/delete', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
-        try { return res.json({ done: true, result: site.emailTenants.removeSender(String(body(req).id||'')) }); }
+        try { assertTenantResource(req,'sender',body(req).id); return res.json({ done: true, result: site.emailTenants.removeSender(String(body(req).id||'')) }); }
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/access-keys/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data = body(req);
+        return res.json({ done: true, accessKeys: site.emailTenants.listAccessKeys({ organizationId: data.organizationId || undefined, status: data.status || undefined }) });
+    });
+    onPost('/api/emails/admin/access-keys/create', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, ...site.emailTenants.createAccessKey(body(req)) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/access-keys/revoke', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data=body(req);
+        try {
+            const organizationId=principalOrganizationId(req);
+            const key=site.emailTenants.listAccessKeys().find(x=>x.id===String(data.id||''));
+            if(!key || (organizationId && key.organizationId!==organizationId)) throw new Error('Access key not found');
+            return res.json({ done:true, key:site.emailTenants.revokeAccessKey(String(data.id||'')) });
+        } catch(error){ return res.json({done:false,error:error?.message||String(error)}); }
     });
 
     onPost('/api/emails/admin/instance/get', async (req, res) => {

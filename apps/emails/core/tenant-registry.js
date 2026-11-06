@@ -5,6 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { normalizeHostname, mailDomainFromHostname } = require('./domain');
 const { verifyMailDomain } = require('./domain-verifier');
+const { permissionsForRole } = require('./tenant-access');
 
 function ensureDir(dir){ fs.mkdirSync(dir,{recursive:true}); }
 function clone(v){ return JSON.parse(JSON.stringify(v)); }
@@ -19,8 +20,10 @@ class MailTenantRegistry{
   constructor(options={}){
     this.file=path.resolve(options.filePath||path.join(process.cwd(),'localStorage','email-tenants','registry.json'));
     this.instanceConfig=options.instanceConfig||null;
-    this.data=read(this.file)||{schemaVersion:1,organizations:[],domains:[],senders:[],senderPools:[],updatedAt:''};
+    this.data=read(this.file)||{schemaVersion:2,organizations:[],domains:[],senders:[],senderPools:[],accessKeys:[],updatedAt:''};
     if(!Array.isArray(this.data.senderPools)) this.data.senderPools=[];
+    if(!Array.isArray(this.data.accessKeys)) this.data.accessKeys=[];
+    this.data.schemaVersion=Math.max(2,Number(this.data.schemaVersion||1));
     this._ensureDefault();
     this._save();
   }
@@ -122,6 +125,7 @@ class MailTenantRegistry{
     const d=addr.split('@')[1];
     const domainRow=this.data.domains.find(x=>x.id===input.domainId)||this.data.domains.find(x=>x.domain===d);
     if(!domainRow) throw new Error('Sender domain is not registered');
+    if(input.organizationId && domainRow.organizationId!==String(input.organizationId)) throw new Error('Sender domain does not belong to the selected organization');
     if(domainRow.domain!==d) throw new Error('Sender email does not match selected domain');
     const row={id:id('sender_'),organizationId:domainRow.organizationId,domainId:domainRow.id,email:addr,displayName:String(input.displayName||'').trim(),replyTo:email(input.replyTo)||'',status:['active','disabled','warming'].includes(String(input.status))?String(input.status):'active',tags:Array.isArray(input.tags)?[...new Set(input.tags.map(x=>String(x).trim()).filter(Boolean))]:[],createdAt:now(),updatedAt:now()};
     this.data.senders.push(row); this._save(); return clone(row);
@@ -175,6 +179,50 @@ class MailTenantRegistry{
     const members=pool.senderIds.map(id=>this.senderReadiness(id));
     const readyMembers=members.filter(x=>x.ready);
     return {ready:pool.status==='active'&&readyMembers.length===pool.senderIds.length,pool:clone(pool),members,readyCount:readyMembers.length,total:members.length};
+  }
+  listAccessKeys(input={}){
+    let rows=this.data.accessKeys;
+    if(input.organizationId) rows=rows.filter(x=>x.organizationId===input.organizationId);
+    if(input.status) rows=rows.filter(x=>x.status===input.status);
+    return clone(rows.map(({secretHash,...row})=>row));
+  }
+  createAccessKey(input={}){
+    const organizationId=String(input.organizationId||'').trim();
+    const org=this.data.organizations.find(x=>x.id===organizationId);
+    if(!org) throw new Error('Organization not found');
+    const role=String(input.role||'viewer').trim();
+    if(!['organization_admin','operator','viewer'].includes(role)) throw new Error('Invalid access-key role');
+    const name=String(input.name||role+' key').trim().slice(0,120)||'Access key';
+    const secret='emk_'+crypto.randomBytes(32).toString('base64url');
+    const prefix=secret.slice(0,12);
+    const row={
+      id:id('key_'),organizationId,name,role,permissions:permissionsForRole(role),prefix,
+      secretHash:crypto.createHash('sha256').update(secret).digest('hex'),status:'active',
+      createdAt:now(),updatedAt:now(),lastUsedAt:null,revokedAt:null
+    };
+    this.data.accessKeys.push(row); this._save();
+    return {key:clone(Object.fromEntries(Object.entries(row).filter(([k])=>k!=='secretHash'))),secret};
+  }
+  revokeAccessKey(idv){
+    const row=this.data.accessKeys.find(x=>x.id===idv); if(!row) throw new Error('Access key not found');
+    row.status='revoked'; row.revokedAt=now(); row.updatedAt=now(); this._save();
+    const {secretHash,...safe}=row; return clone(safe);
+  }
+  assertResourceOrganization(kind,idv,organizationId){
+    const map={domain:'domains',sender:'senders',senderPool:'senderPools'}; const key=map[kind];
+    if(!key) throw new Error('Unknown resource kind');
+    const row=this.data[key].find(x=>x.id===idv); if(!row || (organizationId && row.organizationId!==organizationId)) throw new Error('Resource not found');
+    return clone(row);
+  }
+  authenticateAccessKey(secret){
+    const raw=String(secret||'').trim(); if(!raw) return null;
+    const hash=crypto.createHash('sha256').update(raw).digest('hex');
+    const row=this.data.accessKeys.find(x=>x.status==='active' && typeof x.secretHash==='string' && x.secretHash.length===hash.length && crypto.timingSafeEqual(Buffer.from(x.secretHash,'hex'),Buffer.from(hash,'hex')));
+    if(!row) return null;
+    const org=this.data.organizations.find(x=>x.id===row.organizationId);
+    if(!org || org.status!=='active') return null;
+    const last=Date.parse(row.lastUsedAt||0)||0; if(Date.now()-last>60000){ row.lastUsedAt=now(); row.updatedAt=now(); this._save(); }
+    return {type:'tenant_api_key',keyId:row.id,organizationId:row.organizationId,role:row.role,permissions:permissionsForRole(row.role),name:row.name,prefix:row.prefix};
   }
   organizationDomains(organizationId){ return this.data.domains.filter(x=>x.organizationId===organizationId).map(x=>x.domain); }
   organizationSenders(organizationId){ return this.data.senders.filter(x=>x.organizationId===organizationId).map(x=>x.email); }

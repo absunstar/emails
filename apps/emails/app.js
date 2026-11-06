@@ -613,6 +613,19 @@ module.exports = function init(site) {
         if (isAdminRequest(req) || localAdmin(req) || adminBrowser(req)) {
             return (req._emailPrincipal = { type: 'super_admin', role: 'super_admin', organizationId: '', permissions: ['*'] });
         }
+        if (!browserAuth.isSignedOut(req)) {
+            const identity = browserAuth.browserIdentity(req);
+            if (identity?.raw) {
+                const preferred = String(req?.session?.email_active_organization_id || '').trim();
+                const member = site.emailTenants?.principalForIdentity?.('x-browser', identity.raw, preferred);
+                if (member) {
+                    req.session = req.session || {};
+                    req.session.email_active_organization_id = member.organizationId;
+                    req.session.$save?.();
+                    return (req._emailPrincipal = member);
+                }
+            }
+        }
         return null;
     }
 
@@ -763,6 +776,8 @@ module.exports = function init(site) {
         req.session = req.session || {};
         req.session.email_admin_authenticated = false;
         req.session.email_admin_username = '';
+        req.session.email_active_organization_id = '';
+        req._emailPrincipal = null;
         req.session.$save?.();
         return res.json({ done: true });
     });
@@ -770,6 +785,14 @@ module.exports = function init(site) {
     site.onGET({
         name: 'login',
         path: __dirname + '/site_files/html/login.html',
+        parser: 'html css js',
+        compress: true,
+        overwrite: true,
+    });
+
+    site.onGET({
+        name: 'join',
+        path: __dirname + '/site_files/html/join.html',
         parser: 'html css js',
         compress: true,
         overwrite: true,
@@ -790,7 +813,51 @@ module.exports = function init(site) {
     });
 
     onPost('/api/v2/browser-auth/signout', (req, res) => {
-        res.json(browserAuth.signOut(req));
+        const result=browserAuth.signOut(req);
+        req.session = req.session || {};
+        req.session.email_active_organization_id='';
+        req._emailPrincipal=null;
+        req.session.$save?.();
+        res.json(result);
+    });
+
+    onPost('/api/v2/tenant/session/status', (req, res) => {
+        const identity = browserAuth.browserIdentity(req);
+        if (!identity?.raw || browserAuth.isSignedOut(req)) return res.json({ done:true, authenticated:false, memberships:[], principal:null });
+        const memberships = site.emailTenants.membershipsForIdentity('x-browser', identity.raw).map((member) => { const org=site.emailTenants.getOrganization(member.organizationId); return Object.assign({}, member, { organizationName:org?.name || member.organizationId, organizationSlug:org?.slug || '' }); });
+        const principal = requestPrincipal(req);
+        return res.json({ done:true, authenticated:!!principal, identity:{ provider:'x-browser', subject:identity.raw, brand:identity.brand, id:identity.id }, memberships, principal: principal ? { type:principal.type, memberId:principal.memberId||null, organizationId:principal.organizationId||'', role:principal.role, permissions:principal.permissions||[], name:principal.name||'' } : null });
+    });
+
+    onPost('/api/v2/tenant/session/switch', (req, res) => {
+        const identity = browserAuth.browserIdentity(req);
+        if (!identity?.raw || browserAuth.isSignedOut(req)) return res.json({ done:false, error:'Social Browser sign-in is required.' });
+        const organizationId = String(rawBody(req).organizationId || '').trim();
+        const memberships = site.emailTenants.membershipsForIdentity('x-browser', identity.raw);
+        if (!memberships.some(x=>x.organizationId===organizationId)) return res.json({ done:false, error:'Organization membership not found.' });
+        req.session = req.session || {};
+        req.session.email_active_organization_id = organizationId;
+        req._emailPrincipal = null;
+        req.session.$save?.();
+        const principal = requestPrincipal(req);
+        return res.json({ done:true, principal:{ type:principal.type, memberId:principal.memberId||null, organizationId:principal.organizationId, role:principal.role, permissions:principal.permissions, name:principal.name||'' } });
+    });
+
+    onPost('/api/v2/tenant/invitations/accept', (req, res) => {
+        const identity = browserAuth.browserIdentity(req);
+        if (!identity?.raw || browserAuth.isSignedOut(req)) return res.json({ done:false, error:'Social Browser sign-in is required.' });
+        const token = String(rawBody(req).token || '').trim();
+        if (!token) return res.json({ done:false, error:'Invitation token is required.' });
+        try {
+            const sessionUser = browserAuth.syncSession(req) || {};
+            const result = site.emailTenants.acceptInvitation(token, { authProvider:'x-browser', subject:identity.raw, displayName:sessionUser?.profile?.displayName || sessionUser?.profile?.name || identity.brand || 'Social Browser' });
+            req.session = req.session || {};
+            req.session.email_active_organization_id = result.member.organizationId;
+            req._emailPrincipal = null;
+            req.session.$save?.();
+            const principal = requestPrincipal(req);
+            return res.json({ done:true, member:result.member, invitation:result.invitation, principal:{ type:principal.type, memberId:principal.memberId, organizationId:principal.organizationId, role:principal.role, permissions:principal.permissions, name:principal.name||'' } });
+        } catch(error) { return res.json({ done:false, error:error?.message || String(error) }); }
     });
 
 
@@ -1959,7 +2026,7 @@ module.exports = function init(site) {
         if (!site.emailTenants) return res.json({ done: false, error: 'Tenant registry is unavailable.' });
         const organizationId = principalOrganizationId(req);
         if (!organizationId) return res.json({ done: true, status: site.emailTenants.status() });
-        return res.json({ done: true, status: { organizationId, organizations: 1, domains: site.emailTenants.listDomains({organizationId}).length, senders: site.emailTenants.listSenders({organizationId}).length, senderPools: site.emailTenants.listSenderPools({organizationId}).length, accessKeys: site.emailTenants.listAccessKeys({organizationId}).length } });
+        return res.json({ done: true, status: { organizationId, organizations: 1, domains: site.emailTenants.listDomains({organizationId}).length, senders: site.emailTenants.listSenders({organizationId}).length, senderPools: site.emailTenants.listSenderPools({organizationId}).length, accessKeys: site.emailTenants.listAccessKeys({organizationId}).length, members: site.emailTenants.listMembers({organizationId}).length, invitations: site.emailTenants.listInvitations({organizationId}).length } });
     });
 
     onPost('/api/emails/admin/organizations/list', async (req, res) => {
@@ -2078,6 +2145,52 @@ module.exports = function init(site) {
             const key=site.emailTenants.listAccessKeys().find(x=>x.id===String(data.id||''));
             if(!key || (organizationId && key.organizationId!==organizationId)) throw new Error('Access key not found');
             return res.json({ done:true, key:site.emailTenants.revokeAccessKey(String(data.id||'')) });
+        } catch(error){ return res.json({done:false,error:error?.message||String(error)}); }
+    });
+
+    onPost('/api/emails/admin/members/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data=body(req);
+        return res.json({ done:true, members:site.emailTenants.listMembers({ organizationId:data.organizationId||undefined, status:data.status||undefined }) });
+    });
+    onPost('/api/emails/admin/members/update', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data=body(req);
+        try {
+            const organizationId=principalOrganizationId(req);
+            const member=site.emailTenants.listMembers().find(x=>x.id===String(data.id||''));
+            if(!member || (organizationId && member.organizationId!==organizationId)) throw new Error('Member not found');
+            return res.json({done:true,member:site.emailTenants.updateMember(String(data.id||''),data)});
+        } catch(error){ return res.json({done:false,error:error?.message||String(error)}); }
+    });
+    onPost('/api/emails/admin/members/delete', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data=body(req);
+        try {
+            const organizationId=principalOrganizationId(req);
+            const member=site.emailTenants.listMembers().find(x=>x.id===String(data.id||''));
+            if(!member || (organizationId && member.organizationId!==organizationId)) throw new Error('Member not found');
+            return res.json({done:true,result:site.emailTenants.removeMember(String(data.id||''))});
+        } catch(error){ return res.json({done:false,error:error?.message||String(error)}); }
+    });
+    onPost('/api/emails/admin/invitations/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data=body(req);
+        return res.json({done:true,invitations:site.emailTenants.listInvitations({ organizationId:data.organizationId||undefined, status:data.status||undefined })});
+    });
+    onPost('/api/emails/admin/invitations/create', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({done:true,...site.emailTenants.createInvitation(body(req))}); }
+        catch(error){ return res.json({done:false,error:error?.message||String(error)}); }
+    });
+    onPost('/api/emails/admin/invitations/revoke', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data=body(req);
+        try {
+            const organizationId=principalOrganizationId(req);
+            const invite=site.emailTenants.listInvitations().find(x=>x.id===String(data.id||''));
+            if(!invite || (organizationId && invite.organizationId!==organizationId)) throw new Error('Invitation not found');
+            return res.json({done:true,invitation:site.emailTenants.revokeInvitation(String(data.id||''))});
         } catch(error){ return res.json({done:false,error:error?.message||String(error)}); }
     });
 

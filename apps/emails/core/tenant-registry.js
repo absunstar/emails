@@ -20,10 +20,12 @@ class MailTenantRegistry{
   constructor(options={}){
     this.file=path.resolve(options.filePath||path.join(process.cwd(),'localStorage','email-tenants','registry.json'));
     this.instanceConfig=options.instanceConfig||null;
-    this.data=read(this.file)||{schemaVersion:2,organizations:[],domains:[],senders:[],senderPools:[],accessKeys:[],updatedAt:''};
+    this.data=read(this.file)||{schemaVersion:3,organizations:[],domains:[],senders:[],senderPools:[],accessKeys:[],members:[],invitations:[],updatedAt:''};
     if(!Array.isArray(this.data.senderPools)) this.data.senderPools=[];
     if(!Array.isArray(this.data.accessKeys)) this.data.accessKeys=[];
-    this.data.schemaVersion=Math.max(2,Number(this.data.schemaVersion||1));
+    if(!Array.isArray(this.data.members)) this.data.members=[];
+    if(!Array.isArray(this.data.invitations)) this.data.invitations=[];
+    this.data.schemaVersion=Math.max(3,Number(this.data.schemaVersion||1));
     this._ensureDefault();
     this._save();
   }
@@ -47,7 +49,7 @@ class MailTenantRegistry{
       }
     }
   }
-  status(){ return {organizations:this.data.organizations.length,domains:this.data.domains.length,senders:this.data.senders.length,senderPools:this.data.senderPools.length,file:this.file,updatedAt:this.data.updatedAt}; }
+  status(){ return {organizations:this.data.organizations.length,domains:this.data.domains.length,senders:this.data.senders.length,senderPools:this.data.senderPools.length,accessKeys:this.data.accessKeys.length,members:this.data.members.length,invitations:this.data.invitations.length,file:this.file,updatedAt:this.data.updatedAt}; }
   listOrganizations(){ return clone(this.data.organizations); }
   createOrganization(input={}){
     const name=String(input.name||'').trim(); if(!name) throw new Error('Organization name is required');
@@ -179,6 +181,73 @@ class MailTenantRegistry{
     const members=pool.senderIds.map(id=>this.senderReadiness(id));
     const readyMembers=members.filter(x=>x.ready);
     return {ready:pool.status==='active'&&readyMembers.length===pool.senderIds.length,pool:clone(pool),members,readyCount:readyMembers.length,total:members.length};
+  }
+  listMembers(input={}){
+    let rows=this.data.members;
+    if(input.organizationId) rows=rows.filter(x=>x.organizationId===input.organizationId);
+    if(input.status) rows=rows.filter(x=>x.status===input.status);
+    if(input.authProvider) rows=rows.filter(x=>x.authProvider===input.authProvider);
+    return clone(rows);
+  }
+  createInvitation(input={}){
+    const organizationId=String(input.organizationId||'').trim();
+    const org=this.data.organizations.find(x=>x.id===organizationId); if(!org) throw new Error('Organization not found');
+    const role=String(input.role||'viewer').trim(); if(!['organization_admin','operator','viewer'].includes(role)) throw new Error('Invalid invitation role');
+    const inviteEmail=email(input.email)||'';
+    const label=String(input.name||input.displayName||inviteEmail||role+' invitation').trim().slice(0,160);
+    const secret='emi_'+crypto.randomBytes(32).toString('base64url');
+    const prefix=secret.slice(0,12);
+    const defaultExpiry=new Date(Date.now()+7*24*60*60*1000).toISOString();
+    const expiresAt=input.expiresAt?new Date(input.expiresAt).toISOString():defaultExpiry;
+    const row={id:id('invite_'),organizationId,email:inviteEmail,name:label,role,prefix,tokenHash:crypto.createHash('sha256').update(secret).digest('hex'),status:'pending',expiresAt,createdAt:now(),updatedAt:now(),acceptedAt:null,revokedAt:null,memberId:null};
+    this.data.invitations.push(row); this._save();
+    const {tokenHash,...safe}=row; return {invitation:clone(safe),secret};
+  }
+  listInvitations(input={}){
+    let rows=this.data.invitations.map((item)=>{const row={...item};if(row.status==='pending'&&Date.parse(row.expiresAt||0)&&Date.parse(row.expiresAt)<Date.now())row.status='expired';return row;});
+    if(input.organizationId) rows=rows.filter(x=>x.organizationId===input.organizationId);
+    if(input.status) rows=rows.filter(x=>x.status===input.status);
+    return clone(rows.map(({tokenHash,...row})=>row));
+  }
+  revokeInvitation(idv){
+    const row=this.data.invitations.find(x=>x.id===idv); if(!row) throw new Error('Invitation not found');
+    if(row.status==='accepted') throw new Error('Accepted invitation cannot be revoked');
+    row.status='revoked'; row.revokedAt=now(); row.updatedAt=now(); this._save();
+    const {tokenHash,...safe}=row; return clone(safe);
+  }
+  _invitationBySecret(secret){
+    const raw=String(secret||'').trim(); if(!raw) return null;
+    const hash=crypto.createHash('sha256').update(raw).digest('hex');
+    return this.data.invitations.find(x=>x.status==='pending' && typeof x.tokenHash==='string' && x.tokenHash.length===hash.length && crypto.timingSafeEqual(Buffer.from(x.tokenHash,'hex'),Buffer.from(hash,'hex')))||null;
+  }
+  acceptInvitation(secret,identity={}){
+    const row=this._invitationBySecret(secret); if(!row) throw new Error('Invitation not found or no longer active');
+    if(Date.parse(row.expiresAt||0) && Date.parse(row.expiresAt)<Date.now()){ row.status='expired'; row.updatedAt=now(); this._save(); throw new Error('Invitation has expired'); }
+    const org=this.data.organizations.find(x=>x.id===row.organizationId); if(!org || org.status!=='active') throw new Error('Organization is unavailable');
+    const authProvider=String(identity.authProvider||'').trim(); const subject=String(identity.subject||'').trim();
+    if(!authProvider || !subject) throw new Error('Authenticated identity is required');
+    let member=this.data.members.find(x=>x.organizationId===row.organizationId && x.authProvider===authProvider && x.subject===subject);
+    if(member){ member.role=row.role; member.status='active'; member.displayName=String(identity.displayName||member.displayName||row.name||'').trim(); member.email=email(identity.email)||member.email||row.email||''; member.updatedAt=now(); }
+    else { member={id:id('member_'),organizationId:row.organizationId,authProvider,subject,displayName:String(identity.displayName||row.name||'').trim(),email:email(identity.email)||row.email||'',role:row.role,permissions:permissionsForRole(row.role),status:'active',createdAt:now(),updatedAt:now(),lastLoginAt:now()}; this.data.members.push(member); }
+    row.status='accepted'; row.acceptedAt=now(); row.memberId=member.id; row.updatedAt=now(); this._save();
+    const {tokenHash,...safeInvite}=row; return {member:clone(member),invitation:clone(safeInvite)};
+  }
+  updateMember(idv,patch={}){
+    const row=this.data.members.find(x=>x.id===idv); if(!row) throw new Error('Member not found');
+    if(patch.role!=null){ const role=String(patch.role); if(!['organization_admin','operator','viewer'].includes(role)) throw new Error('Invalid member role'); row.role=role; row.permissions=permissionsForRole(role); }
+    if(patch.status!=null){ const status=String(patch.status); if(!['active','disabled'].includes(status)) throw new Error('Invalid member status'); row.status=status; }
+    if(patch.displayName!=null) row.displayName=String(patch.displayName).trim().slice(0,160);
+    row.updatedAt=now(); this._save(); return clone(row);
+  }
+  removeMember(idv){ const row=this.data.members.find(x=>x.id===idv); if(!row) throw new Error('Member not found'); this.data.members=this.data.members.filter(x=>x.id!==idv); this._save(); return {id:idv,deleted:true}; }
+  membershipsForIdentity(authProvider,subject){
+    const provider=String(authProvider||'').trim(), sub=String(subject||'').trim();
+    return clone(this.data.members.filter(x=>x.authProvider===provider&&x.subject===sub&&x.status==='active').filter(x=>this.data.organizations.some(o=>o.id===x.organizationId&&o.status==='active')));
+  }
+  principalForIdentity(authProvider,subject,preferredOrganizationId){
+    const memberships=this.membershipsForIdentity(authProvider,subject); if(!memberships.length) return null;
+    let member=memberships.find(x=>x.organizationId===String(preferredOrganizationId||''))||memberships[0];
+    return {type:'tenant_member',memberId:member.id,organizationId:member.organizationId,role:member.role,permissions:permissionsForRole(member.role),name:member.displayName||member.email||member.subject,authProvider:member.authProvider,subject:member.subject,memberships};
   }
   listAccessKeys(input={}){
     let rows=this.data.accessKeys;

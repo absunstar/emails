@@ -186,7 +186,7 @@ function createEmailMcpService(options) {
                 vipCount: emailService.listVip().length,
                 policyEnabled: !!policy?.enabled,
                 capabilities: [
-                    'portable-instance-config', 'white-label-branding', 'multi-domain-instance', 'configurable-mcp-identity', 'organizations', 'domain-registry', 'sender-identities', 'sender-pools', 'tenant-access-keys', 'rbac', 'identity-isolation', 'tenant-isolation', 'organization-scoped-messages', 'organization-scoped-schedules', 'organization-scoped-suppressions', 'organization-scoped-deliverability',
+                    'portable-instance-config', 'white-label-branding', 'multi-domain-instance', 'configurable-mcp-identity', 'organizations', 'domain-registry', 'sender-identities', 'sender-pools', 'tenant-access-keys', 'tenant-members', 'tenant-invitations', 'social-browser-membership', 'organization-session-switching', 'rbac', 'identity-isolation', 'tenant-isolation', 'organization-scoped-messages', 'organization-scoped-schedules', 'organization-scoped-suppressions', 'organization-scoped-deliverability',
                     'global-search', 'advanced-filters', 'pagination', 'sorting', 'read', 'read-many', 'favorites', 'folders', 'bulk-update',
                     'send', 'bulk-send', 'reply', 'forward', 'attachments', 'eml-export', 'remote-image-analysis', 'tracking-pixel-analysis',
                     'vip-management', 'delete', 'bulk-delete', 'delete-matching', 'mailbox-statuses', 'statistics',
@@ -204,7 +204,7 @@ function createEmailMcpService(options) {
             enforceAdminRate(scope, false);
             const organizationId=String(scope?.organizationId||'').trim();
             if(!organizationId) return tenantsRequired().status();
-            return { organizationId, organizations:1, domains:tenantsRequired().listDomains({organizationId}).length, senders:tenantsRequired().listSenders({organizationId}).length, senderPools:tenantsRequired().listSenderPools({organizationId}).length, accessKeys:tenantsRequired().listAccessKeys({organizationId}).length };
+            return { organizationId, organizations:1, domains:tenantsRequired().listDomains({organizationId}).length, senders:tenantsRequired().listSenders({organizationId}).length, senderPools:tenantsRequired().listSenderPools({organizationId}).length, accessKeys:tenantsRequired().listAccessKeys({organizationId}).length, members:tenantsRequired().listMembers({organizationId}).length, invitations:tenantsRequired().listInvitations({organizationId}).length };
         },
         async organizationsList(scope) {
             enforceAdminRate(scope, false);
@@ -241,6 +241,38 @@ function createEmailMcpService(options) {
             const row=tenantsRequired().listAccessKeys().find(x=>x.id===String(args.id||''));
             if(!row || (scope?.organizationId && row.organizationId!==scope.organizationId)) throw new Error('Access key not found');
             return tenantsRequired().revokeAccessKey(args.id);
+        },
+        async membersList(args, scope) {
+            enforceAdminRate(scope,false);
+            const organizationId=String(scope?.organizationId||args?.organizationId||'').trim();
+            return { members:tenantsRequired().listMembers({organizationId:organizationId||undefined,status:args?.status||undefined}) };
+        },
+        async memberUpdate(args, scope) {
+            enforceAdminRate(scope,true);
+            const row=tenantsRequired().listMembers().find(x=>x.id===String(args.id||''));
+            if(!row || (scope?.organizationId && row.organizationId!==scope.organizationId)) throw new Error('Member not found');
+            return tenantsRequired().updateMember(args.id,args);
+        },
+        async memberDelete(args, scope) {
+            enforceAdminRate(scope,true);
+            const row=tenantsRequired().listMembers().find(x=>x.id===String(args.id||''));
+            if(!row || (scope?.organizationId && row.organizationId!==scope.organizationId)) throw new Error('Member not found');
+            return tenantsRequired().removeMember(args.id);
+        },
+        async invitationsList(args, scope) {
+            enforceAdminRate(scope,false);
+            const organizationId=String(scope?.organizationId||args?.organizationId||'').trim();
+            return { invitations:tenantsRequired().listInvitations({organizationId:organizationId||undefined,status:args?.status||undefined}) };
+        },
+        async invitationCreate(args, scope) {
+            enforceAdminRate(scope,true);
+            return tenantsRequired().createInvitation(Object.assign({},args,scope?.organizationId?{organizationId:scope.organizationId}:{}));
+        },
+        async invitationRevoke(args, scope) {
+            enforceAdminRate(scope,true);
+            const row=tenantsRequired().listInvitations().find(x=>x.id===String(args.id||''));
+            if(!row || (scope?.organizationId && row.organizationId!==scope.organizationId)) throw new Error('Invitation not found');
+            return tenantsRequired().revokeInvitation(args.id);
         },
 
         async instanceGet(scope) {

@@ -46,7 +46,10 @@
         tenantSenders: [],
         senderPools: [],
         accessKeys: [],
+        members: [],
+        invitations: [],
         organizationId: '',
+        tenantSession: null,
     };
 
     const q = (selector, base) => (base || document).querySelector(selector);
@@ -318,21 +321,45 @@
     }
 
     async function loadOrganizationScopeOptions() {
+        let tenantSession = null;
+        try { tenantSession = await ui.post('/api/v2/tenant/session/status', {}); } catch (_) {}
+        state.tenantSession = tenantSession?.principal?.type === 'tenant_member' ? tenantSession : null;
+        const select = q('[data-admin-org-scope]');
+        if (state.tenantSession) {
+            const memberships = state.tenantSession.memberships || [];
+            state.organizationId = state.tenantSession.principal.organizationId || memberships[0]?.organizationId || '';
+            state.organizations = memberships.map(m => ({ id:m.organizationId, name:m.organizationName || m.organizationId, slug:m.organizationSlug || '', status:'active' }));
+            if (select) {
+                select.innerHTML = memberships.map(m => '<option value="' + escape(m.organizationId) + '">' + escape(m.organizationName || m.organizationId) + ' · ' + escape(m.role || 'viewer') + '</option>').join('');
+                select.value = state.organizationId;
+                select.title = 'Switch active organization';
+            }
+            return;
+        }
         const response = await ui.post('/api/emails/admin/organizations/list', {});
         if (!response || response.done === false) throw new Error(response?.error || 'Unable to load organizations');
         state.organizations = response.organizations || [];
-        const select = q('[data-admin-org-scope]');
         if (select) {
             const saved = readLocal('socialTempMail.admin.organizationId', '');
             select.innerHTML = '<option value="">All organizations</option>' + state.organizations.filter(x => x.status !== 'disabled').map(x => '<option value="' + escape(x.id) + '">' + escape(x.name) + '</option>').join('');
             const valid = state.organizations.some(x => x.id === saved && x.status !== 'disabled');
             state.organizationId = valid ? saved : '';
             select.value = state.organizationId;
+            select.title = 'Organization scope';
         }
     }
 
     async function changeOrganizationScope(value) {
-        state.organizationId = String(value || '');
+        const nextOrganizationId = String(value || '');
+        if (state.tenantSession) {
+            const response = await ui.post('/api/v2/tenant/session/switch', { organizationId: nextOrganizationId });
+            if (!response || response.done === false) throw new Error(response?.error || 'Unable to switch organization');
+            state.organizationId = nextOrganizationId;
+            toast('Active organization changed. Reloading workspace…', 'success', 'Organization switched');
+            location.reload();
+            return;
+        }
+        state.organizationId = nextOrganizationId;
         writeLocal('socialTempMail.admin.organizationId', state.organizationId);
         state.offset = 0;
         state.selected.clear();
@@ -1422,19 +1449,27 @@
         const poolOrg=q('[data-pool-org]'); if(poolOrg) poolOrg.innerHTML=state.organizations.filter(o=>o.status!=='disabled').map(o=>'<option value="'+escape(o.id)+'">'+escape(o.name)+'</option>').join('');
         renderPoolSenderOptions();
         const poolHost=q('[data-tenant-pool-list]'); if(poolHost) poolHost.innerHTML=state.senderPools.map(pool=>'<tr><td><strong>'+escape(pool.name)+'</strong></td><td>'+escape(orgName(pool.organizationId))+'</td><td>'+escape(pool.mode)+'</td><td>'+escape((pool.senderIds||[]).length)+'</td><td>'+tenantPill(pool.status)+'</td><td><div class="mail-ops-row-actions"><button type="button" data-admin-action="tenant-pool-readiness" data-tenant-id="'+escape(pool.id)+'">Readiness</button><button type="button" class="danger" data-admin-action="tenant-pool-delete" data-tenant-id="'+escape(pool.id)+'">Delete</button></div></td></tr>').join('')||'<tr><td colspan="6">No sender pools.</td></tr>';
+        const memberOrg=q('[data-member-org]'); if(memberOrg) memberOrg.innerHTML=state.organizations.filter(o=>o.status!=='disabled').map(o=>'<option value="'+escape(o.id)+'">'+escape(o.name)+'</option>').join('');
+        const memberHost=q('[data-member-list]'); if(memberHost) memberHost.innerHTML=state.members.map(m=>'<tr data-member-row="'+escape(m.id)+'"><td><strong>'+escape(m.displayName||m.email||'Member')+'</strong><br><small>'+escape(m.email||'')+'</small></td><td>'+escape(orgName(m.organizationId))+'</td><td><code>'+escape(m.authProvider||'')+':'+escape(m.subject||'')+'</code></td><td><select class="sb-select" data-member-role><option value="viewer"'+(m.role==='viewer'?' selected':'')+'>Viewer</option><option value="operator"'+(m.role==='operator'?' selected':'')+'>Operator</option><option value="organization_admin"'+(m.role==='organization_admin'?' selected':'')+'>Organization Admin</option></select></td><td>'+tenantPill(m.status)+'</td><td><div class="mail-ops-row-actions"><button type="button" data-admin-action="member-update" data-tenant-id="'+escape(m.id)+'">Save role</button><button type="button" class="danger" data-admin-action="member-delete" data-tenant-id="'+escape(m.id)+'">Remove</button></div></td></tr>').join('')||'<tr><td colspan="6">No members yet.</td></tr>';
+        const inviteHost=q('[data-invitation-list]'); if(inviteHost) inviteHost.innerHTML=state.invitations.map(i=>'<tr><td><strong>'+escape(i.name||i.email||'Invitation')+'</strong><br><small>'+escape(i.email||'')+'</small></td><td>'+escape(orgName(i.organizationId))+'</td><td>'+escape(i.role||'viewer')+'</td><td>'+tenantPill(i.status)+'</td><td>'+escape(dateTime(i.expiresAt))+'</td><td><div class="mail-ops-row-actions">'+(i.status==='pending'?'<button type="button" class="danger" data-admin-action="invite-revoke" data-tenant-id="'+escape(i.id)+'">Revoke</button>':'—')+'</div></td></tr>').join('')||'<tr><td colspan="6">No invitations.</td></tr>';
         const keyOrg=q('[data-access-key-org]'); if(keyOrg) keyOrg.innerHTML=state.organizations.filter(o=>o.status!=='disabled').map(o=>'<option value="'+escape(o.id)+'">'+escape(o.name)+'</option>').join('');
         const keyHost=q('[data-access-key-list]'); if(keyHost) keyHost.innerHTML=state.accessKeys.map(k=>'<tr><td><strong>'+escape(k.name||'Access key')+'</strong></td><td>'+escape(orgName(k.organizationId))+'</td><td>'+escape(k.role||'viewer')+'</td><td><code>'+escape(k.prefix||'')+'…</code></td><td>'+tenantPill(k.status)+'</td><td>'+escape(dateTime(k.lastUsedAt))+'</td><td><div class="mail-ops-row-actions">'+(k.status==='active'?'<button type="button" class="danger" data-admin-action="access-key-revoke" data-tenant-id="'+escape(k.id)+'">Revoke</button>':'—')+'</div></td></tr>').join('')||'<tr><td colspan="7">No access keys.</td></tr>';
     }
 
     async function loadTenants(){
-        const [o,d,se,po,ak]=await Promise.all([post('/api/emails/admin/organizations/list',{}),post('/api/emails/admin/domains/list',{}),post('/api/emails/admin/senders/list',{}),post('/api/emails/admin/sender-pools/list',{}),post('/api/emails/admin/access-keys/list',{}).catch(()=>({accessKeys:[]}))]);
-        state.organizations=o.organizations||[]; state.tenantDomains=d.domains||[]; state.tenantSenders=se.senders||[]; state.senderPools=po.pools||[]; state.accessKeys=ak.accessKeys||[]; renderTenants(); return {o,d,se,po,ak};
+        const [o,d,se,po,ak,me,iv]=await Promise.all([post('/api/emails/admin/organizations/list',{}),post('/api/emails/admin/domains/list',{}),post('/api/emails/admin/senders/list',{}),post('/api/emails/admin/sender-pools/list',{}),post('/api/emails/admin/access-keys/list',{}).catch(()=>({accessKeys:[]})),post('/api/emails/admin/members/list',{}).catch(()=>({members:[]})),post('/api/emails/admin/invitations/list',{}).catch(()=>({invitations:[]}))]);
+        state.organizations=o.organizations||[]; state.tenantDomains=d.domains||[]; state.tenantSenders=se.senders||[]; state.senderPools=po.pools||[]; state.accessKeys=ak.accessKeys||[]; state.members=me.members||[]; state.invitations=iv.invitations||[]; renderTenants(); return {o,d,se,po,ak,me,iv};
     }
     async function openTenants(button){setBusy(button,true,'Loading…');try{await loadTenants();showTenantTab(state.tenantTab);ui.show('#adminTenantsModal');}catch(e){toast(e.message||'Unable to load domain manager.','error','Domains unavailable');}finally{setBusy(button,false);}}
     function renderPoolSenderOptions(){const orgId=q('[data-pool-org]')?.value||'';const host=q('[data-pool-senders]');if(!host)return;host.innerHTML=state.tenantSenders.filter(x=>x.organizationId===orgId&&x.status!=='disabled').map(x=>'<option value="'+escape(x.id)+'">'+escape(x.email)+'</option>').join('');}
     async function addSenderPool(){const organizationId=q('[data-pool-org]')?.value||'';const name=String(q('[data-pool-name]')?.value||'').trim();const mode=q('[data-pool-mode]')?.value||'rotate';const senderIds=Array.from(q('[data-pool-senders]')?.selectedOptions||[]).map(x=>x.value);if(!name)return toast('Enter a pool name.','warning','Name required');if(!senderIds.length)return toast('Select at least one sender identity.','warning','Senders required');await post('/api/emails/admin/sender-pools/add',{organizationId,name,mode,senderIds});q('[data-pool-name]').value='';await loadTenants();toast('Sender pool created.','success');}
     async function poolReadiness(id,button){setBusy(button,true,'Checking…');try{const r=await post('/api/emails/admin/sender-pools/readiness',{id});const rd=r.readiness||{};toast(rd.ready?'All pool senders are ready.':('Ready '+Number(rd.readyCount||0)+' / '+Number(rd.total||0)),rd.ready?'success':'warning',rd.ready?'Pool ready':'Pool not ready',{duration:5000});}catch(e){toast(e.message||'Pool readiness failed.','error','Check failed');}finally{setBusy(button,false);}}
     async function deleteSenderPool(id){if(!window.confirm('Delete this sender pool?'))return;await post('/api/emails/admin/sender-pools/delete',{id});await loadTenants();toast('Sender pool deleted.','success');}
+
+    async function createInvitation(){const organizationId=q('[data-member-org]')?.value||'';const name=String(q('[data-invite-name]')?.value||'').trim();const email=String(q('[data-invite-email]')?.value||'').trim();const role=q('[data-invite-role]')?.value||'viewer';const r=await post('/api/emails/admin/invitations/create',{organizationId,name,email,role});const link=location.origin+'/join?token='+encodeURIComponent(r.secret||'');const box=q('[data-invite-secret]');if(box){box.hidden=false;box.innerHTML='<strong>Invitation created. Copy this link now — the token is shown only once.</strong><br><code>'+escape(link)+'</code><div class="mail-ops-row-actions"><button type="button" data-admin-action="invite-copy" data-secret="'+escape(link)+'">Copy invitation link</button></div>';}if(q('[data-invite-name]'))q('[data-invite-name]').value='';if(q('[data-invite-email]'))q('[data-invite-email]').value='';await loadTenants();toast('Invitation created.','success','Invitation ready',{duration:5000});}
+    async function revokeInvitation(id){if(!window.confirm('Revoke this invitation?'))return;await post('/api/emails/admin/invitations/revoke',{id});await loadTenants();toast('Invitation revoked.','success');}
+    async function updateMember(id,button){const row=button.closest('[data-member-row]');const role=q('[data-member-role]',row)?.value||'viewer';await post('/api/emails/admin/members/update',{id,role});await loadTenants();toast('Member role updated.','success');}
+    async function deleteMember(id){if(!window.confirm('Remove this member from the organization?'))return;await post('/api/emails/admin/members/delete',{id});await loadTenants();toast('Member removed.','success');}
 
     async function createAccessKey(){const organizationId=q('[data-access-key-org]')?.value||'';const name=String(q('[data-access-key-name]')?.value||'').trim();const role=q('[data-access-key-role]')?.value||'viewer';const r=await post('/api/emails/admin/access-keys/create',{organizationId,name,role});const box=q('[data-access-key-secret]');if(box){box.hidden=false;box.innerHTML='<strong>Copy this secret now — it will not be shown again.</strong><br><code>'+escape(r.secret||'')+'</code><div class="mail-ops-row-actions"><button type="button" data-admin-action="access-key-copy" data-secret="'+escape(r.secret||'')+'">Copy</button></div>';}const input=q('[data-access-key-name]');if(input)input.value='';await loadTenants();toast('Access key created. Copy the secret now.','success','Key created',{duration:5000});}
     async function revokeAccessKey(id){if(!window.confirm('Revoke this access key immediately?'))return;await post('/api/emails/admin/access-keys/revoke',{id});await loadTenants();toast('Access key revoked.','success');}
@@ -1964,6 +1999,11 @@
         if (action === 'tenant-domain-add') return addDomain();
         if (action === 'tenant-sender-add') return addSender();
         if (action === 'tenant-pool-add') return addSenderPool();
+        if (action === 'invite-create') return createInvitation();
+        if (action === 'invite-revoke') return revokeInvitation(button.dataset.tenantId);
+        if (action === 'invite-copy') { navigator.clipboard?.writeText(button.dataset.secret||''); return toast('Invitation link copied.','success','Copied'); }
+        if (action === 'member-update') return updateMember(button.dataset.tenantId,button);
+        if (action === 'member-delete') return deleteMember(button.dataset.tenantId);
         if (action === 'access-key-create') return createAccessKey();
         if (action === 'access-key-revoke') return revokeAccessKey(button.dataset.tenantId);
         if (action === 'access-key-copy') { navigator.clipboard?.writeText(button.dataset.secret||''); return toast('Access key copied.','success','Copied'); }

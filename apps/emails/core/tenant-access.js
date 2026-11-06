@@ -39,6 +39,8 @@ function httpPermission(pathname, method) {
   if (/\/admin\/organizations\/update/.test(p)) return 'tenant.write';
   if (/\/admin\/access-keys\/(?:create|revoke)/.test(p)) return 'tenant.write';
   if (/\/admin\/access-keys\/list/.test(p)) return 'tenant.write';
+  if (/\/admin\/(?:members|invitations)\/(?:create|update|delete|remove|revoke)/.test(p)) return 'tenant.write';
+  if (/\/admin\/(?:members|invitations)\/list/.test(p)) return 'tenant.write';
   if (/\/admin\/(?:domains|senders|sender-pools)\/(?:add|update|delete|verify)/.test(p)) return 'sender.write';
   if (/\/admin\/(?:organizations|domains|senders|sender-pools)\//.test(p)) return 'tenant.read';
 
@@ -65,6 +67,8 @@ function mcpPermission(name) {
   if (/^email_organization_update/.test(n)) return 'tenant.write';
   if (/^email_access_key_(?:create|revoke)/.test(n)) return 'tenant.write';
   if (/^email_access_keys_list/.test(n)) return 'tenant.write';
+  if (/^email_(?:member_(?:update|delete)|invitation_(?:create|revoke))/.test(n)) return 'tenant.write';
+  if (/^email_(?:members_list|invitations_list)/.test(n)) return 'tenant.write';
   if (/^email_(?:domain|sender|sender_pool)_(?:add|update|delete|verify)/.test(n)) return 'sender.write';
   if (/^email_(?:tenants_status|organizations_list|domains_list|senders_list|sender_pools_list|sender_readiness|sender_pool_readiness)/.test(n)) return 'tenant.read';
 

@@ -81,3 +81,25 @@ Tenant agents should use the dedicated Streamable HTTP endpoint:
 This endpoint always requires a valid tenant access key (or an explicitly configured super-admin bearer token). The legacy secret MCP path remains reserved for trusted super-admin integrations. Tenant MCP sessions are bound to the principal that initialized them, and tools/resources/prompts are filtered by role. Direct calls to hidden write tools are still rejected server-side.
 
 Revoking an access key takes effect immediately for new HTTP and MCP requests.
+
+## Organization members and Social Browser identity
+
+Organizations can contain human members in addition to API/MCP access keys. A member is bound to an external identity (`authProvider` + `subject`) and has one of the tenant roles: `organization_admin`, `operator`, or `viewer`.
+
+The built-in Social Browser provider uses the detected `x-browser` identity as the member subject. Trusted instance-admin browser IDs remain super admins for backward compatibility. Other Social Browser sessions receive admin access only when an active tenant membership exists.
+
+### Invitations
+
+Organization admins create one-time invitations from **Domains & Sender Manager → Members**. The invitation token is returned once; only its SHA-256 hash is persisted. The generated link uses:
+
+`/join?token=<one-time-invitation-secret>`
+
+The recipient opens the link in Social Browser, signs in if needed, and accepts the invitation. Acceptance binds that Social Browser identity to the organization and role, marks the invitation accepted, and makes that organization the active workspace.
+
+Invitation expiry is configurable through the API/MCP `expiresAt` field; the UI uses the secure default expiry when no value is supplied. Pending invitations can be revoked before acceptance.
+
+### Multiple organization memberships
+
+A Social Browser identity may belong to multiple organizations. The Admin organization selector becomes a workspace switcher for tenant members. The selected organization is stored in the server session and all subsequent mail, campaign, schedule, sender, deliverability, member, and tenant operations use that organization principal.
+
+Signing out clears the active organization session. Removing or disabling a membership removes access to that organization immediately on subsequent requests.

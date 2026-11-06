@@ -543,6 +543,7 @@
                     <button type="button" data-admin-action="tenant-tab" data-tenant-tab="domains">Domains</button>
                     <button type="button" data-admin-action="tenant-tab" data-tenant-tab="senders">Senders</button>
                     <button type="button" data-admin-action="tenant-tab" data-tenant-tab="pools">Sender Pools</button>
+                    <button type="button" data-admin-action="tenant-tab" data-tenant-tab="members">Members</button>
                     <button type="button" data-admin-action="tenant-tab" data-tenant-tab="access-keys">Access Keys</button>
                 </div>
                 <section data-tenant-pane="organizations">
@@ -564,6 +565,13 @@
                     <div class="mail-suppression-add"><select class="sb-select" data-pool-org></select><input class="sb-input" data-pool-name placeholder="Pool name"><select class="sb-select" data-pool-mode><option value="rotate">Rotate</option><option value="single">Single</option></select><button class="sb-btn" type="button" data-admin-action="tenant-pool-add">Create pool</button></div>
                     <label class="sb-field"><span>Pool sender identities</span><select class="sb-select" data-pool-senders multiple size="5"></select></label>
                     <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Name</th><th>Organization</th><th>Mode</th><th>Senders</th><th>Status</th><th>Actions</th></tr></thead><tbody data-tenant-pool-list></tbody></table></div>
+                </section>
+                <section data-tenant-pane="members" hidden>
+                    <div class="mail-ops-section-head"><div><h3>Members & Invitations</h3><p>Bind Social Browser identities to an organization with role-based access.</p></div></div>
+                    <div class="mail-suppression-add"><select class="sb-select" data-member-org></select><input class="sb-input" data-invite-name placeholder="Member name"><input class="sb-input" data-invite-email placeholder="Email (optional)"><select class="sb-select" data-invite-role><option value="viewer">Viewer</option><option value="operator">Operator</option><option value="organization_admin">Organization Admin</option></select><button class="sb-btn" type="button" data-admin-action="invite-create">Create invitation</button></div>
+                    <div class="mail-feedback-status" data-invite-secret hidden></div>
+                    <h4>Members</h4><div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Name</th><th>Organization</th><th>Identity</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody data-member-list></tbody></table></div>
+                    <h4 style="margin-top:18px">Invitations</h4><div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Name</th><th>Organization</th><th>Role</th><th>Status</th><th>Expires</th><th>Actions</th></tr></thead><tbody data-invitation-list></tbody></table></div>
                 </section>
                 <section data-tenant-pane="access-keys" hidden>
                     <div class="mail-ops-section-head"><div><h3>Access Keys</h3><p>Tenant-bound keys for API and MCP access. Secrets are shown only once at creation.</p></div></div>

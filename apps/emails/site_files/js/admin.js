@@ -44,6 +44,7 @@
         organizations: [],
         tenantDomains: [],
         tenantSenders: [],
+        senderPools: [],
     };
 
     const q = (selector, base) => (base || document).querySelector(selector);
@@ -1375,13 +1376,21 @@
         const domainSelect=q('[data-tenant-sender-domain]'); if(domainSelect) domainSelect.innerHTML=state.tenantDomains.filter(d=>d.status!=='disabled').map(d=>'<option value="'+escape(d.id)+'">'+escape(d.domain)+'</option>').join('');
         const senderHost=q('[data-tenant-sender-list]');
         if(senderHost) senderHost.innerHTML=state.tenantSenders.map(x=>'<tr><td><strong>'+escape(x.email)+'</strong></td><td>'+escape(x.displayName||'—')+'</td><td>'+escape(domainName(x.domainId))+'</td><td>'+tenantPill(x.status)+'</td><td>'+escape(x.replyTo||'—')+'</td><td>'+escape((x.tags||[]).join(', ')||'—')+'</td><td><div class="mail-ops-row-actions"><button type="button" data-admin-action="tenant-sender-readiness" data-tenant-id="'+escape(x.id)+'">Readiness</button><button type="button" class="danger" data-admin-action="tenant-sender-delete" data-tenant-id="'+escape(x.id)+'">Delete</button></div></td></tr>').join('')||'<tr><td colspan="7">No sender identities.</td></tr>';
+        const poolOrg=q('[data-pool-org]'); if(poolOrg) poolOrg.innerHTML=state.organizations.filter(o=>o.status!=='disabled').map(o=>'<option value="'+escape(o.id)+'">'+escape(o.name)+'</option>').join('');
+        renderPoolSenderOptions();
+        const poolHost=q('[data-tenant-pool-list]'); if(poolHost) poolHost.innerHTML=state.senderPools.map(pool=>'<tr><td><strong>'+escape(pool.name)+'</strong></td><td>'+escape(orgName(pool.organizationId))+'</td><td>'+escape(pool.mode)+'</td><td>'+escape((pool.senderIds||[]).length)+'</td><td>'+tenantPill(pool.status)+'</td><td><div class="mail-ops-row-actions"><button type="button" data-admin-action="tenant-pool-readiness" data-tenant-id="'+escape(pool.id)+'">Readiness</button><button type="button" class="danger" data-admin-action="tenant-pool-delete" data-tenant-id="'+escape(pool.id)+'">Delete</button></div></td></tr>').join('')||'<tr><td colspan="6">No sender pools.</td></tr>';
     }
 
     async function loadTenants(){
-        const [o,d,se]=await Promise.all([post('/api/emails/admin/organizations/list',{}),post('/api/emails/admin/domains/list',{}),post('/api/emails/admin/senders/list',{})]);
-        state.organizations=o.organizations||[]; state.tenantDomains=d.domains||[]; state.tenantSenders=se.senders||[]; renderTenants(); return {o,d,se};
+        const [o,d,se,po]=await Promise.all([post('/api/emails/admin/organizations/list',{}),post('/api/emails/admin/domains/list',{}),post('/api/emails/admin/senders/list',{}),post('/api/emails/admin/sender-pools/list',{})]);
+        state.organizations=o.organizations||[]; state.tenantDomains=d.domains||[]; state.tenantSenders=se.senders||[]; state.senderPools=po.pools||[]; renderTenants(); return {o,d,se,po};
     }
     async function openTenants(button){setBusy(button,true,'Loading…');try{await loadTenants();showTenantTab(state.tenantTab);ui.show('#adminTenantsModal');}catch(e){toast(e.message||'Unable to load domain manager.','error','Domains unavailable');}finally{setBusy(button,false);}}
+    function renderPoolSenderOptions(){const orgId=q('[data-pool-org]')?.value||'';const host=q('[data-pool-senders]');if(!host)return;host.innerHTML=state.tenantSenders.filter(x=>x.organizationId===orgId&&x.status!=='disabled').map(x=>'<option value="'+escape(x.id)+'">'+escape(x.email)+'</option>').join('');}
+    async function addSenderPool(){const organizationId=q('[data-pool-org]')?.value||'';const name=String(q('[data-pool-name]')?.value||'').trim();const mode=q('[data-pool-mode]')?.value||'rotate';const senderIds=Array.from(q('[data-pool-senders]')?.selectedOptions||[]).map(x=>x.value);if(!name)return toast('Enter a pool name.','warning','Name required');if(!senderIds.length)return toast('Select at least one sender identity.','warning','Senders required');await post('/api/emails/admin/sender-pools/add',{organizationId,name,mode,senderIds});q('[data-pool-name]').value='';await loadTenants();toast('Sender pool created.','success');}
+    async function poolReadiness(id,button){setBusy(button,true,'Checking…');try{const r=await post('/api/emails/admin/sender-pools/readiness',{id});const rd=r.readiness||{};toast(rd.ready?'All pool senders are ready.':('Ready '+Number(rd.readyCount||0)+' / '+Number(rd.total||0)),rd.ready?'success':'warning',rd.ready?'Pool ready':'Pool not ready',{duration:5000});}catch(e){toast(e.message||'Pool readiness failed.','error','Check failed');}finally{setBusy(button,false);}}
+    async function deleteSenderPool(id){if(!window.confirm('Delete this sender pool?'))return;await post('/api/emails/admin/sender-pools/delete',{id});await loadTenants();toast('Sender pool deleted.','success');}
+
     async function addOrganization(){const input=q('[data-tenant-new-org]');const name=String(input?.value||'').trim();if(!name)return toast('Enter an organization name.','warning','Name required');await post('/api/emails/admin/organizations/create',{name});input.value='';await loadTenants();toast('Organization created.','success');}
     async function addDomain(){const domain=String(q('[data-tenant-domain-name]')?.value||'').trim();const organizationId=q('[data-tenant-domain-org]')?.value||'';const dkimSelector=String(q('[data-tenant-domain-selector]')?.value||'').trim();if(!domain)return toast('Enter a domain.','warning','Domain required');await post('/api/emails/admin/domains/add',{organizationId,domain,dkimSelector});q('[data-tenant-domain-name]').value='';await loadTenants();toast('Domain registered.','success');}
     async function addSender(){const email=String(q('[data-tenant-sender-email]')?.value||'').trim();const displayName=String(q('[data-tenant-sender-name]')?.value||'').trim();const domainId=q('[data-tenant-sender-domain]')?.value||'';if(!email)return toast('Enter a sender email.','warning','Email required');await post('/api/emails/admin/senders/add',{domainId,email,displayName});q('[data-tenant-sender-email]').value='';q('[data-tenant-sender-name]').value='';await loadTenants();toast('Sender identity added.','success');}
@@ -1904,6 +1913,9 @@
         if (action === 'tenant-org-add') return addOrganization();
         if (action === 'tenant-domain-add') return addDomain();
         if (action === 'tenant-sender-add') return addSender();
+        if (action === 'tenant-pool-add') return addSenderPool();
+        if (action === 'tenant-pool-readiness') return poolReadiness(button.dataset.tenantId, button);
+        if (action === 'tenant-pool-delete') return deleteSenderPool(button.dataset.tenantId);
         if (action === 'tenant-domain-verify') return verifyTenantDomain(button.dataset.tenantId, button);
         if (action === 'tenant-domain-delete') return deleteTenantItem('domain', button.dataset.tenantId);
         if (action === 'tenant-sender-readiness') return checkSenderReadiness(button.dataset.tenantId, button);
@@ -2100,6 +2112,7 @@
             loadMessages();
             return;
         }
+        const poolOrg = event.target.closest('[data-pool-org]'); if (poolOrg) { renderPoolSenderOptions(); return; }
         const scheduleFilter = event.target.closest('[data-schedule-filter]');
         if (scheduleFilter) {
             loadSchedules({ silent: true });

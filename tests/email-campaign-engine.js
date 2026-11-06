@@ -178,6 +178,16 @@ const { createEmailCampaignEngine } = require('../apps/emails/core/email-campaig
   tenantEngine.start(pooled.id); await tenantEngine.tick(); await tenantEngine.tick();
   assert.equal(tenantSent[0].from,'one@a.test');
   assert.equal(tenantSent[1].from,'two@a.test');
+  tenantRegistry.listSenderPools=()=>[{id:'pool_a',organizationId:'org_a',name:'Pool A',senderIds:['sender_1','sender_2'],mode:'rotate',status:'active'}];
+  tenantRegistry.senderPoolReadiness=(id)=>({ready:id==='pool_a',pool:tenantRegistry.listSenderPools()[0],members:[],readyCount:2,total:2});
+  const pooledById=tenantEngine.create({name:'Pool by id',organizationId:'org_a',senderPoolId:'pool_a',recipients:[{email:'p@example.com'},{email:'q@example.com'}],messages:[{subject:'Pool id',text:'ok'}],startAt:'now',pacing:{mode:'fixed',intervalSeconds:0}});
+  assert.equal(pooledById.senderPoolId,'pool_a');
+  assert.deepEqual(pooledById.senderIds,['sender_1','sender_2']);
+  assert.equal(pooledById.senderMode,'rotate');
+  tenantEngine.start(pooledById.id); await tenantEngine.tick(); await tenantEngine.tick();
+  const orgList=tenantEngine.list({organizationId:'org_a'});
+  assert(orgList.campaigns.every(x=>x.organizationId==='org_a'));
+
   assert.throws(()=>tenantEngine.create({name:'Wrong org',organizationId:'org_a',senderIds:['sender_b'],recipients:[{email:'z@example.com'}],messages:[{text:'x'}]}),/does not belong/);
 
   console.log('email-campaign-engine tests passed');

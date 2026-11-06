@@ -19,7 +19,8 @@ class MailTenantRegistry{
   constructor(options={}){
     this.file=path.resolve(options.filePath||path.join(process.cwd(),'localStorage','email-tenants','registry.json'));
     this.instanceConfig=options.instanceConfig||null;
-    this.data=read(this.file)||{schemaVersion:1,organizations:[],domains:[],senders:[],updatedAt:''};
+    this.data=read(this.file)||{schemaVersion:1,organizations:[],domains:[],senders:[],senderPools:[],updatedAt:''};
+    if(!Array.isArray(this.data.senderPools)) this.data.senderPools=[];
     this._ensureDefault();
     this._save();
   }
@@ -39,7 +40,7 @@ class MailTenantRegistry{
       }
     }
   }
-  status(){ return {organizations:this.data.organizations.length,domains:this.data.domains.length,senders:this.data.senders.length,file:this.file,updatedAt:this.data.updatedAt}; }
+  status(){ return {organizations:this.data.organizations.length,domains:this.data.domains.length,senders:this.data.senders.length,senderPools:this.data.senderPools.length,file:this.file,updatedAt:this.data.updatedAt}; }
   listOrganizations(){ return clone(this.data.organizations); }
   createOrganization(input={}){
     const name=String(input.name||'').trim(); if(!name) throw new Error('Organization name is required');
@@ -129,7 +130,48 @@ class MailTenantRegistry{
     if(Array.isArray(patch.tags)) row.tags=[...new Set(patch.tags.map(x=>String(x).trim()).filter(Boolean))];
     row.updatedAt=now(); this._save(); return clone(row);
   }
-  removeSender(idv){ const row=this.data.senders.find(x=>x.id===idv); if(!row) throw new Error('Sender identity not found'); this.data.senders=this.data.senders.filter(x=>x.id!==idv); this._save(); return {id:idv,deleted:true}; }
+  removeSender(idv){ const row=this.data.senders.find(x=>x.id===idv); if(!row) throw new Error('Sender identity not found'); if(this.data.senderPools.some(x=>(x.senderIds||[]).includes(idv))) throw new Error('Remove sender identity from sender pools first'); this.data.senders=this.data.senders.filter(x=>x.id!==idv); this._save(); return {id:idv,deleted:true}; }
+  listSenderPools(input={}){
+    let rows=this.data.senderPools;
+    if(input.organizationId) rows=rows.filter(x=>x.organizationId===input.organizationId);
+    if(input.status) rows=rows.filter(x=>x.status===input.status);
+    return clone(rows);
+  }
+  addSenderPool(input={}){
+    const orgId=String(input.organizationId||'').trim()||this.data.organizations.find(x=>x.isDefault)?.id;
+    if(!this.data.organizations.some(x=>x.id===orgId)) throw new Error('Organization not found');
+    const name=String(input.name||'').trim(); if(!name) throw new Error('Sender pool name is required');
+    const senderIds=[...new Set((Array.isArray(input.senderIds)?input.senderIds:[]).map(x=>String(x).trim()).filter(Boolean))];
+    if(!senderIds.length) throw new Error('Sender pool requires at least one sender identity');
+    const senders=senderIds.map(id=>this.data.senders.find(x=>x.id===id));
+    if(senders.some(x=>!x)) throw new Error('One or more sender identities were not found');
+    if(senders.some(x=>x.organizationId!==orgId)) throw new Error('All sender identities must belong to the selected organization');
+    const row={id:id('pool_'),organizationId:orgId,name,description:String(input.description||''),senderIds,mode:['rotate','single'].includes(String(input.mode))?String(input.mode):'rotate',status:['active','disabled'].includes(String(input.status))?String(input.status):'active',createdAt:now(),updatedAt:now()};
+    this.data.senderPools.push(row); this._save(); return clone(row);
+  }
+  updateSenderPool(idv,patch={}){
+    const row=this.data.senderPools.find(x=>x.id===idv); if(!row) throw new Error('Sender pool not found');
+    if(patch.name!=null) row.name=String(patch.name).trim()||row.name;
+    if(patch.description!=null) row.description=String(patch.description);
+    if(patch.mode!=null && ['rotate','single'].includes(String(patch.mode))) row.mode=String(patch.mode);
+    if(patch.status!=null && ['active','disabled'].includes(String(patch.status))) row.status=String(patch.status);
+    if(Array.isArray(patch.senderIds)){
+      const ids=[...new Set(patch.senderIds.map(x=>String(x).trim()).filter(Boolean))];
+      if(!ids.length) throw new Error('Sender pool requires at least one sender identity');
+      const senders=ids.map(id=>this.data.senders.find(x=>x.id===id));
+      if(senders.some(x=>!x)) throw new Error('One or more sender identities were not found');
+      if(senders.some(x=>x.organizationId!==row.organizationId)) throw new Error('All sender identities must belong to the pool organization');
+      row.senderIds=ids;
+    }
+    row.updatedAt=now(); this._save(); return clone(row);
+  }
+  removeSenderPool(idv){ const row=this.data.senderPools.find(x=>x.id===idv); if(!row) throw new Error('Sender pool not found'); this.data.senderPools=this.data.senderPools.filter(x=>x.id!==idv); this._save(); return {id:idv,deleted:true}; }
+  senderPoolReadiness(idv){
+    const pool=this.data.senderPools.find(x=>x.id===idv); if(!pool) throw new Error('Sender pool not found');
+    const members=pool.senderIds.map(id=>this.senderReadiness(id));
+    const readyMembers=members.filter(x=>x.ready);
+    return {ready:pool.status==='active'&&readyMembers.length===pool.senderIds.length,pool:clone(pool),members,readyCount:readyMembers.length,total:members.length};
+  }
   resolveOrganizationByDomain(d){ const row=this.data.domains.find(x=>x.domain===domain(d)); return row?clone(this.data.organizations.find(x=>x.id===row.organizationId)||null):null; }
   resolveSender(addr){ const a=email(addr); const row=this.data.senders.find(x=>x.email===a); return clone(row||null); }
 }

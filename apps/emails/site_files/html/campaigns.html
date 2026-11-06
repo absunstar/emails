@@ -23,10 +23,13 @@
     <aside class="mail-campaign-list-panel">
       <div class="mail-campaign-panel-head">
         <div><small>CAMPAIGNS</small><h2>All Campaigns</h2></div>
-        <select class="sb-select" data-campaign-filter>
-          <option value="">All</option><option value="draft">Draft</option><option value="scheduled">Scheduled</option>
-          <option value="running">Running</option><option value="paused">Paused</option><option value="completed">Completed</option><option value="stopped">Stopped</option>
-        </select>
+        <div class="mail-campaign-filter-stack">
+          <select class="sb-select" data-campaign-org-filter><option value="">All organizations</option></select>
+          <select class="sb-select" data-campaign-filter>
+            <option value="">All statuses</option><option value="draft">Draft</option><option value="scheduled">Scheduled</option>
+            <option value="running">Running</option><option value="paused">Paused</option><option value="completed">Completed</option><option value="stopped">Stopped</option>
+          </select>
+        </div>
       </div>
       <div class="mail-campaign-list" data-campaign-list></div>
       <div class="mail-campaign-empty" data-campaign-empty hidden>No campaigns yet.</div>
@@ -70,7 +73,8 @@
           <div class="sb-form-grid">
             <div class="sb-field"><label>Name</label><input class="sb-input" name="name" required></div>
             <div class="sb-field"><label>Organization</label><select class="sb-select" name="organizationId" data-campaign-organization></select></div>
-            <div class="sb-field wide"><label>Sender identities</label><select class="sb-select" name="senderIds" data-campaign-senders multiple size="4"></select><small>Select one sender, or multiple senders for a pool.</small></div>
+            <div class="sb-field"><label>Sender pool</label><select class="sb-select" name="senderPoolId" data-campaign-pools><option value="">Manual sender selection</option></select></div>
+            <div class="sb-field wide"><label>Sender identities</label><select class="sb-select" name="senderIds" data-campaign-senders multiple size="4"></select><small>Select a reusable pool above, or choose senders manually.</small></div>
             <div class="sb-field"><label>Sender mode</label><select class="sb-select" name="senderMode"><option value="single">Single sender</option><option value="rotate">Rotate sender pool</option></select></div>
             <div class="sb-field"><label>Legacy From fallback</label><input class="sb-input" type="email" name="from" placeholder="Only for legacy/manual campaigns"></div>
             <div class="sb-field wide"><label>Description</label><input class="sb-input" name="description"></div>

@@ -11,7 +11,7 @@ const DEFAULT_MCP_SECRET = String(process.env.EMAIL_MCP_DEFAULT_SECRET || 'SOCIA
 const SERVER_INFO = {
     name: String(process.env.EMAIL_MCP_NAME || 'social-browser-email').trim() || 'social-mail',
     title: String(process.env.EMAIL_MCP_TITLE || 'Social Browser Email Manager').trim() || 'Social Mail MCP',
-    version: '4.8.0',
+    version: '4.9.0',
 };
 
 const SERVER_INSTRUCTIONS = [
@@ -57,6 +57,7 @@ const MESSAGE_SEND_PROPERTIES = {
     organizationId: { type: 'string' },
     senderIds: { type: 'array', items: { type: 'string' } },
     senderMode: { type: 'string', enum: ['single', 'rotate'] },
+    senderPoolId: { type: 'string' },
     to: {
         oneOf: [
             { type: 'string', minLength: 3 },
@@ -174,6 +175,11 @@ const TOOLS = [
     tool('email_domain_update', 'Update managed domain', 'Update domain lifecycle/verification metadata.', { id:{type:'string',minLength:1}, status:{type:'string',enum:['pending','verified','warning','disabled']}, dkimSelector:{type:'string'}, notes:{type:'string'}, verification:{type:'object'} }, ['id'], {readOnlyHint:false}),
     tool('email_domain_verify', 'Verify managed domain DNS', 'Resolve and evaluate MX, SPF, DKIM and DMARC for a registered domain, persist the latest verification state, and return repair recommendations.', { id:{type:'string',minLength:1} }, ['id']),
     tool('email_domain_delete', 'Delete managed domain', 'Delete a domain after sender identities have been removed.', { id:{type:'string',minLength:1}, confirm:{type:'boolean'} }, ['id','confirm'], {readOnlyHint:false,destructiveHint:true}),
+    tool('email_sender_pools_list', 'List sender pools', 'List reusable sender pools scoped to organizations.', { organizationId:{type:'string'}, status:{type:'string'} }),
+    tool('email_sender_pool_add', 'Create sender pool', 'Create a reusable sender pool from sender identities that belong to the same organization.', { organizationId:{type:'string'}, name:{type:'string',minLength:1}, description:{type:'string'}, senderIds:{type:'array',minItems:1,items:{type:'string'}}, mode:{type:'string',enum:['single','rotate']}, status:{type:'string',enum:['active','disabled']} }, ['name','senderIds'], {readOnlyHint:false}),
+    tool('email_sender_pool_update', 'Update sender pool', 'Update sender pool membership, mode, name or status.', { id:{type:'string',minLength:1}, name:{type:'string'}, description:{type:'string'}, senderIds:{type:'array',items:{type:'string'}}, mode:{type:'string',enum:['single','rotate']}, status:{type:'string',enum:['active','disabled']} }, ['id'], {readOnlyHint:false}),
+    tool('email_sender_pool_readiness', 'Check sender pool readiness', 'Check readiness of all sender identities inside a sender pool.', { id:{type:'string',minLength:1} }, ['id']),
+    tool('email_sender_pool_delete', 'Delete sender pool', 'Delete a reusable sender pool.', { id:{type:'string',minLength:1}, confirm:{type:'boolean'} }, ['id','confirm'], {readOnlyHint:false,destructiveHint:true}),
     tool('email_senders_list', 'List sender identities', 'List sender identities by organization/domain/status.', { organizationId:{type:'string'}, domainId:{type:'string'}, status:{type:'string'} }),
     tool('email_sender_add', 'Add sender identity', 'Register a sender identity on a managed domain.', { domainId:{type:'string'}, email:{type:'string',minLength:3}, displayName:{type:'string'}, replyTo:{type:'string'}, status:{type:'string',enum:['active','disabled','warming']}, tags:{type:'array',items:{type:'string'}} }, ['email'], {readOnlyHint:false}),
     tool('email_sender_update', 'Update sender identity', 'Update display name, reply-to, status or tags for a sender identity.', { id:{type:'string',minLength:1}, displayName:{type:'string'}, replyTo:{type:'string'}, status:{type:'string',enum:['active','disabled','warming']}, tags:{type:'array',items:{type:'string'}} }, ['id'], {readOnlyHint:false}),
@@ -197,6 +203,7 @@ const TOOLS = [
     tool('email_campaign_status', 'Campaign engine status', 'Return persistent campaign engine status and counts by lifecycle state.', {}),
     tool('email_campaigns_list', 'List email campaigns', 'List persistent campaigns with status, progress, pacing summary, recipient count, message count, and start time.', {
         status: { type: 'string', enum: ['draft', 'scheduled', 'running', 'paused', 'completed', 'stopped'] },
+        organizationId: { type: 'string' },
         limit: { type: 'integer', minimum: 1, maximum: 500, default: 100 },
     }),
     tool('email_campaign_get', 'Get email campaign', 'Read one campaign in full, including recipients, messages, queue jobs, variables, pacing, lifecycle state, progress, and event log.', {
@@ -616,7 +623,7 @@ function validateToolArguments(name, raw) {
         if (!args.config || typeof args.config !== 'object' || Array.isArray(args.config)) return fail('config must be an object');
         return { ok: true, args: { config: args.config } };
     }
-    if (['email_organization_update','email_domain_update','email_sender_update','email_domain_verify','email_sender_readiness'].includes(name)) {
+    if (['email_organization_update','email_domain_update','email_sender_update','email_domain_verify','email_sender_readiness','email_sender_pool_update','email_sender_pool_readiness'].includes(name)) {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
         return { ok:true, args:{...args,id:args.id.trim()} };
     }
@@ -628,23 +635,28 @@ function validateToolArguments(name, raw) {
         if (typeof args.domain !== 'string' || !args.domain.trim()) return fail('domain is required');
         return { ok:true, args };
     }
+    if (name === 'email_sender_pool_add') {
+        if (typeof args.name !== 'string' || !args.name.trim()) return fail('name is required');
+        if (!Array.isArray(args.senderIds) || !args.senderIds.length) return fail('senderIds must be a non-empty array');
+        return { ok:true, args };
+    }
     if (name === 'email_sender_add') {
         if (typeof args.email !== 'string' || !args.email.trim()) return fail('email is required');
         return { ok:true, args };
     }
-    if (['email_domain_delete','email_sender_delete'].includes(name)) {
+    if (['email_domain_delete','email_sender_delete','email_sender_pool_delete'].includes(name)) {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
         if (args.confirm !== true) return fail('confirm=true is required');
         return { ok:true, args:{id:args.id.trim(),confirm:true} };
     }
-    if (['email_domains_list','email_senders_list'].includes(name)) return { ok:true, args:args||{} };
+    if (['email_domains_list','email_senders_list','email_sender_pools_list'].includes(name)) return { ok:true, args:args||{} };
     if (name === 'email_campaigns_list') {
         const statuses = ['', 'draft', 'scheduled', 'running', 'paused', 'completed', 'stopped'];
         const status = String(args.status || '').toLowerCase();
         if (!statuses.includes(status)) return fail('invalid campaign status');
         const limit = args.limit === undefined ? 100 : Number(args.limit);
         if (!Number.isInteger(limit) || limit < 1 || limit > 500) return fail('limit must be 1 to 500');
-        return { ok: true, args: { status, limit } };
+        return { ok: true, args: { status, organizationId: String(args.organizationId || '').trim(), limit } };
     }
     if (name === 'email_campaign_get' || name === 'email_campaign_start' || name === 'email_campaign_pause' || name === 'email_campaign_resume' || name === 'email_campaign_stop' || name === 'email_campaign_report') {
         if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
@@ -684,6 +696,7 @@ function validateToolArguments(name, raw) {
             organizationId: String(args.organizationId || '').trim(),
             senderIds,
             senderMode: String(args.senderMode || 'single'),
+            senderPoolId: String(args.senderPoolId || '').trim(),
             replyTo: String(args.replyTo || '').trim(),
             recipients: args.recipients,
             messages: args.messages,
@@ -1183,6 +1196,11 @@ async function executeTool(name, args, service, scope) {
     else if (name === 'email_domain_update') output = await service.domainUpdate(args, scope);
     else if (name === 'email_domain_verify') output = await service.domainVerify(args, scope);
     else if (name === 'email_domain_delete') output = await service.domainDelete(args, scope);
+    else if (name === 'email_sender_pools_list') output = await service.senderPoolsList(args, scope);
+    else if (name === 'email_sender_pool_add') output = await service.senderPoolAdd(args, scope);
+    else if (name === 'email_sender_pool_update') output = await service.senderPoolUpdate(args, scope);
+    else if (name === 'email_sender_pool_readiness') output = await service.senderPoolReadiness(args, scope);
+    else if (name === 'email_sender_pool_delete') output = await service.senderPoolDelete(args, scope);
     else if (name === 'email_senders_list') output = await service.sendersList(args, scope);
     else if (name === 'email_sender_add') output = await service.senderAdd(args, scope);
     else if (name === 'email_sender_update') output = await service.senderUpdate(args, scope);

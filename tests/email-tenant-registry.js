@@ -28,6 +28,14 @@ assert.equal(registry.resolveSender('sales@acme.example').id,sender.id);
 assert.equal(registry.resolveOrganizationByDomain('acme.example').id,acme.id);
 
 assert.throws(()=>registry.removeDomain(domain.id),/Remove sender identities/);
+const sender2=registry.addSender({domainId:domain.id,email:'support@acme.example',displayName:'Acme Support'});
+const pool=registry.addSenderPool({organizationId:acme.id,name:'Primary Pool',senderIds:[sender.id,sender2.id],mode:'rotate'});
+assert.equal(pool.senderIds.length,2);
+assert.equal(registry.listSenderPools({organizationId:acme.id})[0].id,pool.id);
+assert.equal(registry.senderPoolReadiness(pool.id).total,2);
+assert.throws(()=>registry.removeSender(sender.id),/sender pools/);
+registry.removeSenderPool(pool.id);
+registry.removeSender(sender2.id);
 registry.removeSender(sender.id);
 assert.equal(registry.removeDomain(domain.id).deleted,true);
 

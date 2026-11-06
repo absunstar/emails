@@ -541,6 +541,7 @@
                     <button type="button" class="is-active" data-admin-action="tenant-tab" data-tenant-tab="organizations">Organizations</button>
                     <button type="button" data-admin-action="tenant-tab" data-tenant-tab="domains">Domains</button>
                     <button type="button" data-admin-action="tenant-tab" data-tenant-tab="senders">Senders</button>
+                    <button type="button" data-admin-action="tenant-tab" data-tenant-tab="pools">Sender Pools</button>
                 </div>
                 <section data-tenant-pane="organizations">
                     <div class="mail-ops-section-head"><div><h3>Organizations</h3><p>Each organization owns its domains and sender identities.</p></div><div class="mail-ops-actions"><input class="sb-input" data-tenant-new-org placeholder="Organization name"><button class="sb-btn" type="button" data-admin-action="tenant-org-add">Add</button></div></div>
@@ -555,6 +556,12 @@
                     <div class="mail-ops-section-head"><div><h3>Sender identities</h3><p>Manage From identities tied to registered domains.</p></div></div>
                     <div class="mail-suppression-add"><select class="sb-select" data-tenant-sender-domain></select><input class="sb-input" data-tenant-sender-email placeholder="sender@example.com"><input class="sb-input" data-tenant-sender-name placeholder="Display name"><button class="sb-btn" type="button" data-admin-action="tenant-sender-add">Add sender</button></div>
                     <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Email</th><th>Name</th><th>Domain</th><th>Status</th><th>Reply-To</th><th>Tags</th><th>Actions</th></tr></thead><tbody data-tenant-sender-list></tbody></table></div>
+                </section>
+                <section data-tenant-pane="pools" hidden>
+                    <div class="mail-ops-section-head"><div><h3>Sender pools</h3><p>Reusable sender groups for campaigns. Every sender in a pool must belong to the same organization.</p></div></div>
+                    <div class="mail-suppression-add"><select class="sb-select" data-pool-org></select><input class="sb-input" data-pool-name placeholder="Pool name"><select class="sb-select" data-pool-mode><option value="rotate">Rotate</option><option value="single">Single</option></select><button class="sb-btn" type="button" data-admin-action="tenant-pool-add">Create pool</button></div>
+                    <label class="sb-field"><span>Pool sender identities</span><select class="sb-select" data-pool-senders multiple size="5"></select></label>
+                    <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Name</th><th>Organization</th><th>Mode</th><th>Senders</th><th>Status</th><th>Actions</th></tr></thead><tbody data-tenant-pool-list></tbody></table></div>
                 </section>
             </div>
         </div>

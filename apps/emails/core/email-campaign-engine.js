@@ -185,8 +185,18 @@ class EmailCampaignEngine {
         if (!name) throw new Error('Campaign name is required');
         const defaultOrg = this.tenantRegistry?.listOrganizations?.().find(x => x.isDefault) || null;
         const organizationId = String(input.organizationId || defaultOrg?.id || '').trim();
-        const senderIds = Array.isArray(input.senderIds) ? [...new Set(input.senderIds.map(x => String(x).trim()).filter(Boolean))] : [];
-        const senderMode = input.senderMode === 'rotate' ? 'rotate' : 'single';
+        const senderPoolId = String(input.senderPoolId || '').trim();
+        let senderIds = Array.isArray(input.senderIds) ? [...new Set(input.senderIds.map(x => String(x).trim()).filter(Boolean))] : [];
+        let senderMode = input.senderMode === 'rotate' ? 'rotate' : 'single';
+        if (this.tenantRegistry && senderPoolId) {
+            const pool = this.tenantRegistry.listSenderPools().find(x => x.id === senderPoolId);
+            if (!pool) throw new Error('Sender pool not found');
+            if (organizationId && pool.organizationId !== organizationId) throw new Error('Sender pool does not belong to the selected organization');
+            const poolReadiness = this.tenantRegistry.senderPoolReadiness(senderPoolId);
+            if (!poolReadiness.ready) throw new Error('Sender pool is not ready');
+            senderIds = [...pool.senderIds];
+            senderMode = pool.mode === 'single' ? 'single' : 'rotate';
+        }
         let senderPool = [];
         if (this.tenantRegistry && senderIds.length) {
             senderPool = senderIds.map(id => this.tenantRegistry.listSenders().find(x => x.id === id)).filter(Boolean);
@@ -207,7 +217,7 @@ class EmailCampaignEngine {
         const startAt = parseStartAt(input.startAt || 'now');
         const c = {
             id: id('campaign_'), name, description: String(input.description || '').slice(0, 1000), from,
-            organizationId, senderIds, senderMode, legacySender: senderIds.length === 0,
+            organizationId, senderPoolId, senderIds, senderMode, legacySender: senderIds.length === 0,
             replyTo: String(input.replyTo || '').trim(), recipients: unique, messages, messageMode,
             pacing: normalizePacing(input.pacing), startAt, status: 'draft',
             createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), startedAt: null, completedAt: null,
@@ -228,7 +238,8 @@ class EmailCampaignEngine {
     }
     list(input = {}) {
         const status = String(input.status || '').trim();
-        const items = this._all().filter(c => !status || c.status === status).sort((a,b) => Date.parse(b.createdAt)-Date.parse(a.createdAt));
+        const organizationId = String(input.organizationId || '').trim();
+        const items = this._all().filter(c => (!status || c.status === status) && (!organizationId || c.organizationId === organizationId)).sort((a,b) => Date.parse(b.createdAt)-Date.parse(a.createdAt));
         return { count: items.length, campaigns: items.slice(0, Math.max(1, Math.min(500, Number(input.limit || 100)))).map(c => publicCampaign(c, false)) };
     }
     get(cid) { const c = this._read(cid); if (!c) throw new Error('Campaign not found'); return publicCampaign(c, true); }

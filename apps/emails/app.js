@@ -1922,6 +1922,31 @@ module.exports = function init(site) {
         catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
     });
 
+    onPost('/api/emails/admin/sender-pools/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        return res.json({ done: true, pools: site.emailTenants.listSenderPools(body(req)) });
+    });
+    onPost('/api/emails/admin/sender-pools/add', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, pool: site.emailTenants.addSenderPool(body(req)) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/sender-pools/update', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data=body(req); try { return res.json({ done: true, pool: site.emailTenants.updateSenderPool(String(data.id||''), data) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/sender-pools/readiness', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, readiness: site.emailTenants.senderPoolReadiness(String(body(req).id||'')) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/sender-pools/delete', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, result: site.emailTenants.removeSenderPool(String(body(req).id||'')) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
     onPost('/api/emails/admin/senders/list', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         return res.json({ done: true, senders: site.emailTenants.listSenders(body(req)) });

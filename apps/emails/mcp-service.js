@@ -31,6 +31,7 @@ function createEmailMcpService(options) {
     const deliverability = options.deliverability || null;
     const operationsManager = options.operationsManager || null;
     const campaignEngine = options.campaignEngine || null;
+    const instanceConfig = options.instanceConfig || null;
     if (!emailService) throw new Error('Shared email service is required');
 
     function requestedDomain(args) {
@@ -96,6 +97,11 @@ function createEmailMcpService(options) {
         return campaignEngine;
     }
 
+    function instanceRequired() {
+        if (!instanceConfig) throw new Error('Email instance configuration is not available');
+        return instanceConfig;
+    }
+
     function policyListName(name) {
         const policy = policyRequired();
         const value = String(name || '').trim();
@@ -152,6 +158,7 @@ function createEmailMcpService(options) {
                 vipCount: emailService.listVip().length,
                 policyEnabled: !!policy?.enabled,
                 capabilities: [
+                    'portable-instance-config', 'white-label-branding', 'multi-domain-instance', 'configurable-mcp-identity',
                     'global-search', 'advanced-filters', 'pagination', 'sorting', 'read', 'read-many', 'favorites', 'folders', 'bulk-update',
                     'send', 'bulk-send', 'reply', 'forward', 'attachments', 'eml-export', 'remote-image-analysis', 'tracking-pixel-analysis',
                     'vip-management', 'delete', 'bulk-delete', 'delete-matching', 'mailbox-statuses', 'statistics',
@@ -163,6 +170,18 @@ function createEmailMcpService(options) {
                     'automatic-backup', 'backup-validation', 'disaster-recovery-preview', 'disaster-recovery-restore', 'disk-quota', 'message-limit-control', 'retention-cleanup', 'emergency-low-space-mode', 'operational-alerts', 'storage-history',
                 ],
             };
+        },
+
+        async instanceGet(scope) {
+            enforceAdminRate(scope, false);
+            return instanceRequired().getPublic();
+        },
+
+        async instanceUpdate(args, scope) {
+            enforceAdminRate(scope, true);
+            const result = instanceRequired().update(args.config || {});
+            await emailService.store.audit('mcp_instance_config_update', { updatedAt: new Date().toISOString(), restartRequired: !!result.restartRequired });
+            return result;
         },
 
         async search(args, scope) {

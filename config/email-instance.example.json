@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "instance": {
+    "name": "Acme Mail",
+    "edition": "enterprise"
+  },
+  "network": {
+    "publicOrigin": "https://mail.example.com",
+    "smtpHostname": "mx.example.com",
+    "mailDomains": ["example.com", "support.example.com"]
+  },
+  "brand": {
+    "productName": "Acme Mail",
+    "companyName": "Acme Corp",
+    "websiteUrl": "https://example.com",
+    "supportUrl": "https://support.example.com",
+    "logoUrl": "/images/company-logo.png",
+    "downloads": {
+      "windows": "",
+      "linux": ""
+    },
+    "socialBrowserLogin": {
+      "enabled": false,
+      "label": "Login by Social Browser"
+    }
+  },
+  "mcp": {
+    "name": "acme-mail",
+    "title": "Acme Mail MCP",
+    "host": "127.0.0.1",
+    "port": 60026
+  },
+  "features": {
+    "socialBrowserLogin": false,
+    "campaigns": true,
+    "mcp": true,
+    "temporaryMail": true
+  }
+}

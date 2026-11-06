@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { createEmailService, extractAddresses, normalizeEmail } = require('./core/email-service');
-const { isAdminRequest, isBrowserSession, hasVipAccess, isTrustedBrowserId, browserRequestID } = require('./core/access');
+const { safeEqual, isAdminRequest, isBrowserSession, hasVipAccess, isTrustedBrowserId, browserRequestID } = require('./core/access');
 const { requestDomain, apiDomain, addressBelongsToDomain, messageBelongsToDomain, mailboxForDomain } = require('./core/domain');
 const { getClientContext } = require('./core/client-context');
 const chatTransactional=require('./core/chat-transactional-auth');
@@ -54,7 +54,7 @@ module.exports = function init(site) {
     site.emailUnsubscribe = site.emailUnsubscribe || createEmailUnsubscribeService({
         deliverability: site.emailDeliverability,
         baseDir: process.env.EMAIL_UNSUBSCRIBE_DIR || path.join(site.cwd, 'localStorage', 'email-unsubscribe'),
-        publicOrigin: process.env.EMAIL_PUBLIC_ORIGIN || 'https://emails.social-browser.com',
+        publicOrigin: site.emailInstance?.get?.().network.publicOrigin || process.env.EMAIL_PUBLIC_ORIGIN || 'https://emails.social-browser.com',
         monitor: site.emailRuntimeMonitor,
     });
     const service = site.emailService || createEmailService({
@@ -604,8 +604,17 @@ module.exports = function init(site) {
         return isBrowserSession(req) && isTrustedBrowserId(browserRequestID(req), adminBrowserIDs);
     }
 
+    function localAdminConfigured() {
+        return !!String(process.env.EMAIL_ADMIN_PASSWORD || '').trim();
+    }
+
+    function localAdmin(req) {
+        return req?.session?.email_admin_authenticated === true;
+    }
+
     function admin(req) {
         if (isAdminRequest(req)) return true;
+        if (localAdmin(req)) return true;
         return adminBrowser(req);
     }
 
@@ -655,6 +664,37 @@ module.exports = function init(site) {
             source: 'website-api',
         }, extra || {});
     }
+
+    site.onGET({ name: 'admin-login', overwrite: true }, (req, res) => {
+        if (admin(req)) return res.redirect('/admin');
+        const enabled = localAdminConfigured();
+        return site.emailTemplateRenderer.renderResponse(req, res, __dirname + '/site_files/html/admin-login.html', { localAdminEnabled: enabled });
+    });
+
+    onPost('/api/v2/admin-auth/signin', (req, res) => {
+        if (!localAdminConfigured()) return res.json({ done: false, error: 'Local admin login is not configured.' });
+        const data = body(req);
+        const expectedUser = String(process.env.EMAIL_ADMIN_USERNAME || 'admin').trim();
+        const expectedPassword = String(process.env.EMAIL_ADMIN_PASSWORD || '');
+        const username = String(data.username || '').trim();
+        const password = String(data.password || '');
+        if (!safeEqual(username, expectedUser) || !safeEqual(password, expectedPassword)) {
+            return res.json({ done: false, error: 'Invalid admin credentials.' });
+        }
+        req.session = req.session || {};
+        req.session.email_admin_authenticated = true;
+        req.session.email_admin_username = username;
+        req.session.$save?.();
+        return res.json({ done: true, username });
+    });
+
+    onPost('/api/v2/admin-auth/signout', (req, res) => {
+        req.session = req.session || {};
+        req.session.email_admin_authenticated = false;
+        req.session.email_admin_username = '';
+        req.session.$save?.();
+        return res.json({ done: true });
+    });
 
     site.onGET({
         name: 'login',
@@ -759,17 +799,17 @@ module.exports = function init(site) {
     });
 
     site.onGET({ name: 'campaigns', overwrite: true }, (req, res) => {
-        if (!adminBrowser(req)) {
+        if (!admin(req)) {
             res.status(403);
-            return res.sendHTML('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Email Campaigns · Sign in</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08111f;color:#dbeafe;font-family:Arial,sans-serif}.box{width:min(520px,calc(100% - 36px));padding:30px;border:1px solid #223a59;border-radius:18px;background:#0d1829;text-align:center;box-shadow:0 22px 70px rgba(0,0,0,.28)}.icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 14px;border-radius:16px;background:#102b49;color:#6fd4ff;font-size:26px}.box h1{margin:0 0 10px;color:#fff}.box p{margin:0;color:#91a9c5;line-height:1.65}.actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border:1px solid #315477;border-radius:11px;background:#15263c;color:#dff3ff;text-decoration:none;font-weight:700}.btn.primary{border-color:#278ed2;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);color:#fff}.btn:hover{filter:brightness(1.1)}.hint{display:block;margin-top:14px;color:#607c99;font-size:12px}</style></head><body><div class="box"><div class="icon">✉</div><h1>Email Campaigns</h1><p>Sign in with Social Browser to access campaign management, sending controls and reports.</p><div class="actions"><a class="btn primary" href="/login?next=%2Fcampaigns">Login by Social Browser</a><a class="btn" href="/">Back to Temp Mail</a></div><small class="hint">After successful sign in you will return directly to Email Campaigns.</small></div></body></html>');
+            return res.sendHTML('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Email Campaigns · Sign in</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08111f;color:#dbeafe;font-family:Arial,sans-serif}.box{width:min(520px,calc(100% - 36px));padding:30px;border:1px solid #223a59;border-radius:18px;background:#0d1829;text-align:center;box-shadow:0 22px 70px rgba(0,0,0,.28)}.icon{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 14px;border-radius:16px;background:#102b49;color:#6fd4ff;font-size:26px}.box h1{margin:0 0 10px;color:#fff}.box p{margin:0;color:#91a9c5;line-height:1.65}.actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border:1px solid #315477;border-radius:11px;background:#15263c;color:#dff3ff;text-decoration:none;font-weight:700}.btn.primary{border-color:#278ed2;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);color:#fff}.btn:hover{filter:brightness(1.1)}.hint{display:block;margin-top:14px;color:#607c99;font-size:12px}</style></head><body><div class="box"><div class="icon">✉</div><h1>Email Campaigns</h1><p>Sign in with Social Browser to access campaign management, sending controls and reports.</p><div class="actions"><a class="btn primary" href="/admin-login?next=%2Fcampaigns">Local Admin Login</a><a class="btn" href="/login?next=%2Fcampaigns">Login by Social Browser</a><a class="btn" href="/">Back</a></div><small class="hint">After successful sign in you will return directly to Email Campaigns.</small></div></body></html>');
         }
         return site.emailTemplateRenderer.renderResponse(req, res, __dirname + '/site_files/html/campaigns.html');
     });
 
     site.onGET({ name: 'admin', overwrite: true }, (req, res) => {
-        if (!adminBrowser(req)) {
+        if (!admin(req)) {
             res.status(403);
-            return res.sendHTML('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin access required</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08111f;color:#dbeafe;font-family:Arial,sans-serif}.box{width:min(520px,calc(100% - 36px));padding:28px;border:1px solid #223a59;border-radius:18px;background:#0d1829;text-align:center}.box h1{margin:0 0 10px;color:#fff}.box p{color:#91a9c5;line-height:1.6}.box a{display:inline-block;margin-top:10px;padding:10px 14px;border-radius:10px;background:#1d4ed8;color:#fff;text-decoration:none;font-weight:700}</style></head><body><div class="box"><h1>Admin access required</h1><p>This dashboard is available only from an authorized Social Browser environment.</p><a href="/">Back to Temp Mail</a></div></body></html>');
+            return res.sendHTML('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin access required</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#08111f;color:#dbeafe;font-family:Arial,sans-serif}.box{width:min(520px,calc(100% - 36px));padding:28px;border:1px solid #223a59;border-radius:18px;background:#0d1829;text-align:center}.box h1{margin:0 0 10px;color:#fff}.box p{color:#91a9c5;line-height:1.6}.box a{display:inline-block;margin-top:10px;padding:10px 14px;border-radius:10px;background:#1d4ed8;color:#fff;text-decoration:none;font-weight:700}</style></head><body><div class="box"><h1>Admin access required</h1><p>This dashboard is available only from an authorized Social Browser environment.</p><a href="/admin-login?next=%2Fadmin">Local Admin Login</a> <a href="/login?next=%2Fadmin">Login by Social Browser</a> <a href="/">Back</a></div></body></html>');
         }
         return site.emailTemplateRenderer.renderResponse(req, res, __dirname + '/site_files/html/index.html');
     });
@@ -1828,6 +1868,24 @@ module.exports = function init(site) {
     onPost('/api/emails/admin/policy/get', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         res.json({ done: true, config: policy.getConfig(), defaults: policy.getDefaults(), status: policy.status(), path: policy.filePath });
+    });
+
+    onPost('/api/emails/admin/instance/get', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!site.emailInstance) return res.json({ done: false, error: 'Instance configuration is unavailable.' });
+        return res.json({ done: true, config: site.emailInstance.getPublic() });
+    });
+
+    onPost('/api/emails/admin/instance/update', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!site.emailInstance) return res.json({ done: false, error: 'Instance configuration is unavailable.' });
+        try {
+            const result = site.emailInstance.update(body(req).config || {});
+            await service.store.audit('admin_instance_config_update', { browser: browserRequestID(req) || '', ip: clientIp(req), updatedAt: new Date().toISOString() });
+            return res.json({ done: true, ...result });
+        } catch (error) {
+            return res.json({ done: false, error: error?.message || String(error) });
+        }
     });
 
     onPost('/api/emails/admin/policy/update', async (req, res) => {

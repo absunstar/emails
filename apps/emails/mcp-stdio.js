@@ -1,6 +1,9 @@
 'use strict';
 
 const path = require('path');
+const { createEmailInstanceConfig } = require('./core/instance-config');
+const instanceConfig = createEmailInstanceConfig({ cwd: process.cwd() });
+instanceConfig.applyProcessEnv();
 const readline = require('readline');
 const { createSmtpOutboundTransport } = require('./core/smtp-outbound');
 let sendmailImpl = null;
@@ -57,7 +60,7 @@ const operationsManager = createEmailBackupStorageManager({
     alertWebhook: process.env.EMAIL_OPS_ALERT_WEBHOOK || '',
     logger: () => {},
 });
-const service = createEmailMcpService({ emailService, abusePolicy: policy, scheduler, campaignEngine, deliverability, operationsManager });
+const service = createEmailMcpService({ emailService, abusePolicy: policy, scheduler, campaignEngine, deliverability, operationsManager, instanceConfig });
 const session = {
     id: 'stdio',
     createdAt: Date.now(),

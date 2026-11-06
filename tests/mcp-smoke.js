@@ -7,6 +7,8 @@ async function main() {
     const calls = [];
     const service = {
         async capabilities() { calls.push(['capabilities']); return { manager: true, capabilities: ['global-search', 'security-policy-update'] }; },
+        async instanceGet() { calls.push(['instanceGet']); return { instance: { name: 'Acme Mail' }, network: { publicOrigin: 'https://mail.acme.example' }, mcp: { name: 'acme-mail' } }; },
+        async instanceUpdate(args) { calls.push(['instanceUpdate', args]); return { config: args.config, restartRequired: true }; },
         async search(args) { calls.push(['search', args]); return { count: 1, totalMatches: 1, messages: [{ guid: 'g1', subject: 'Hello' }] }; },
         async read(guid) { calls.push(['read', guid]); return { message: { guid, text: 'Body', html: '<img src="https://example.com/pixel.gif">' } }; },
         async readMany(guids) { calls.push(['readMany', guids]); return { count: guids.length, messages: guids.map((guid) => ({ guid })) }; },
@@ -106,11 +108,17 @@ async function main() {
         assert.equal(list.json.result.tools.length, TOOLS.length);
         assert.ok(TOOLS.length >= 34);
         for (const name of [
-            'email_capabilities', 'email_search', 'email_forward', 'email_update_bulk', 'email_attachment_read', 'email_eml_export',
+            'email_capabilities', 'email_instance_get', 'email_instance_update', 'email_search', 'email_forward', 'email_update_bulk', 'email_attachment_read', 'email_eml_export',
             'email_analyze', 'email_vip_set', 'email_folder_create', 'email_schedule', 'email_schedule_bulk', 'email_schedules_list', 'email_scheduler_status',
             'email_campaign_status', 'email_campaigns_list', 'email_campaign_get', 'email_campaign_create', 'email_campaign_update', 'email_campaign_start', 'email_campaign_pause', 'email_campaign_resume', 'email_campaign_stop', 'email_campaign_delete', 'email_campaign_report', 'email_campaign_jobs', 'email_campaign_events',
             'email_policy_get', 'email_policy_export', 'email_policy_import', 'email_policy_rule_add', 'email_policy_limit_set',
         ]) assert.ok(list.json.result.tools.some((t) => t.name === name), 'missing tool ' + name);
+
+        const instance = await modernPost(31, 'tools/call', { name: 'email_instance_get', arguments: {} }, 'email_instance_get');
+        assert.equal(instance.json.result.structuredContent.instance.name, 'Acme Mail');
+
+        const instanceUpdate = await modernPost(32, 'tools/call', { name: 'email_instance_update', arguments: { config: { instance: { name: 'Client Mail' } } } }, 'email_instance_update');
+        assert.equal(instanceUpdate.json.result.structuredContent.restartRequired, true);
 
         const call = await modernPost(4, 'tools/call', { name: 'email_search', arguments: { query: 'hello', favorite: true, sortBy: 'subject', sortDir: 'asc', limit: 5 } }, 'email_search');
         assert.equal(call.response.status, 200);

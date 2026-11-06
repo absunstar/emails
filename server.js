@@ -2,6 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createEmailInstanceConfig } = require('./apps/emails/core/instance-config');
+const emailInstance = createEmailInstanceConfig({ cwd: __dirname });
+emailInstance.applyProcessEnv();
 const { PassThrough } = require('stream');
 const SMTPServer = require('smtp-server').SMTPServer;
 const parser = require('mailparser').simpleParser;
@@ -40,6 +43,7 @@ const site = core({
 
 // Native Core is the runtime authority. The legacy iSite runtime is not loaded.
 site.cwd = __dirname;
+site.emailInstance = emailInstance;
 site.dir = path.join(__dirname, 'site_files');
 site.apps = [{ name: 'emails', name2: 'emails', path: path.join(__dirname, 'apps', 'emails') }];
 site.options = site.options || {};
@@ -128,7 +132,7 @@ site.emailDeliverability = createEmailDeliverabilityEngine({
 site.emailUnsubscribe = createEmailUnsubscribeService({
     deliverability: site.emailDeliverability,
     baseDir: process.env.EMAIL_UNSUBSCRIBE_DIR || path.join(site.cwd, 'localStorage', 'email-unsubscribe'),
-    publicOrigin: process.env.EMAIL_PUBLIC_ORIGIN || 'https://emails.social-browser.com',
+    publicOrigin: site.emailInstance.get().network.publicOrigin,
     monitor: site.emailRuntimeMonitor,
 });
 
@@ -193,7 +197,7 @@ const inboundSmtpTls = loadInboundSmtpTls();
 
 const smtpServer = new SMTPServer({
     ...inboundSmtpTls,
-    name: String(process.env.SMTP_HOSTNAME || 'emails.egytag.com').trim(),
+    name: String(process.env.SMTP_HOSTNAME || site.emailInstance.get().network.smtpHostname).trim(),
     onAuth(auth, session, callback) {
         callback(null, { user: auth.username });
     },
@@ -405,6 +409,7 @@ const mcpService = createEmailMcpService({
     campaignEngine: site.emailCampaignEngine,
     deliverability: site.emailDeliverability,
     operationsManager: site.emailOperationsManager,
+    instanceConfig: site.emailInstance,
 });
 site.emailMcpServer = startEmailMcpServer({
     service: mcpService,

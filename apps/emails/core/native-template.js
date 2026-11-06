@@ -14,6 +14,46 @@ function readWords(file) {
     }
 }
 
+function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>\"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+}
+
+function applyInstanceBranding(html, instance) {
+    if (!instance || typeof instance !== 'object') return html;
+    const brand = instance.brand || {};
+    const features = instance.features || {};
+    const productName = String(brand.productName || instance.instance?.name || 'Social Mail');
+    const companyName = String(brand.companyName || productName);
+    const websiteUrl = String(brand.websiteUrl || '').replace(/\/+$/, '');
+    const supportUrl = String(brand.supportUrl || '').replace(/\/+$/, '');
+    const logoUrl = String(brand.logoUrl || '/images/social-browser-brand-icon.png');
+    const windowsUrl = String(brand.downloads?.windows || '');
+    const linuxUrl = String(brand.downloads?.linux || '');
+    const socialBrowserEnabled = features.socialBrowserLogin !== false && brand.socialBrowserLogin?.enabled !== false;
+
+    if (windowsUrl) html = html.replace(/https:\/\/social-browser\.com\/download-windows-latest/gi, windowsUrl);
+    if (linuxUrl) html = html.replace(/https:\/\/social-browser\.com\/download-linux-latest/gi, linuxUrl);
+    if (websiteUrl) html = html.replace(/https:\/\/social-browser\.com\/?/gi, websiteUrl + '/');
+    html = html.replace(/\/images\/social-browser-brand-icon\.png/gi, logoUrl);
+    html = html.replace(/\|\s*Egytag\b/g, '| ' + escapeHtml(companyName));
+    html = html.replace(/>Egytag<\/a>/g, '>' + escapeHtml(companyName) + '</a>');
+    html = html.replace(/title=\"Egytag Temporary Email\"/g, 'title=\"' + escapeHtml(productName) + '\"');
+
+    if (!socialBrowserEnabled) {
+        html = html.replace(/<a\b[^>]*href=\"\/login\?next=[^\"]*\"[^>]*>.*?<\/a>/gis, '');
+        html = html.replace(/<button\b[^>]*data-browser-signin[^>]*>.*?<\/button>/gis, '');
+        html = html.replace(/<a\b[^>]*data-quick-mail-link=\"social_browser\"[^>]*>.*?<\/a>/gis, '');
+        html = html.replace(/<a\b[^>]*data-limit-alert-cta[^>]*>.*?<\/a>/gis, '');
+        html = html.replace(/<a\b[^>]*data-browser-download(?:-linux)?[^>]*>.*?<\/a>/gis, '');
+        html = html.replace(/<p\b[^>]*class=\"browser-login-source\"[^>]*>.*?<\/p>/gis, '');
+    }
+
+    const bootstrap = '<script>window.__emailInstance=' + JSON.stringify(instance).replace(/</g, '\\u003c') + ';</script>';
+    if (html.includes('</head>')) html = html.replace('</head>', bootstrap + '</head>');
+    else html = bootstrap + html;
+    return html;
+}
+
 function createNativeTemplateRenderer(site, options = {}) {
     const wordRows = [
         ...readWords(path.join(site.cwd, 'site_files', 'json', 'words.json')),
@@ -89,7 +129,9 @@ function createNativeTemplateRenderer(site, options = {}) {
         const langCode = req.session.language.name;
         const current = String(req.path || req.pathname || req.url || '/').split(/[?#]/)[0] || '/';
         const base = fromPath(current) ? current.slice(fromPath(current).length+1) || '/' : current;
-        const canonical = 'https://emails.egytag.com' + (prefix(langCode) + (base === '/' ? '/' : base));
+        const instance = site.emailInstance?.getPublic?.() || null;
+        const publicOrigin = String(instance?.network?.publicOrigin || process.env.EMAIL_PUBLIC_ORIGIN || 'https://emails.egytag.com').replace(/\/+$/, '');
+        const canonical = publicOrigin + (prefix(langCode) + (base === '/' ? '/' : base));
         // Match Social Browser's per-language URL, lang/dir and canonical conventions.
         html = html.replace(/<html\b[^>]*>/i, (tag) => {
             let v = tag.replace(/\blang="[^"]*"/i, 'lang="'+langCode+'"');
@@ -101,8 +143,8 @@ function createNativeTemplateRenderer(site, options = {}) {
         html = html.replace(/<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>(?:\s*)/i, '');
         html = html.replace(/<link\s+rel="alternate"\s+hreflang="[^"]*"\s+href="[^"]*"\s*\/?>(?:\s*)/gi, '');
         if (publicPages.includes(base)) {
-            const alternate = Object.entries(languages).map(([code,entry]) => '<link rel="alternate" hreflang="'+code+'" href="https://emails.egytag.com'+(prefix(code)+(base==='/'?'/':base))+'">').join('');
-            html = html.replace('</head>', '<link rel="canonical" href="'+canonical+'">'+alternate+'<link rel="alternate" hreflang="x-default" href="https://emails.egytag.com'+(base==='/'?'/':base)+'"></head>');
+            const alternate = Object.entries(languages).map(([code,entry]) => '<link rel="alternate" hreflang="'+code+'" href="'+publicOrigin+(prefix(code)+(base==='/'?'/':base))+'">').join('');
+            html = html.replace('</head>', '<link rel="canonical" href="'+canonical+'">'+alternate+'<link rel="alternate" hreflang="x-default" href="'+publicOrigin+(base==='/'?'/':base)+'"></head>');
         }
         html = html.replace(/\bhref="\/(?:temporary-email|disposable-email|verification-code-email|temp-email-for-testing|multiple-temporary-inboxes|developer-temp-mail|embed-builder|embed-examples|privacy)(?=["?#])/g, value => 'href="'+prefix(langCode)+value.slice(6));
         if (langCode !== 'en') html=html.replace(/\bhref="\/(?=["?#])/g, 'href="'+prefix(langCode)+'/');
@@ -129,6 +171,7 @@ function createNativeTemplateRenderer(site, options = {}) {
             }
         }
         // The route is already localized by the server. Never rewrite /api URLs or external links.
+        html = applyInstanceBranding(html, instance);
         return html;
     }
 
@@ -148,4 +191,4 @@ function createNativeTemplateRenderer(site, options = {}) {
     return { parser, render, renderResponse, prepareRequest };
 }
 
-module.exports = { createNativeTemplateRenderer };
+module.exports = { createNativeTemplateRenderer, applyInstanceBranding };

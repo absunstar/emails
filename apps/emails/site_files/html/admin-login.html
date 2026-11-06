@@ -27,5 +27,5 @@
 <script>
 (function(){const form=document.getElementById('adminLoginForm'),error=document.getElementById('adminLoginError');form.addEventListener('submit',async function(e){e.preventDefault();error.textContent='';const button=form.querySelector('button');button.disabled=true;try{const data=Object.fromEntries(new FormData(form).entries());const r=await fetch('/api/v2/admin-auth/signin',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify(data)});const j=await r.json();if(!j.done)throw new Error(j.error||'Login failed');const next=new URLSearchParams(location.search).get('next');location.assign(next&&next.startsWith('/')&&!next.startsWith('//')?next:'/admin');}catch(err){error.textContent=err.message||'Login failed';}finally{button.disabled=false;}})})();
 </script>
-</body>
+<script x-import="instance-runtime.js"></script></body>
 </html>

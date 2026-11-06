@@ -63,7 +63,7 @@ function defaultConfig() {
             edition: 'self-hosted',
         },
         network: {
-            publicOrigin: 'https://emails.social-browser.com',
+            publicOrigin: 'https://emails.egytag.com',
             smtpHostname: 'emails.egytag.com',
             mailDomains: [],
         },

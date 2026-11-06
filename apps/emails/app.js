@@ -704,6 +704,11 @@ module.exports = function init(site) {
         overwrite: true,
     });
 
+    site.onGET({ name: '/api/v2/instance/public', overwrite: true }, (req, res) => {
+        const config = site.emailInstance?.getPublic?.() || {};
+        return res.json({ done: true, config });
+    });
+
     site.onGET({ name: '/api/v2/browser-auth/status', overwrite: true }, (req, res) => {
         if (!guardHttp(req, res, ['api'])) return;
         res.json(browserAuth.status(req));

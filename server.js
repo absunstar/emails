@@ -163,7 +163,12 @@ for (const publicFile of ['robots.txt', 'sitemap.xml', 'app-ads.txt']) {
         const filePath = path.join(site.cwd, 'site_files', publicFile);
         if (!fs.existsSync(filePath)) { res.status(404); return res.end('Not Found'); }
         if (typeof res.set === 'function') res.set('Content-Type', publicFile.endsWith('.xml') ? 'application/xml; charset=utf-8' : 'text/plain; charset=utf-8');
-        res.end(fs.readFileSync(filePath));
+        let content = fs.readFileSync(filePath, 'utf8');
+        if (publicFile === 'robots.txt' || publicFile === 'sitemap.xml') {
+            const origin = String(site.emailInstance?.get?.().network.publicOrigin || process.env.EMAIL_PUBLIC_ORIGIN || 'https://emails.egytag.com').replace(/\/+$/, '');
+            content = content.replace(/https:\/\/emails\.(?:egytag|social-browser)\.com/gi, origin);
+        }
+        res.end(content);
     });
 }
 

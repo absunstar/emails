@@ -39,6 +39,7 @@
         operations: null,
         operationsConfig: null,
         operationsCleanupPreview: null,
+        instanceConfig: null,
     };
 
     const q = (selector, base) => (base || document).querySelector(selector);
@@ -1351,6 +1352,88 @@
         { group: 'Outgoing mail', name: 'allowOutboundDomains', title: 'Allow outbound domains', help: 'Optional whitelist for outgoing recipient domains.', placeholder: 'gmail.com\noutlook.com' },
     ];
 
+    function instanceGet(obj, path) {
+        return String(path || '').split('.').reduce((value, key) => value == null ? undefined : value[key], obj);
+    }
+
+    function instanceSet(obj, path, value) {
+        const parts = String(path || '').split('.');
+        let target = obj;
+        parts.forEach((key, index) => {
+            if (index === parts.length - 1) target[key] = value;
+            else {
+                if (!target[key] || typeof target[key] !== 'object') target[key] = {};
+                target = target[key];
+            }
+        });
+    }
+
+    function renderInstanceConfig() {
+        if (!state.instanceConfig) return;
+        qa('[data-instance-config]').forEach((input) => {
+            const path = input.dataset.instanceConfig;
+            let value = instanceGet(state.instanceConfig, path);
+            if (path === 'network.mailDomains') value = Array.isArray(value) ? value.join('\n') : '';
+            if (input.dataset.instanceKind === 'boolean') input.checked = !!value;
+            else input.value = value == null ? '' : value;
+        });
+        const host = q('[data-instance-status]');
+        if (host) {
+            const auth = state.instanceConfig.auth || {};
+            host.innerHTML = '<div><strong>Instance ID</strong><span>' + escape(state.instanceConfig.instance?.id || '—') + '</span></div>' +
+                '<div><strong>Local admin</strong><span>' + (auth.localAdminConfigured ? 'Configured' : 'Not configured') + '</span></div>' +
+                '<div><strong>MCP access</strong><span>' + (state.instanceConfig.mcp?.secretConfigured || state.instanceConfig.mcp?.bearerTokenConfigured ? 'Configured' : 'Generated/default runtime access') + '</span></div>';
+        }
+    }
+
+    async function loadInstanceConfig() {
+        const response = await post('/api/emails/admin/instance/get', {});
+        state.instanceConfig = response.config || {};
+        renderInstanceConfig();
+        return response;
+    }
+
+    async function openInstance(button) {
+        setBusy(button, true, 'Loading…');
+        try {
+            await loadInstanceConfig();
+            ui.show('#adminInstanceModal');
+        } catch (error) {
+            toast(error.message || 'Unable to load instance settings.', 'error', 'Instance unavailable');
+        } finally { setBusy(button, false); }
+    }
+
+    function readInstanceConfig() {
+        const config = JSON.parse(JSON.stringify(state.instanceConfig || {}));
+        qa('[data-instance-config]').forEach((input) => {
+            let value;
+            if (input.dataset.instanceKind === 'boolean') value = !!input.checked;
+            else if (input.dataset.instanceKind === 'number') value = Number(input.value || 0);
+            else if (input.dataset.instanceConfig === 'network.mailDomains') value = String(input.value || '').split(/\r?\n|,/).map(v => v.trim()).filter(Boolean);
+            else value = String(input.value || '').trim();
+            instanceSet(config, input.dataset.instanceConfig, value);
+        });
+        delete config.auth;
+        delete config.configPath;
+        if (config.mcp) {
+            delete config.mcp.secretConfigured;
+            delete config.mcp.bearerTokenConfigured;
+        }
+        return config;
+    }
+
+    async function saveInstance(button) {
+        setBusy(button, true, 'Saving…');
+        try {
+            const response = await post('/api/emails/admin/instance/update', { config: readInstanceConfig() });
+            state.instanceConfig = response.config || state.instanceConfig;
+            renderInstanceConfig();
+            toast(response.restartRequired ? 'Instance settings saved. Restart the mail service to activate network/MCP identity changes.' : 'Instance settings saved.', 'success', 'Instance saved', { duration: 4200 });
+        } catch (error) {
+            toast(error.message || 'Unable to save instance settings.', 'error', 'Save failed');
+        } finally { setBusy(button, false); }
+    }
+
     function policyClone(value) {
         return value == null ? value : JSON.parse(JSON.stringify(value));
     }
@@ -1779,6 +1862,9 @@
         const action = button.dataset.adminAction;
         const guid = button.dataset.guid || '';
         if (action === 'refresh' || action === 'refresh-folders') return refreshAll(button);
+        if (action === 'open-instance') return openInstance(button);
+        if (action === 'instance-refresh') return loadInstanceConfig();
+        if (action === 'instance-save') return saveInstance(button);
         if (action === 'open-policy') return openPolicy(button);
         if (action === 'policy-save') return savePolicy(button);
         if (action === 'policy-reset') return resetPolicy(button);

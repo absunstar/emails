@@ -17,6 +17,10 @@
             </div>
             <div class="mail-admin-hero-actions">
                 <span class="mail-admin-access-badge"><span class="mail-admin-live-dot"></span> Full admin access</span>
+                <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="open-instance">
+                    <svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><path d="M8 9h8M8 13h8"></path></svg>
+                    <span>Instance</span>
+                </button>
                 <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="open-policy">
                     <svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6l8-3Z"></path><path d="M9 12l2 2 4-5"></path></svg>
                     <span>Security &amp; Policies</span>
@@ -520,6 +524,45 @@
         </div>
     </div>
 
+
+    <div id="adminInstanceModal" class="modal" hidden>
+        <div class="modal-content mail-admin-ops-modal">
+            <div class="modal-header">
+                <div><small class="mail-admin-kicker">SELF-HOSTED · WHITE-LABEL · MULTI-DOMAIN</small><h2>Instance Settings</h2><p>Configure this deployment without changing project source code.</p></div>
+                <button class="sb-modal-close" type="button" data-modal-close="#adminInstanceModal">×</button>
+            </div>
+            <div class="modal-body mail-admin-ops-body">
+                <div class="mail-delivery-settings">
+                    <article class="mail-delivery-settings-card"><h4>Instance & Network</h4><div class="mail-delivery-settings-grid">
+                        <label><span>Instance name</span><input class="sb-input" data-instance-config="instance.name"></label>
+                        <label><span>Edition</span><input class="sb-input" data-instance-config="instance.edition"></label>
+                        <label><span>Public origin</span><input class="sb-input" data-instance-config="network.publicOrigin" placeholder="https://mail.example.com"></label>
+                        <label><span>SMTP hostname</span><input class="sb-input" data-instance-config="network.smtpHostname" placeholder="mx.example.com"></label>
+                        <label style="grid-column:1/-1"><span>Mail domains</span><textarea class="sb-textarea" data-instance-config="network.mailDomains" placeholder="example.com
+support.example.com"></textarea></label>
+                    </div></article>
+                    <article class="mail-delivery-settings-card"><h4>Branding</h4><div class="mail-delivery-settings-grid">
+                        <label><span>Product name</span><input class="sb-input" data-instance-config="brand.productName"></label>
+                        <label><span>Company name</span><input class="sb-input" data-instance-config="brand.companyName"></label>
+                        <label><span>Website URL</span><input class="sb-input" data-instance-config="brand.websiteUrl"></label>
+                        <label><span>Support URL</span><input class="sb-input" data-instance-config="brand.supportUrl"></label>
+                        <label><span>Logo URL</span><input class="sb-input" data-instance-config="brand.logoUrl"></label>
+                        <label><span>Windows download</span><input class="sb-input" data-instance-config="brand.downloads.windows"></label>
+                        <label><span>Linux download</span><input class="sb-input" data-instance-config="brand.downloads.linux"></label>
+                        <label><span>Social Browser login</span><input type="checkbox" data-instance-config="features.socialBrowserLogin" data-instance-kind="boolean"></label>
+                    </div></article>
+                    <article class="mail-delivery-settings-card"><h4>MCP</h4><div class="mail-delivery-settings-grid">
+                        <label><span>MCP name</span><input class="sb-input" data-instance-config="mcp.name"></label>
+                        <label><span>MCP title</span><input class="sb-input" data-instance-config="mcp.title"></label>
+                        <label><span>MCP host</span><input class="sb-input" data-instance-config="mcp.host"></label>
+                        <label><span>MCP port</span><input class="sb-input" type="number" min="1" max="65535" data-instance-config="mcp.port" data-instance-kind="number"></label>
+                    </div></article>
+                </div>
+                <div class="mail-feedback-status" data-instance-status></div>
+            </div>
+            <div class="modal-footer"><button class="sb-btn sb-btn-ghost" type="button" data-admin-action="instance-refresh">Refresh</button><button class="sb-btn" type="button" data-admin-action="instance-save">Save instance</button></div>
+        </div>
+    </div>
     <div id="adminHealthModal" class="modal" hidden>
         <div class="modal-content mail-admin-ops-modal">
             <div class="modal-header">

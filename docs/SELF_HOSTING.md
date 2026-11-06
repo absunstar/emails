@@ -33,3 +33,9 @@ Instance updates report whether a restart is required. Network identity, SMTP ho
 ## Portability rule
 
 Customer-specific domains, brand identity, MCP names/endpoints, credentials and public origins belong in instance configuration or environment variables, not in project source code.
+
+## Runtime branding
+
+The HTML renderer and shared UI load the active instance branding at runtime. Product/company name, logo, public origin, Social Browser login visibility, website/download links and canonical/alternate URLs are instance-aware. `robots.txt` and `sitemap.xml` are also rewritten to the active public origin when served.
+
+The Mail Admin console includes **Instance Settings** for network identity, managed mail domains, branding and MCP identity. Network/SMTP/MCP identity changes are persisted immediately but should be followed by a service restart.

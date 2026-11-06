@@ -401,6 +401,7 @@ site.emailScheduler = site.emailScheduler || createEmailScheduler({
 site.emailRuntimeMonitor.component('scheduler', 'running', site.emailScheduler.status());
 site.emailCampaignEngine = site.emailCampaignEngine || createEmailCampaignEngine({
     emailService: site.emailService,
+    tenantRegistry: site.emailTenants,
     baseDir: process.env.EMAIL_CAMPAIGN_DIR || path.join(site.cwd, 'localStorage', 'email-campaigns'),
     logger: (message) => site.log(message),
     intervalMs: Number(process.env.EMAIL_CAMPAIGN_TICK_MS || 1000),

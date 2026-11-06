@@ -11,7 +11,7 @@ const DEFAULT_MCP_SECRET = String(process.env.EMAIL_MCP_DEFAULT_SECRET || 'SOCIA
 const SERVER_INFO = {
     name: String(process.env.EMAIL_MCP_NAME || 'social-browser-email').trim() || 'social-mail',
     title: String(process.env.EMAIL_MCP_TITLE || 'Social Browser Email Manager').trim() || 'Social Mail MCP',
-    version: '4.7.0',
+    version: '4.8.0',
 };
 
 const SERVER_INSTRUCTIONS = [
@@ -54,6 +54,9 @@ const SEARCH_PROPERTIES = {
 
 const MESSAGE_SEND_PROPERTIES = {
     from: { type: 'string', minLength: 3 },
+    organizationId: { type: 'string' },
+    senderIds: { type: 'array', items: { type: 'string' } },
+    senderMode: { type: 'string', enum: ['single', 'rotate'] },
     to: {
         oneOf: [
             { type: 'string', minLength: 3 },
@@ -128,6 +131,9 @@ const CAMPAIGN_PACING = {
 const CAMPAIGN_CREATE_PROPERTIES = {
     name: { type: 'string', minLength: 1, maxLength: 240 },
     description: { type: 'string', maxLength: 1000 },
+    organizationId: { type: 'string' },
+    senderIds: { type: 'array', items: { type: 'string' } },
+    senderMode: { type: 'string', enum: ['single', 'rotate'] },
     from: { type: 'string', minLength: 3 },
     replyTo: { type: 'string' },
     recipients: { type: 'array', minItems: 1, maxItems: 100000, items: CAMPAIGN_RECIPIENT },
@@ -196,7 +202,7 @@ const TOOLS = [
     tool('email_campaign_get', 'Get email campaign', 'Read one campaign in full, including recipients, messages, queue jobs, variables, pacing, lifecycle state, progress, and event log.', {
         id: { type: 'string', minLength: 1 },
     }, ['id']),
-    tool('email_campaign_create', 'Create email campaign', 'Create a persistent standalone email campaign. The campaign is created as draft; call email_campaign_start to run or schedule it. Supports recipient variables, rotate/A-B, sequence, assigned one-to-one messages, and fixed/random/rate/batch pacing.', CAMPAIGN_CREATE_PROPERTIES, ['name', 'from', 'recipients', 'messages'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
+    tool('email_campaign_create', 'Create email campaign', 'Create a persistent standalone email campaign. The campaign is created as draft; call email_campaign_start to run or schedule it. Supports recipient variables, rotate/A-B, sequence, assigned one-to-one messages, and fixed/random/rate/batch pacing.', CAMPAIGN_CREATE_PROPERTIES, ['name', 'recipients', 'messages'], { readOnlyHint: false, idempotentHint: false, openWorldHint: true }),
     tool('email_campaign_update', 'Update email campaign', 'Update mutable campaign settings such as name, pacing, or start time while the campaign is draft, paused, or scheduled.', {
         id: { type: 'string', minLength: 1 },
         name: { type: 'string', minLength: 1, maxLength: 240 },
@@ -665,7 +671,8 @@ function validateToolArguments(name, raw) {
     }
     if (name === 'email_campaign_create') {
         if (typeof args.name !== 'string' || !args.name.trim()) return fail('name is required');
-        if (typeof args.from !== 'string' || !args.from.trim()) return fail('from is required');
+        const senderIds = Array.isArray(args.senderIds) ? args.senderIds.map(x => String(x).trim()).filter(Boolean) : [];
+        if ((!args.from || !String(args.from).trim()) && !senderIds.length) return fail('from or senderIds is required');
         if (!Array.isArray(args.recipients) || !args.recipients.length) return fail('recipients must be a non-empty array');
         if (!Array.isArray(args.messages) || !args.messages.length) return fail('messages must be a non-empty array');
         if (args.messageMode !== undefined && !['rotate', 'sequence', 'assigned'].includes(String(args.messageMode))) return fail('messageMode must be rotate, sequence, or assigned');
@@ -673,7 +680,10 @@ function validateToolArguments(name, raw) {
         return { ok: true, args: {
             name: args.name.trim(),
             description: String(args.description || '').slice(0, 1000),
-            from: args.from.trim(),
+            from: String(args.from || '').trim(),
+            organizationId: String(args.organizationId || '').trim(),
+            senderIds,
+            senderMode: String(args.senderMode || 'single'),
             replyTo: String(args.replyTo || '').trim(),
             recipients: args.recipients,
             messages: args.messages,

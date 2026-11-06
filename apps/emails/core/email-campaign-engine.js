@@ -106,6 +106,7 @@ class EmailCampaignEngine {
     constructor(options = {}) {
         if (!options.emailService) throw new Error('emailService is required');
         this.emailService = options.emailService;
+        this.tenantRegistry = options.tenantRegistry || null;
         this.baseDir = path.resolve(options.baseDir || path.join(process.cwd(), 'localStorage', 'email-campaigns'));
         this.dir = path.join(this.baseDir, 'campaigns');
         this.logger = typeof options.logger === 'function' ? options.logger : () => {};
@@ -180,9 +181,22 @@ class EmailCampaignEngine {
     }
     create(input = {}) {
         const name = String(input.name || '').trim();
-        const from = email(input.from || '');
+        let from = email(input.from || '');
         if (!name) throw new Error('Campaign name is required');
-        if (!from) throw new Error('A valid From address is required');
+        const defaultOrg = this.tenantRegistry?.listOrganizations?.().find(x => x.isDefault) || null;
+        const organizationId = String(input.organizationId || defaultOrg?.id || '').trim();
+        const senderIds = Array.isArray(input.senderIds) ? [...new Set(input.senderIds.map(x => String(x).trim()).filter(Boolean))] : [];
+        const senderMode = input.senderMode === 'rotate' ? 'rotate' : 'single';
+        let senderPool = [];
+        if (this.tenantRegistry && senderIds.length) {
+            senderPool = senderIds.map(id => this.tenantRegistry.listSenders().find(x => x.id === id)).filter(Boolean);
+            if (senderPool.length !== senderIds.length) throw new Error('One or more sender identities were not found');
+            if (organizationId && senderPool.some(x => x.organizationId !== organizationId)) throw new Error('Sender identity does not belong to the selected organization');
+            const notReady = senderPool.map(x => ({ sender:x, readiness:this.tenantRegistry.senderReadiness(x.id) })).find(x => !x.readiness.ready);
+            if (notReady) throw new Error('Sender is not ready: ' + notReady.sender.email + ' (' + notReady.readiness.reasons.join(', ') + ')');
+            from = senderPool[0].email;
+        }
+        if (!from) throw new Error('A valid From address or sender identity is required');
         const recipients = (Array.isArray(input.recipients) ? input.recipients : []).map(normalizeRecipient).filter(r => r.email);
         const unique = []; const seen = new Set();
         for (const r of recipients) if (!seen.has(r.email)) { seen.add(r.email); unique.push(r); }
@@ -193,6 +207,7 @@ class EmailCampaignEngine {
         const startAt = parseStartAt(input.startAt || 'now');
         const c = {
             id: id('campaign_'), name, description: String(input.description || '').slice(0, 1000), from,
+            organizationId, senderIds, senderMode, legacySender: senderIds.length === 0,
             replyTo: String(input.replyTo || '').trim(), recipients: unique, messages, messageMode,
             pacing: normalizePacing(input.pacing), startAt, status: 'draft',
             createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), startedAt: null, completedAt: null,
@@ -246,8 +261,18 @@ class EmailCampaignEngine {
         this._recount(c); this._save(c);
         const vars = Object.assign({}, item.variables || {}, { email: item.recipient, campaign: { id: c.id, name: c.name } });
         try {
+            let sendFrom = c.from;
+            if (this.tenantRegistry && Array.isArray(c.senderIds) && c.senderIds.length) {
+                const index = c.senderMode === 'rotate' ? ((c.stats.sent + c.stats.failed + c.stats.unknown) % c.senderIds.length) : 0;
+                const sender = this.tenantRegistry.listSenders().find(x => x.id === c.senderIds[index]);
+                if (!sender) throw new Error('Configured sender identity is unavailable');
+                const readiness = this.tenantRegistry.senderReadiness(sender.id);
+                if (!readiness.ready) throw new Error('Sender is not ready: ' + sender.email + ' (' + readiness.reasons.join(', ') + ')');
+                sendFrom = sender.email;
+                item.senderId = sender.id; item.from = sender.email;
+            }
             const result = await this.emailService.send({
-                from: c.from, to: item.recipient, replyTo: c.replyTo || msg.replyTo || '',
+                from: sendFrom, to: item.recipient, replyTo: c.replyTo || msg.replyTo || '',
                 subject: template(msg.subject, vars), text: template(msg.text, vars), html: template(msg.html, vars),
             });
             item.status = 'sent'; item.guid = result?.guid || ''; item.error = ''; item.finishedAt = new Date().toISOString();

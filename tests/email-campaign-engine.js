@@ -158,5 +158,27 @@ const { createEmailCampaignEngine } = require('../apps/emails/core/email-campaig
   assert.equal(sequence.queue[0].messageIndex, 0);
   assert.equal(sequence.queue[1].messageIndex, 1);
 
+
+  // Multi-tenant sender pool: campaigns are scoped to one organization and can rotate ready sender identities.
+  const tenantSent = [];
+  const tenantRegistry = {
+    listOrganizations(){ return [{id:'org_a',name:'A',isDefault:true,status:'active'},{id:'org_b',name:'B',isDefault:false,status:'active'}]; },
+    listSenders(){ return [
+      {id:'sender_1',organizationId:'org_a',domainId:'domain_a',email:'one@a.test',status:'active'},
+      {id:'sender_2',organizationId:'org_a',domainId:'domain_a',email:'two@a.test',status:'active'},
+      {id:'sender_b',organizationId:'org_b',domainId:'domain_b',email:'one@b.test',status:'active'},
+    ]; },
+    senderReadiness(id){ return {ready:id!=='sender_b_bad',reasons:id==='sender_b_bad'?['domain_not_verified']:[]}; }
+  };
+  const tenantEngine=createEmailCampaignEngine({emailService:{send:async m=>{tenantSent.push(m);return {guid:'t'+tenantSent.length};}},tenantRegistry,baseDir:fs.mkdtempSync(path.join(os.tmpdir(),'email-campaigns-tenant-')),intervalMs:500});
+  const pooled=tenantEngine.create({name:'Tenant pool',organizationId:'org_a',senderIds:['sender_1','sender_2'],senderMode:'rotate',recipients:[{email:'x@example.com'},{email:'y@example.com'}],messages:[{subject:'Pool',text:'ok'}],startAt:'now',pacing:{mode:'fixed',intervalSeconds:0}});
+  assert.equal(pooled.organizationId,'org_a');
+  assert.deepEqual(pooled.senderIds,['sender_1','sender_2']);
+  assert.equal(pooled.legacySender,false);
+  tenantEngine.start(pooled.id); await tenantEngine.tick(); await tenantEngine.tick();
+  assert.equal(tenantSent[0].from,'one@a.test');
+  assert.equal(tenantSent[1].from,'two@a.test');
+  assert.throws(()=>tenantEngine.create({name:'Wrong org',organizationId:'org_a',senderIds:['sender_b'],recipients:[{email:'z@example.com'}],messages:[{text:'x'}]}),/does not belong/);
+
   console.log('email-campaign-engine tests passed');
 })().catch(e => { console.error(e); process.exit(1); });

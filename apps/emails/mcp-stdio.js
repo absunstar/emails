@@ -48,6 +48,7 @@ const scheduler = createEmailScheduler({
 }).start();
 const campaignEngine = createEmailCampaignEngine({
     emailService,
+    tenantRegistry,
     baseDir: process.env.EMAIL_CAMPAIGN_DIR || path.join(cwd, 'localStorage', 'email-campaigns'),
     logger: () => {},
     intervalMs: Number(process.env.EMAIL_CAMPAIGN_TICK_MS || 1000),

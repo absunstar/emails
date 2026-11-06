@@ -34,11 +34,19 @@ function normalizeRecipient(input) {
     const obj = input && typeof input === 'object' ? input : {};
     const address = email(obj.email || obj.to || '');
     const variables = Object.assign({}, obj.variables && typeof obj.variables === 'object' ? obj.variables : {});
+    let messageIndex;
+    let messageId;
     for (const [key, value] of Object.entries(obj)) {
-        if (!['email', 'to', 'variables'].includes(key) && typeof value !== 'object') variables[key] = value;
+        if (['email', 'to', 'variables'].includes(key) || typeof value === 'object') continue;
+        if (key === 'messageIndex') { messageIndex = value; continue; }
+        if (key === 'messageId') { messageId = String(value).trim(); continue; }
+        variables[key] = value;
     }
     variables.email = address;
-    return { email: address, variables };
+    const out = { email: address, variables };
+    if (messageIndex != null && messageIndex !== '') out.messageIndex = messageIndex;
+    if (messageId) out.messageId = messageId;
+    return out;
 }
 function normalizeMessage(input, index) {
     const msg = input && typeof input === 'object' ? input : {};
@@ -142,11 +150,26 @@ class EmailCampaignEngine {
         c.progress = stats.total ? Math.round(((stats.sent + stats.failed + stats.unknown + stats.skipped) / stats.total) * 10000) / 100 : 0;
         return stats;
     }
+    _resolveMessageIndex(recipient, messages) {
+        if (recipient && recipient.messageIndex != null && recipient.messageIndex !== '') {
+            const idx = Math.floor(Number(recipient.messageIndex) || 0);
+            if (idx >= 0 && idx < messages.length) return idx;
+        }
+        if (recipient && recipient.messageId) {
+            const found = messages.findIndex(m => m.id === recipient.messageId);
+            if (found >= 0) return found;
+        }
+        return 0;
+    }
     _buildQueue(recipients, messages, mode) {
         const queue = [];
         if (mode === 'sequence') {
             for (const recipient of recipients) for (let i = 0; i < messages.length; i++) queue.push({
                 id: id('job_'), recipient: recipient.email, variables: recipient.variables, messageIndex: i, status: 'pending', attempts: 0,
+            });
+        } else if (mode === 'assigned') {
+            for (const recipient of recipients) queue.push({
+                id: id('job_'), recipient: recipient.email, variables: recipient.variables, messageIndex: this._resolveMessageIndex(recipient, messages), status: 'pending', attempts: 0,
             });
         } else {
             recipients.forEach((recipient, i) => queue.push({
@@ -166,7 +189,7 @@ class EmailCampaignEngine {
         if (!unique.length) throw new Error('At least one valid recipient is required');
         const messages = (Array.isArray(input.messages) ? input.messages : []).map(normalizeMessage).filter(m => m.text || m.html);
         if (!messages.length) throw new Error('At least one message with text or HTML content is required');
-        const messageMode = input.messageMode === 'sequence' ? 'sequence' : 'rotate';
+        const messageMode = ['sequence', 'assigned'].includes(input.messageMode) ? input.messageMode : 'rotate';
         const startAt = parseStartAt(input.startAt || 'now');
         const c = {
             id: id('campaign_'), name, description: String(input.description || '').slice(0, 1000), from,

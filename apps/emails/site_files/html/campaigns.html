@@ -76,7 +76,7 @@
         </section>
 
         <section class="mail-campaign-form-section">
-          <div class="mail-campaign-section-head"><div><h3>2. Recipients &amp; Variables</h3><p>Paste one email per line, or CSV rows. The first row can contain headers such as <code>email,name,company</code>.</p></div><div class="mail-campaign-recipient-tools"><button type="button" class="sb-btn sb-btn-ghost" data-campaign-action="recipient-example">Example</button><button type="button" class="sb-btn sb-btn-ghost" data-campaign-action="recipient-clear">Clear</button></div></div>
+          <div class="mail-campaign-section-head"><div><h3>2. Recipients &amp; Variables</h3><p>Paste one email per line, or CSV rows. The first row can contain headers such as <code>email,name,company</code>. To assign a specific message per recipient, add a <code>messageIndex</code> or <code>messageId</code> column (used with the "One personalized message per recipient" mode).</p></div><div class="mail-campaign-recipient-tools"><button type="button" class="sb-btn sb-btn-ghost" data-campaign-action="recipient-example">Example</button><button type="button" class="sb-btn sb-btn-ghost" data-campaign-action="recipient-clear">Clear</button></div></div>
           <textarea class="sb-textarea mail-campaign-recipients" name="recipients" placeholder="Paste emails or CSV data here..."></textarea>
         </section>
 
@@ -84,7 +84,7 @@
           <div class="mail-campaign-section-head"><h3>3. Messages</h3><button type="button" class="sb-btn sb-btn-ghost" data-campaign-action="add-message">Add message</button></div>
           <div data-campaign-messages></div>
           <label class="mail-campaign-radio-row"><span>Message behavior</span>
-            <select class="sb-select" name="messageMode"><option value="rotate">Rotate / A-B between recipients</option><option value="sequence">Send every message to every recipient</option></select>
+            <select class="sb-select" name="messageMode"><option value="rotate">Rotate / A-B between recipients</option><option value="sequence">Send every message to every recipient</option><option value="assigned">One personalized message per recipient</option></select>
           </label>
         </section>
 

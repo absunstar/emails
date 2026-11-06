@@ -11,7 +11,7 @@ const DEFAULT_MCP_SECRET = String(process.env.EMAIL_MCP_DEFAULT_SECRET || 'SOCIA
 const SERVER_INFO = {
     name: String(process.env.EMAIL_MCP_NAME || 'social-browser-email').trim() || 'social-mail',
     title: String(process.env.EMAIL_MCP_TITLE || 'Social Browser Email Manager').trim() || 'Social Mail MCP',
-    version: '4.5.0',
+    version: '4.6.0',
 };
 
 const SERVER_INSTRUCTIONS = [
@@ -159,6 +159,18 @@ function tool(name, title, description, properties, required, annotations, extra
 
 const TOOLS = [
     tool('email_capabilities', 'Email manager capabilities', 'Describe manager scope and enabled email, admin, storage, and security capabilities.', {}),
+    tool('email_tenants_status', 'Mail tenant registry status', 'Return counts for organizations, domains and sender identities.', {}),
+    tool('email_organizations_list', 'List organizations', 'List organizations/tenants configured in this mail instance.', {}),
+    tool('email_organization_create', 'Create organization', 'Create a new organization/tenant.', { name:{type:'string',minLength:1}, slug:{type:'string'} }, ['name'], {readOnlyHint:false}),
+    tool('email_organization_update', 'Update organization', 'Update organization name or status.', { id:{type:'string',minLength:1}, name:{type:'string'}, status:{type:'string',enum:['active','disabled']} }, ['id'], {readOnlyHint:false}),
+    tool('email_domains_list', 'List managed domains', 'List registered mail domains, optionally scoped to an organization or status.', { organizationId:{type:'string'}, status:{type:'string'} }),
+    tool('email_domain_add', 'Add managed domain', 'Register a mail domain under an organization.', { organizationId:{type:'string'}, domain:{type:'string',minLength:3}, dkimSelector:{type:'string'}, notes:{type:'string'} }, ['domain'], {readOnlyHint:false}),
+    tool('email_domain_update', 'Update managed domain', 'Update domain lifecycle/verification metadata.', { id:{type:'string',minLength:1}, status:{type:'string',enum:['pending','verified','warning','disabled']}, dkimSelector:{type:'string'}, notes:{type:'string'}, verification:{type:'object'} }, ['id'], {readOnlyHint:false}),
+    tool('email_domain_delete', 'Delete managed domain', 'Delete a domain after sender identities have been removed.', { id:{type:'string',minLength:1}, confirm:{type:'boolean'} }, ['id','confirm'], {readOnlyHint:false,destructiveHint:true}),
+    tool('email_senders_list', 'List sender identities', 'List sender identities by organization/domain/status.', { organizationId:{type:'string'}, domainId:{type:'string'}, status:{type:'string'} }),
+    tool('email_sender_add', 'Add sender identity', 'Register a sender identity on a managed domain.', { domainId:{type:'string'}, email:{type:'string',minLength:3}, displayName:{type:'string'}, replyTo:{type:'string'}, status:{type:'string',enum:['active','disabled','warming']}, tags:{type:'array',items:{type:'string'}} }, ['email'], {readOnlyHint:false}),
+    tool('email_sender_update', 'Update sender identity', 'Update display name, reply-to, status or tags for a sender identity.', { id:{type:'string',minLength:1}, displayName:{type:'string'}, replyTo:{type:'string'}, status:{type:'string',enum:['active','disabled','warming']}, tags:{type:'array',items:{type:'string'}} }, ['id'], {readOnlyHint:false}),
+    tool('email_sender_delete', 'Delete sender identity', 'Delete a sender identity.', { id:{type:'string',minLength:1}, confirm:{type:'boolean'} }, ['id','confirm'], {readOnlyHint:false,destructiveHint:true}),
     tool('email_instance_get', 'Get mail instance configuration', 'Read the portable self-hosted instance identity, branding, public origin, SMTP hostname, mail domains, feature flags, and MCP endpoint identity. Sensitive credentials are not returned.', {}),
     tool('email_instance_update', 'Update mail instance configuration', 'Persist portable instance configuration for white-label/self-hosted deployments. Changes to network, SMTP, MCP identity, or runtime providers generally require a service restart.', { config: { type: 'object' } }, ['config'], { readOnlyHint: false }),
     tool('email_search', 'Search emails', 'Global or domain-scoped server-side email search with filters, pagination, sorting, favorites, folders, status, and attachments.', Object.assign({}, SEARCH_PROPERTIES, {
@@ -471,7 +483,7 @@ function validateScheduleRetryFields(args) {
 
 function validateToolArguments(name, raw) {
     const args = objectArgs(raw);
-    if (name === 'email_capabilities' || name === 'email_instance_get' || name === 'email_vip_list' || name === 'email_folders_list' || name === 'email_policy_get' || name === 'email_policy_export' || name === 'email_policy_status' || name === 'email_scheduler_status' || name === 'email_campaign_status' || name === 'email_deliverability_status' || name === 'email_deliverability_config_get' || name === 'email_operations_status' || name === 'email_backups_list' || name === 'email_storage_report' || name === 'email_storage_config_get' || name === 'email_storage_message_limit_get') return { ok: true, args: {} };
+    if (name === 'email_capabilities' || name === 'email_instance_get' || name === 'email_tenants_status' || name === 'email_organizations_list' || name === 'email_vip_list' || name === 'email_folders_list' || name === 'email_policy_get' || name === 'email_policy_export' || name === 'email_policy_status' || name === 'email_scheduler_status' || name === 'email_campaign_status' || name === 'email_deliverability_status' || name === 'email_deliverability_config_get' || name === 'email_operations_status' || name === 'email_backups_list' || name === 'email_storage_report' || name === 'email_storage_config_get' || name === 'email_storage_message_limit_get') return { ok: true, args: {} };
     if (name === 'email_search') {
         const checked = validateSearch(args, 500);
         if (!checked.ok) return checked;
@@ -596,6 +608,28 @@ function validateToolArguments(name, raw) {
         if (!args.config || typeof args.config !== 'object' || Array.isArray(args.config)) return fail('config must be an object');
         return { ok: true, args: { config: args.config } };
     }
+    if (['email_organization_update','email_domain_update','email_sender_update'].includes(name)) {
+        if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
+        return { ok:true, args:{...args,id:args.id.trim()} };
+    }
+    if (name === 'email_organization_create') {
+        if (typeof args.name !== 'string' || !args.name.trim()) return fail('name is required');
+        return { ok:true, args };
+    }
+    if (name === 'email_domain_add') {
+        if (typeof args.domain !== 'string' || !args.domain.trim()) return fail('domain is required');
+        return { ok:true, args };
+    }
+    if (name === 'email_sender_add') {
+        if (typeof args.email !== 'string' || !args.email.trim()) return fail('email is required');
+        return { ok:true, args };
+    }
+    if (['email_domain_delete','email_sender_delete'].includes(name)) {
+        if (typeof args.id !== 'string' || !args.id.trim()) return fail('id is required');
+        if (args.confirm !== true) return fail('confirm=true is required');
+        return { ok:true, args:{id:args.id.trim(),confirm:true} };
+    }
+    if (['email_domains_list','email_senders_list'].includes(name)) return { ok:true, args:args||{} };
     if (name === 'email_campaigns_list') {
         const statuses = ['', 'draft', 'scheduled', 'running', 'paused', 'completed', 'stopped'];
         const status = String(args.status || '').toLowerCase();
@@ -1128,6 +1162,18 @@ function makeScope(req, session) {
 async function executeTool(name, args, service, scope) {
     let output;
     if (name === 'email_capabilities') output = await service.capabilities(scope);
+    else if (name === 'email_tenants_status') output = await service.tenantsStatus(scope);
+    else if (name === 'email_organizations_list') output = await service.organizationsList(scope);
+    else if (name === 'email_organization_create') output = await service.organizationCreate(args, scope);
+    else if (name === 'email_organization_update') output = await service.organizationUpdate(args, scope);
+    else if (name === 'email_domains_list') output = await service.domainsList(args, scope);
+    else if (name === 'email_domain_add') output = await service.domainAdd(args, scope);
+    else if (name === 'email_domain_update') output = await service.domainUpdate(args, scope);
+    else if (name === 'email_domain_delete') output = await service.domainDelete(args, scope);
+    else if (name === 'email_senders_list') output = await service.sendersList(args, scope);
+    else if (name === 'email_sender_add') output = await service.senderAdd(args, scope);
+    else if (name === 'email_sender_update') output = await service.senderUpdate(args, scope);
+    else if (name === 'email_sender_delete') output = await service.senderDelete(args, scope);
     else if (name === 'email_instance_get') output = await service.instanceGet(scope);
     else if (name === 'email_instance_update') output = await service.instanceUpdate(args, scope);
     else if (name === 'email_search') output = await service.search(args, scope);

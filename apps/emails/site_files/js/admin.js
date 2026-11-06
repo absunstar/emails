@@ -40,6 +40,10 @@
         operationsConfig: null,
         operationsCleanupPreview: null,
         instanceConfig: null,
+        tenantTab: 'organizations',
+        organizations: [],
+        tenantDomains: [],
+        tenantSenders: [],
     };
 
     const q = (selector, base) => (base || document).querySelector(selector);
@@ -1352,6 +1356,37 @@
         { group: 'Outgoing mail', name: 'allowOutboundDomains', title: 'Allow outbound domains', help: 'Optional whitelist for outgoing recipient domains.', placeholder: 'gmail.com\noutlook.com' },
     ];
 
+    function orgName(id) { return state.organizations.find(x => x.id === id)?.name || id || '—'; }
+    function domainName(id) { return state.tenantDomains.find(x => x.id === id)?.domain || id || '—'; }
+    function tenantPill(value) { return '<span class="mail-campaign-status status-' + escape(value || 'unknown') + '">' + escape(value || 'unknown') + '</span>'; }
+
+    function showTenantTab(name) {
+        state.tenantTab = name || 'organizations';
+        qa('[data-tenant-tab]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.tenantTab === state.tenantTab));
+        qa('[data-tenant-pane]').forEach(pane => pane.hidden = pane.dataset.tenantPane !== state.tenantTab);
+    }
+
+    function renderTenants() {
+        const orgHost=q('[data-tenant-org-list]');
+        if(orgHost) orgHost.innerHTML=state.organizations.map(o=>'<tr><td>'+escape(o.name)+'</td><td>'+escape(o.slug)+'</td><td>'+tenantPill(o.status)+'</td><td>'+(o.isDefault?'Yes':'—')+'</td><td>'+escape(dateTime(o.createdAt))+'</td></tr>').join('')||'<tr><td colspan="5">No organizations.</td></tr>';
+        const orgSelect=q('[data-tenant-domain-org]'); if(orgSelect) orgSelect.innerHTML=state.organizations.filter(o=>o.status!=='disabled').map(o=>'<option value="'+escape(o.id)+'">'+escape(o.name)+'</option>').join('');
+        const domainHost=q('[data-tenant-domain-list]');
+        if(domainHost) domainHost.innerHTML=state.tenantDomains.map(d=>'<tr><td><strong>'+escape(d.domain)+'</strong><br><small>'+escape(d.dkimSelector||'default')+'</small></td><td>'+escape(orgName(d.organizationId))+'</td><td>'+tenantPill(d.status)+'</td><td>'+escape(d.verification?.mx||'unknown')+'</td><td>'+escape(d.verification?.spf||'unknown')+'</td><td>'+escape(d.verification?.dkim||'unknown')+'</td><td>'+escape(d.verification?.dmarc||'unknown')+'</td><td><button type="button" class="danger" data-admin-action="tenant-domain-delete" data-tenant-id="'+escape(d.id)+'">Delete</button></td></tr>').join('')||'<tr><td colspan="8">No domains.</td></tr>';
+        const domainSelect=q('[data-tenant-sender-domain]'); if(domainSelect) domainSelect.innerHTML=state.tenantDomains.filter(d=>d.status!=='disabled').map(d=>'<option value="'+escape(d.id)+'">'+escape(d.domain)+'</option>').join('');
+        const senderHost=q('[data-tenant-sender-list]');
+        if(senderHost) senderHost.innerHTML=state.tenantSenders.map(x=>'<tr><td><strong>'+escape(x.email)+'</strong></td><td>'+escape(x.displayName||'—')+'</td><td>'+escape(domainName(x.domainId))+'</td><td>'+tenantPill(x.status)+'</td><td>'+escape(x.replyTo||'—')+'</td><td>'+escape((x.tags||[]).join(', ')||'—')+'</td><td><button type="button" class="danger" data-admin-action="tenant-sender-delete" data-tenant-id="'+escape(x.id)+'">Delete</button></td></tr>').join('')||'<tr><td colspan="7">No sender identities.</td></tr>';
+    }
+
+    async function loadTenants(){
+        const [o,d,se]=await Promise.all([post('/api/emails/admin/organizations/list',{}),post('/api/emails/admin/domains/list',{}),post('/api/emails/admin/senders/list',{})]);
+        state.organizations=o.organizations||[]; state.tenantDomains=d.domains||[]; state.tenantSenders=se.senders||[]; renderTenants(); return {o,d,se};
+    }
+    async function openTenants(button){setBusy(button,true,'Loading…');try{await loadTenants();showTenantTab(state.tenantTab);ui.show('#adminTenantsModal');}catch(e){toast(e.message||'Unable to load domain manager.','error','Domains unavailable');}finally{setBusy(button,false);}}
+    async function addOrganization(){const input=q('[data-tenant-new-org]');const name=String(input?.value||'').trim();if(!name)return toast('Enter an organization name.','warning','Name required');await post('/api/emails/admin/organizations/create',{name});input.value='';await loadTenants();toast('Organization created.','success');}
+    async function addDomain(){const domain=String(q('[data-tenant-domain-name]')?.value||'').trim();const organizationId=q('[data-tenant-domain-org]')?.value||'';const dkimSelector=String(q('[data-tenant-domain-selector]')?.value||'default').trim();if(!domain)return toast('Enter a domain.','warning','Domain required');await post('/api/emails/admin/domains/add',{organizationId,domain,dkimSelector});q('[data-tenant-domain-name]').value='';await loadTenants();toast('Domain registered.','success');}
+    async function addSender(){const email=String(q('[data-tenant-sender-email]')?.value||'').trim();const displayName=String(q('[data-tenant-sender-name]')?.value||'').trim();const domainId=q('[data-tenant-sender-domain]')?.value||'';if(!email)return toast('Enter a sender email.','warning','Email required');await post('/api/emails/admin/senders/add',{domainId,email,displayName});q('[data-tenant-sender-email]').value='';q('[data-tenant-sender-name]').value='';await loadTenants();toast('Sender identity added.','success');}
+    async function deleteTenantItem(type,id){if(!window.confirm('Delete this '+type+'?'))return;const url=type==='domain'?'/api/emails/admin/domains/delete':'/api/emails/admin/senders/delete';await post(url,{id});await loadTenants();toast(type==='domain'?'Domain deleted.':'Sender deleted.','success');}
+
     function instanceGet(obj, path) {
         return String(path || '').split('.').reduce((value, key) => value == null ? undefined : value[key], obj);
     }
@@ -1862,6 +1897,13 @@
         const action = button.dataset.adminAction;
         const guid = button.dataset.guid || '';
         if (action === 'refresh' || action === 'refresh-folders') return refreshAll(button);
+        if (action === 'open-tenants') return openTenants(button);
+        if (action === 'tenant-tab') return showTenantTab(button.dataset.tenantTab || 'organizations');
+        if (action === 'tenant-org-add') return addOrganization();
+        if (action === 'tenant-domain-add') return addDomain();
+        if (action === 'tenant-sender-add') return addSender();
+        if (action === 'tenant-domain-delete') return deleteTenantItem('domain', button.dataset.tenantId);
+        if (action === 'tenant-sender-delete') return deleteTenantItem('sender', button.dataset.tenantId);
         if (action === 'open-instance') return openInstance(button);
         if (action === 'instance-refresh') return loadInstanceConfig();
         if (action === 'instance-save') return saveInstance(button);

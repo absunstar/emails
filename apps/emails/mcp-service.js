@@ -32,6 +32,7 @@ function createEmailMcpService(options) {
     const operationsManager = options.operationsManager || null;
     const campaignEngine = options.campaignEngine || null;
     const instanceConfig = options.instanceConfig || null;
+    const tenantRegistry = options.tenantRegistry || null;
     if (!emailService) throw new Error('Shared email service is required');
 
     function requestedDomain(args) {
@@ -102,6 +103,11 @@ function createEmailMcpService(options) {
         return instanceConfig;
     }
 
+    function tenantsRequired() {
+        if (!tenantRegistry) throw new Error('Mail tenant registry is not available');
+        return tenantRegistry;
+    }
+
     function policyListName(name) {
         const policy = policyRequired();
         const value = String(name || '').trim();
@@ -158,7 +164,7 @@ function createEmailMcpService(options) {
                 vipCount: emailService.listVip().length,
                 policyEnabled: !!policy?.enabled,
                 capabilities: [
-                    'portable-instance-config', 'white-label-branding', 'multi-domain-instance', 'configurable-mcp-identity',
+                    'portable-instance-config', 'white-label-branding', 'multi-domain-instance', 'configurable-mcp-identity', 'organizations', 'domain-registry', 'sender-identities',
                     'global-search', 'advanced-filters', 'pagination', 'sorting', 'read', 'read-many', 'favorites', 'folders', 'bulk-update',
                     'send', 'bulk-send', 'reply', 'forward', 'attachments', 'eml-export', 'remote-image-analysis', 'tracking-pixel-analysis',
                     'vip-management', 'delete', 'bulk-delete', 'delete-matching', 'mailbox-statuses', 'statistics',
@@ -171,6 +177,19 @@ function createEmailMcpService(options) {
                 ],
             };
         },
+
+        async tenantsStatus(scope) { enforceAdminRate(scope, false); return tenantsRequired().status(); },
+        async organizationsList(scope) { enforceAdminRate(scope, false); return { organizations: tenantsRequired().listOrganizations() }; },
+        async organizationCreate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().createOrganization(args); },
+        async organizationUpdate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().updateOrganization(args.id, args); },
+        async domainsList(args, scope) { enforceAdminRate(scope, false); return { domains: tenantsRequired().listDomains(args || {}) }; },
+        async domainAdd(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().addDomain(args); },
+        async domainUpdate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().updateDomain(args.id, args); },
+        async domainDelete(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().removeDomain(args.id); },
+        async sendersList(args, scope) { enforceAdminRate(scope, false); return { senders: tenantsRequired().listSenders(args || {}) }; },
+        async senderAdd(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().addSender(args); },
+        async senderUpdate(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().updateSender(args.id, args); },
+        async senderDelete(args, scope) { enforceAdminRate(scope, true); return tenantsRequired().removeSender(args.id); },
 
         async instanceGet(scope) {
             enforceAdminRate(scope, false);

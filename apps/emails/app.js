@@ -1875,6 +1875,67 @@ module.exports = function init(site) {
         res.json({ done: true, config: policy.getConfig(), defaults: policy.getDefaults(), status: policy.status(), path: policy.filePath });
     });
 
+    onPost('/api/emails/admin/tenants/status', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        if (!site.emailTenants) return res.json({ done: false, error: 'Tenant registry is unavailable.' });
+        return res.json({ done: true, status: site.emailTenants.status() });
+    });
+
+    onPost('/api/emails/admin/organizations/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        return res.json({ done: true, organizations: site.emailTenants.listOrganizations() });
+    });
+    onPost('/api/emails/admin/organizations/create', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, organization: site.emailTenants.createOrganization(body(req)) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/organizations/update', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data=body(req); try { return res.json({ done: true, organization: site.emailTenants.updateOrganization(String(data.id||''), data) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/domains/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        return res.json({ done: true, domains: site.emailTenants.listDomains(body(req)) });
+    });
+    onPost('/api/emails/admin/domains/add', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, domain: site.emailTenants.addDomain(body(req)) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/domains/update', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data=body(req); try { return res.json({ done: true, domain: site.emailTenants.updateDomain(String(data.id||''), data) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/domains/delete', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, result: site.emailTenants.removeDomain(String(body(req).id||'')) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
+    onPost('/api/emails/admin/senders/list', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        return res.json({ done: true, senders: site.emailTenants.listSenders(body(req)) });
+    });
+    onPost('/api/emails/admin/senders/add', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, sender: site.emailTenants.addSender(body(req)) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/senders/update', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        const data=body(req); try { return res.json({ done: true, sender: site.emailTenants.updateSender(String(data.id||''), data) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+    onPost('/api/emails/admin/senders/delete', async (req, res) => {
+        if (!admin(req)) return adminDenied(res);
+        try { return res.json({ done: true, result: site.emailTenants.removeSender(String(body(req).id||'')) }); }
+        catch (error) { return res.json({ done: false, error: error?.message || String(error) }); }
+    });
+
     onPost('/api/emails/admin/instance/get', async (req, res) => {
         if (!admin(req)) return adminDenied(res);
         if (!site.emailInstance) return res.json({ done: false, error: 'Instance configuration is unavailable.' });

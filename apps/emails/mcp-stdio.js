@@ -2,8 +2,10 @@
 
 const path = require('path');
 const { createEmailInstanceConfig } = require('./core/instance-config');
+const { createMailTenantRegistry } = require('./core/tenant-registry');
 const instanceConfig = createEmailInstanceConfig({ cwd: process.cwd() });
 instanceConfig.applyProcessEnv();
+const tenantRegistry = createMailTenantRegistry({ filePath: process.env.EMAIL_TENANT_REGISTRY || path.join(process.cwd(), 'localStorage', 'email-tenants', 'registry.json'), instanceConfig });
 const readline = require('readline');
 const { createSmtpOutboundTransport } = require('./core/smtp-outbound');
 let sendmailImpl = null;
@@ -60,7 +62,7 @@ const operationsManager = createEmailBackupStorageManager({
     alertWebhook: process.env.EMAIL_OPS_ALERT_WEBHOOK || '',
     logger: () => {},
 });
-const service = createEmailMcpService({ emailService, abusePolicy: policy, scheduler, campaignEngine, deliverability, operationsManager, instanceConfig });
+const service = createEmailMcpService({ emailService, abusePolicy: policy, scheduler, campaignEngine, deliverability, operationsManager, instanceConfig, tenantRegistry });
 const session = {
     id: 'stdio',
     createdAt: Date.now(),

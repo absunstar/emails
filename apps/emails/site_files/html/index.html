@@ -17,6 +17,10 @@
             </div>
             <div class="mail-admin-hero-actions">
                 <span class="mail-admin-access-badge"><span class="mail-admin-live-dot"></span> Full admin access</span>
+                <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="open-tenants">
+                    <svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><path d="M8 9h8M8 13h8"></path><path d="M6 3v4M18 3v4"></path></svg>
+                    <span>Domains &amp; Senders</span>
+                </button>
                 <button class="sb-btn sb-btn-ghost" type="button" data-admin-action="open-instance">
                     <svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><path d="M8 9h8M8 13h8"></path></svg>
                     <span>Instance</span>
@@ -525,6 +529,36 @@
     </div>
 
 
+
+    <div id="adminTenantsModal" class="modal" hidden>
+        <div class="modal-content mail-admin-ops-modal">
+            <div class="modal-header">
+                <div><small class="mail-admin-kicker">ORGANIZATIONS · DOMAINS · SENDERS</small><h2>Domains &amp; Sender Manager</h2><p>Manage tenant ownership, mail domains and sender identities from one place.</p></div>
+                <button class="sb-modal-close" type="button" data-modal-close="#adminTenantsModal">×</button>
+            </div>
+            <div class="modal-body mail-admin-ops-body">
+                <div class="mail-ops-tabs">
+                    <button type="button" class="is-active" data-admin-action="tenant-tab" data-tenant-tab="organizations">Organizations</button>
+                    <button type="button" data-admin-action="tenant-tab" data-tenant-tab="domains">Domains</button>
+                    <button type="button" data-admin-action="tenant-tab" data-tenant-tab="senders">Senders</button>
+                </div>
+                <section data-tenant-pane="organizations">
+                    <div class="mail-ops-section-head"><div><h3>Organizations</h3><p>Each organization owns its domains and sender identities.</p></div><div class="mail-ops-actions"><input class="sb-input" data-tenant-new-org placeholder="Organization name"><button class="sb-btn" type="button" data-admin-action="tenant-org-add">Add</button></div></div>
+                    <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Name</th><th>Slug</th><th>Status</th><th>Default</th><th>Created</th></tr></thead><tbody data-tenant-org-list></tbody></table></div>
+                </section>
+                <section data-tenant-pane="domains" hidden>
+                    <div class="mail-ops-section-head"><div><h3>Domains</h3><p>Register domains and track verification state.</p></div></div>
+                    <div class="mail-suppression-add"><select class="sb-select" data-tenant-domain-org></select><input class="sb-input" data-tenant-domain-name placeholder="example.com"><input class="sb-input" data-tenant-domain-selector placeholder="DKIM selector" value="default"><button class="sb-btn" type="button" data-admin-action="tenant-domain-add">Add domain</button></div>
+                    <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Domain</th><th>Organization</th><th>Status</th><th>MX</th><th>SPF</th><th>DKIM</th><th>DMARC</th><th>Actions</th></tr></thead><tbody data-tenant-domain-list></tbody></table></div>
+                </section>
+                <section data-tenant-pane="senders" hidden>
+                    <div class="mail-ops-section-head"><div><h3>Sender identities</h3><p>Manage From identities tied to registered domains.</p></div></div>
+                    <div class="mail-suppression-add"><select class="sb-select" data-tenant-sender-domain></select><input class="sb-input" data-tenant-sender-email placeholder="sender@example.com"><input class="sb-input" data-tenant-sender-name placeholder="Display name"><button class="sb-btn" type="button" data-admin-action="tenant-sender-add">Add sender</button></div>
+                    <div class="mail-ops-table-wrap"><table class="mail-ops-table"><thead><tr><th>Email</th><th>Name</th><th>Domain</th><th>Status</th><th>Reply-To</th><th>Tags</th><th>Actions</th></tr></thead><tbody data-tenant-sender-list></tbody></table></div>
+                </section>
+            </div>
+        </div>
+    </div>
     <div id="adminInstanceModal" class="modal" hidden>
         <div class="modal-content mail-admin-ops-modal">
             <div class="modal-header">

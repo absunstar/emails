@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createEmailInstanceConfig } = require('./apps/emails/core/instance-config');
+const { createMailTenantRegistry } = require('./apps/emails/core/tenant-registry');
 const emailInstance = createEmailInstanceConfig({ cwd: __dirname });
 emailInstance.applyProcessEnv();
 const { PassThrough } = require('stream');
@@ -44,6 +45,7 @@ const site = core({
 // Native Core is the runtime authority. The legacy iSite runtime is not loaded.
 site.cwd = __dirname;
 site.emailInstance = emailInstance;
+site.emailTenants = createMailTenantRegistry({ filePath: process.env.EMAIL_TENANT_REGISTRY || path.join(site.cwd, 'localStorage', 'email-tenants', 'registry.json'), instanceConfig: site.emailInstance });
 site.dir = path.join(__dirname, 'site_files');
 site.apps = [{ name: 'emails', name2: 'emails', path: path.join(__dirname, 'apps', 'emails') }];
 site.options = site.options || {};
@@ -415,6 +417,7 @@ const mcpService = createEmailMcpService({
     deliverability: site.emailDeliverability,
     operationsManager: site.emailOperationsManager,
     instanceConfig: site.emailInstance,
+    tenantRegistry: site.emailTenants,
 });
 site.emailMcpServer = startEmailMcpServer({
     service: mcpService,

@@ -124,6 +124,7 @@ site.emailAbusePolicy = createEmailAbusePolicy({
         blockOutboundDomains: process.env.EMAIL_BLOCK_OUTBOUND_DOMAINS,
         allowOutboundDomains: process.env.EMAIL_ALLOW_OUTBOUND_DOMAINS,
     },
+    localRecipientDomain: (domainName) => site.emailTenants.isManagedMailDomain(domainName),
 });
 
 site.emailDeliverability = createEmailDeliverabilityEngine({

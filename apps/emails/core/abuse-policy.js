@@ -274,6 +274,7 @@ class EmailAbusePolicy {
         options = options || {};
         this.filePath = path.resolve(options.filePath || path.join(process.cwd(), 'localStorage', 'email-abuse-policy.json'));
         this.initial = options.initial || {};
+        this.localRecipientDomain = typeof options.localRecipientDomain === 'function' ? options.localRecipientDomain : null;
         this.defaults = defaultConfig(this.initial);
         this.rateLimiter = new SlidingWindowLimiter();
         this.activeSmtpByIp = new Map();
@@ -350,7 +351,8 @@ class EmailAbusePolicy {
         if (this.listMatches('block' + prefix, value, false)) return { allowed: false, reason: direction + ' address is blocked', rule: 'block' + prefix, value, domain };
         if (domain && this.listMatches('block' + prefix + 'Domains', domain, false)) return { allowed: false, reason: direction + ' domain is blocked', rule: 'block' + prefix + 'Domains', value, domain };
         if (!this.allowListPasses('allow' + prefix, value, false)) return { allowed: false, reason: direction + ' address is not in the allow list', rule: 'allow' + prefix, value, domain };
-        if (domain && !this.allowListPasses('allow' + prefix + 'Domains', domain, false)) return { allowed: false, reason: direction + ' domain is not in the allow list', rule: 'allow' + prefix + 'Domains', value, domain };
+        const managedRecipientDomain = direction === 'to' && domain && this.localRecipientDomain && this.localRecipientDomain(domain) === true;
+        if (domain && !managedRecipientDomain && !this.allowListPasses('allow' + prefix + 'Domains', domain, false)) return { allowed: false, reason: direction + ' domain is not in the allow list', rule: 'allow' + prefix + 'Domains', value, domain };
         return { allowed: true, value, domain };
     }
 

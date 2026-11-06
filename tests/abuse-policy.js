@@ -41,6 +41,16 @@ const { createEmailService } = require('../apps/emails/core/email-service');
     assert.strictEqual(policy.checkIp('10.22.33.44').allowed, false, 'blocked CIDR must be rejected');
     assert.strictEqual(policy.checkAddress('to', 'hello@example.com').allowed, true, 'allow-to domain must permit matching recipient');
     assert.strictEqual(policy.checkAddress('to', 'hello@other.example').allowed, false, 'enabled allow-to domains must act as whitelist');
+    const tenantAware = createEmailAbusePolicy({ filePath: path.join(dir, 'tenant-aware-policy.json'), localRecipientDomain: (domain) => domain === 'egytag.com' });
+    const tenantConfig = tenantAware.getConfig();
+    tenantConfig.lists.allowToDomains.enabled = true;
+    tenantConfig.lists.allowToDomains.values = ['social-browser.com'];
+    tenantAware.update(tenantConfig);
+    assert.strictEqual(tenantAware.checkAddress('to', 'temp@egytag.com').allowed, true, 'managed local recipient domain must bypass stale allow-to domain whitelist');
+    tenantConfig.lists.blockToDomains.enabled = true;
+    tenantConfig.lists.blockToDomains.values = ['egytag.com'];
+    tenantAware.update(tenantConfig);
+    assert.strictEqual(tenantAware.checkAddress('to', 'temp@egytag.com').allowed, false, 'explicit block-to domain rule must still override managed local recipient domains');
     assert.strictEqual(policy.checkOutbound('sender@example.com', 'user@blocked.example').allowed, false, 'outbound block domain must reject recipient');
 
     const smtp1 = policy.smtpConnect('192.0.2.10');

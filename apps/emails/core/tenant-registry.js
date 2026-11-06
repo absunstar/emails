@@ -293,6 +293,7 @@ class MailTenantRegistry{
     const last=Date.parse(row.lastUsedAt||0)||0; if(Date.now()-last>60000){ row.lastUsedAt=now(); row.updatedAt=now(); this._save(); }
     return {type:'tenant_api_key',keyId:row.id,organizationId:row.organizationId,role:row.role,permissions:permissionsForRole(row.role),name:row.name,prefix:row.prefix};
   }
+  isManagedMailDomain(value){ const d=domain(value); return !!d && this.data.domains.some(x=>x.domain===d && x.status!=='disabled'); }
   organizationDomains(organizationId){ return this.data.domains.filter(x=>x.organizationId===organizationId).map(x=>x.domain); }
   organizationSenders(organizationId){ return this.data.senders.filter(x=>x.organizationId===organizationId).map(x=>x.email); }
   getOrganization(idv){ return clone(this.data.organizations.find(x=>x.id===idv)||null); }

@@ -23,6 +23,19 @@ async function main() {
         async scheduleSendNow(args) { calls.push(['scheduleSendNow', args]); return { id: args.id, status: 'sent' }; },
         async scheduleRetry(args) { calls.push(['scheduleRetry', args]); return { id: args.id, status: 'scheduled' }; },
         async schedulerStatus() { calls.push(['schedulerStatus']); return { enabled: true, total: 1, counts: { scheduled: 1 } }; },
+        async campaignStatus() { calls.push(['campaignStatus']); return { enabled: true, total: 1, counts: { draft: 1 } }; },
+        async campaignsList(args) { calls.push(['campaignsList', args]); return { count: 1, campaigns: [{ id: 'campaign_1', name: 'Launch', status: 'draft', progress: 0 }] }; },
+        async campaignGet(args) { calls.push(['campaignGet', args]); return { id: args.id, name: 'Launch', status: 'draft', stats: { total: 2, pending: 2, sent: 0 } }; },
+        async campaignCreate(args) { calls.push(['campaignCreate', args]); return { id: 'campaign_1', name: args.name, status: 'draft', stats: { total: args.recipients.length, pending: args.recipients.length, sent: 0 }, pacing: args.pacing }; },
+        async campaignUpdate(args) { calls.push(['campaignUpdate', args]); return { id: args.id, name: args.name || 'Launch', status: 'draft', pacing: args.pacing || { mode: 'fixed' } }; },
+        async campaignStart(args) { calls.push(['campaignStart', args]); return { id: args.id, status: 'running' }; },
+        async campaignPause(args) { calls.push(['campaignPause', args]); return { id: args.id, status: 'paused' }; },
+        async campaignResume(args) { calls.push(['campaignResume', args]); return { id: args.id, status: 'running' }; },
+        async campaignStop(args) { calls.push(['campaignStop', args]); return { id: args.id, status: 'stopped' }; },
+        async campaignDelete(args) { calls.push(['campaignDelete', args]); return { id: args.id, deleted: true }; },
+        async campaignReport(args) { calls.push(['campaignReport', args]); return { id: args.id, status: 'completed', progress: 100, stats: { total: 2, sent: 2, failed: 0, unknown: 0 }, failures: [], events: [{ type: 'complete' }] }; },
+        async campaignJobs(args) { calls.push(['campaignJobs', args]); return { campaignId: args.id, total: 2, jobs: [{ recipient: 'a@example.com', status: 'sent' }, { recipient: 'b@example.com', status: 'sent' }] }; },
+        async campaignEvents(args) { calls.push(['campaignEvents', args]); return { campaignId: args.id, total: 2, events: [{ type: 'complete' }, { type: 'start' }] }; },
         async reply(args) { calls.push(['reply', args]); return { sent: true, guid: 'g3' }; },
         async forward(args) { calls.push(['forward', args]); return { sent: true, guid: 'g4' }; },
         async update(args) { calls.push(['update', args]); return { guid: args.guid, ...args.patch }; },
@@ -94,7 +107,9 @@ async function main() {
         assert.ok(TOOLS.length >= 34);
         for (const name of [
             'email_capabilities', 'email_search', 'email_forward', 'email_update_bulk', 'email_attachment_read', 'email_eml_export',
-            'email_analyze', 'email_vip_set', 'email_folder_create', 'email_schedule', 'email_schedule_bulk', 'email_schedules_list', 'email_scheduler_status', 'email_policy_get', 'email_policy_export', 'email_policy_import', 'email_policy_rule_add', 'email_policy_limit_set',
+            'email_analyze', 'email_vip_set', 'email_folder_create', 'email_schedule', 'email_schedule_bulk', 'email_schedules_list', 'email_scheduler_status',
+            'email_campaign_status', 'email_campaigns_list', 'email_campaign_get', 'email_campaign_create', 'email_campaign_update', 'email_campaign_start', 'email_campaign_pause', 'email_campaign_resume', 'email_campaign_stop', 'email_campaign_delete', 'email_campaign_report', 'email_campaign_jobs', 'email_campaign_events',
+            'email_policy_get', 'email_policy_export', 'email_policy_import', 'email_policy_rule_add', 'email_policy_limit_set',
         ]) assert.ok(list.json.result.tools.some((t) => t.name === name), 'missing tool ' + name);
 
         const call = await modernPost(4, 'tools/call', { name: 'email_search', arguments: { query: 'hello', favorite: true, sortBy: 'subject', sortDir: 'asc', limit: 5 } }, 'email_search');
@@ -112,6 +127,34 @@ async function main() {
 
         const scheduled = await modernPost(8, 'tools/call', { name: 'email_schedule', arguments: { from: 'sender@example.com', to: 'user@example.net', subject: 'Later', text: 'hello', sendAt: new Date(Date.now() + 86400000).toISOString() } }, 'email_schedule');
         assert.equal(scheduled.json.result.structuredContent.status, 'scheduled');
+
+        const campaign = await modernPost(81, 'tools/call', { name: 'email_campaign_create', arguments: {
+            name: 'Launch',
+            from: 'sender@example.com',
+            recipients: [{ email: 'a@example.com', name: 'Alice' }, { email: 'b@example.com', name: 'Bob', messageIndex: 1 }],
+            messages: [{ id: 'm1', subject: 'Hi {{name}}', text: 'One' }, { id: 'm2', subject: 'Hello {{name}}', text: 'Two' }],
+            messageMode: 'assigned',
+            startAt: 'now',
+            pacing: { mode: 'random', minSeconds: 10, maxSeconds: 30 }
+        } }, 'email_campaign_create');
+        assert.equal(campaign.json.result.structuredContent.id, 'campaign_1');
+        assert.equal(campaign.json.result.structuredContent.stats.total, 2);
+
+        const campaignStart = await modernPost(82, 'tools/call', { name: 'email_campaign_start', arguments: { id: 'campaign_1' } }, 'email_campaign_start');
+        assert.equal(campaignStart.json.result.structuredContent.status, 'running');
+
+        const campaignReport = await modernPost(83, 'tools/call', { name: 'email_campaign_report', arguments: { id: 'campaign_1' } }, 'email_campaign_report');
+        assert.equal(campaignReport.json.result.structuredContent.progress, 100);
+        assert.equal(campaignReport.json.result.structuredContent.stats.sent, 2);
+
+        const campaignJobs = await modernPost(85, 'tools/call', { name: 'email_campaign_jobs', arguments: { id: 'campaign_1', status: 'sent', offset: 0, limit: 25 } }, 'email_campaign_jobs');
+        assert.equal(campaignJobs.json.result.structuredContent.jobs.length, 2);
+
+        const campaignEvents = await modernPost(86, 'tools/call', { name: 'email_campaign_events', arguments: { id: 'campaign_1', limit: 10 } }, 'email_campaign_events');
+        assert.equal(campaignEvents.json.result.structuredContent.events[0].type, 'complete');
+
+        const campaignDeleteDenied = await modernPost(84, 'tools/call', { name: 'email_campaign_delete', arguments: { id: 'campaign_1', confirm: false } }, 'email_campaign_delete');
+        assert.equal(campaignDeleteDenied.json.result.isError, true);
 
         const resetDenied = await modernPost(9, 'tools/call', { name: 'email_policy_reset', arguments: { confirm: false } }, 'email_policy_reset');
         assert.equal(resetDenied.json.result.isError, true);

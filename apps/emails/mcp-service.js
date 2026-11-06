@@ -30,6 +30,7 @@ function createEmailMcpService(options) {
     const scheduler = options.scheduler || null;
     const deliverability = options.deliverability || null;
     const operationsManager = options.operationsManager || null;
+    const campaignEngine = options.campaignEngine || null;
     if (!emailService) throw new Error('Shared email service is required');
 
     function requestedDomain(args) {
@@ -88,6 +89,11 @@ function createEmailMcpService(options) {
     function operationsRequired() {
         if (!operationsManager) throw new Error('Email backup and storage manager is not available');
         return operationsManager;
+    }
+
+    function campaignsRequired() {
+        if (!campaignEngine) throw new Error('Email campaign engine is not available');
+        return campaignEngine;
     }
 
     function policyListName(name) {
@@ -151,6 +157,7 @@ function createEmailMcpService(options) {
                     'vip-management', 'delete', 'bulk-delete', 'delete-matching', 'mailbox-statuses', 'statistics',
                     'security-policy-read', 'security-policy-update', 'security-policy-rules', 'security-policy-limits', 'security-policy-test', 'security-activity',
                     'scheduled-send', 'scheduled-bulk-send', 'schedule-list', 'schedule-update', 'schedule-cancel', 'schedule-send-now', 'schedule-retry',
+                    'campaign-status', 'campaign-list', 'campaign-read', 'campaign-create', 'campaign-update', 'campaign-start', 'campaign-pause', 'campaign-resume', 'campaign-stop', 'campaign-delete', 'campaign-report', 'campaign-jobs', 'campaign-events',
                     'deliverability-status', 'deliverability-preflight', 'deliverability-config', 'per-domain-throttling', 'provider-throttling', 'warmup-ramp',
                     'bounce-suppression', 'unsubscribe-suppression', 'complaint-suppression', 'delivery-circuit-breaker',
                     'automatic-backup', 'backup-validation', 'disaster-recovery-preview', 'disaster-recovery-restore', 'disk-quota', 'message-limit-control', 'retention-cleanup', 'emergency-low-space-mode', 'operational-alerts', 'storage-history',
@@ -265,6 +272,110 @@ function createEmailMcpService(options) {
         async schedulerStatus(scope) {
             enforceAdminRate(scope, false);
             return schedulerRequired().status();
+        },
+
+        async campaignStatus(scope) {
+            enforceAdminRate(scope, false);
+            return campaignsRequired().status();
+        },
+
+        async campaignsList(args, scope) {
+            enforceAdminRate(scope, false);
+            return campaignsRequired().list(args || {});
+        },
+
+        async campaignGet(args, scope) {
+            enforceAdminRate(scope, false);
+            return campaignsRequired().get(args.id);
+        },
+
+        async campaignCreate(args, scope) {
+            enforceAdminRate(scope, true);
+            const campaign = campaignsRequired().create(args || {});
+            await emailService.store.audit('mcp_campaign_create', { campaignId: campaign.id, name: campaign.name, recipients: campaign.stats?.total || 0 });
+            return campaign;
+        },
+
+        async campaignUpdate(args, scope) {
+            enforceAdminRate(scope, false);
+            const campaign = campaignsRequired().update(args.id, args);
+            await emailService.store.audit('mcp_campaign_update', { campaignId: campaign.id, status: campaign.status });
+            return campaign;
+        },
+
+        async campaignStart(args, scope) {
+            enforceAdminRate(scope, false);
+            const campaign = campaignsRequired().start(args.id);
+            await emailService.store.audit('mcp_campaign_start', { campaignId: campaign.id, status: campaign.status });
+            return campaign;
+        },
+
+        async campaignPause(args, scope) {
+            enforceAdminRate(scope, false);
+            const campaign = campaignsRequired().pause(args.id);
+            await emailService.store.audit('mcp_campaign_pause', { campaignId: campaign.id });
+            return campaign;
+        },
+
+        async campaignResume(args, scope) {
+            enforceAdminRate(scope, false);
+            const campaign = campaignsRequired().resume(args.id);
+            await emailService.store.audit('mcp_campaign_resume', { campaignId: campaign.id });
+            return campaign;
+        },
+
+        async campaignStop(args, scope) {
+            enforceAdminRate(scope, false);
+            const campaign = campaignsRequired().stop(args.id);
+            await emailService.store.audit('mcp_campaign_stop', { campaignId: campaign.id });
+            return campaign;
+        },
+
+        async campaignDelete(args, scope) {
+            enforceAdminRate(scope, false);
+            const result = campaignsRequired().remove(args.id);
+            await emailService.store.audit('mcp_campaign_delete', { campaignId: args.id });
+            return result;
+        },
+
+        async campaignReport(args, scope) {
+            enforceAdminRate(scope, false);
+            return campaignsRequired().report(args.id);
+        },
+
+        async campaignJobs(args, scope) {
+            enforceAdminRate(scope, false);
+            const campaign = campaignsRequired().get(args.id);
+            const status = String(args.status || '').trim();
+            const queue = Array.isArray(campaign.queue) ? campaign.queue : [];
+            const filtered = status ? queue.filter((item) => String(item.status || '') === status) : queue;
+            const offset = Math.max(0, Number(args.offset || 0));
+            const limit = Math.max(1, Math.min(1000, Number(args.limit || 100)));
+            return {
+                campaignId: campaign.id,
+                campaignName: campaign.name,
+                status: campaign.status,
+                total: filtered.length,
+                offset,
+                limit,
+                jobs: filtered.slice(offset, offset + limit),
+            };
+        },
+
+        async campaignEvents(args, scope) {
+            enforceAdminRate(scope, false);
+            const campaign = campaignsRequired().get(args.id);
+            const events = Array.isArray(campaign.events) ? campaign.events : [];
+            const offset = Math.max(0, Number(args.offset || 0));
+            const limit = Math.max(1, Math.min(1000, Number(args.limit || 100)));
+            return {
+                campaignId: campaign.id,
+                campaignName: campaign.name,
+                total: events.length,
+                offset,
+                limit,
+                events: events.slice().reverse().slice(offset, offset + limit),
+            };
         },
 
         async deliverabilityStatus(scope) {

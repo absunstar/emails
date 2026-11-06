@@ -402,6 +402,7 @@ const mcpService = createEmailMcpService({
     emailService: site.emailService,
     abusePolicy: site.emailAbusePolicy,
     scheduler: site.emailScheduler,
+    campaignEngine: site.emailCampaignEngine,
     deliverability: site.emailDeliverability,
     operationsManager: site.emailOperationsManager,
 });

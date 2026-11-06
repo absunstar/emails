@@ -11,6 +11,7 @@ function sendmail(message, callback) {
 const { createEmailService } = require('./core/email-service');
 const { createEmailAbusePolicy } = require('./core/abuse-policy');
 const { createEmailScheduler } = require('./core/email-scheduler');
+const { createEmailCampaignEngine } = require('./core/email-campaign-engine');
 const { createEmailDeliverabilityEngine } = require('./core/deliverability-engine');
 const { createEmailBackupStorageManager } = require('./core/backup-storage-manager');
 const { createEmailMcpService } = require('./mcp-service');
@@ -40,6 +41,13 @@ const scheduler = createEmailScheduler({
     logger: () => {},
     intervalMs: Number(process.env.EMAIL_SCHEDULE_TICK_MS || 5000),
 }).start();
+const campaignEngine = createEmailCampaignEngine({
+    emailService,
+    baseDir: process.env.EMAIL_CAMPAIGN_DIR || path.join(cwd, 'localStorage', 'email-campaigns'),
+    logger: () => {},
+    intervalMs: Number(process.env.EMAIL_CAMPAIGN_TICK_MS || 1000),
+});
+if (String(process.env.EMAIL_MCP_STDIO_CAMPAIGN_WORKER || '').trim() === '1') campaignEngine.startEngine();
 const operationsManager = createEmailBackupStorageManager({
     emailService,
     scheduler,
@@ -49,7 +57,7 @@ const operationsManager = createEmailBackupStorageManager({
     alertWebhook: process.env.EMAIL_OPS_ALERT_WEBHOOK || '',
     logger: () => {},
 });
-const service = createEmailMcpService({ emailService, abusePolicy: policy, scheduler, deliverability, operationsManager });
+const service = createEmailMcpService({ emailService, abusePolicy: policy, scheduler, campaignEngine, deliverability, operationsManager });
 const session = {
     id: 'stdio',
     createdAt: Date.now(),

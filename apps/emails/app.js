@@ -18,6 +18,7 @@ const { createEmailUnsubscribeService } = require('./core/unsubscribe-service');
 const { createGooglePlayBilling } = require('./core/google-play-billing');
 const { hasPermission, httpPermission } = require('./core/tenant-access');
 const { createEmbedMetrics, publicHost, loadOrCreateEmbedSigningKey } = require('./core/embed-metrics');
+const { createMobileAnalytics } = require('./core/mobile-analytics');
 
 module.exports = function init(site) {
     const { createSmtpOutboundTransport } = require('./core/smtp-outbound');
@@ -72,6 +73,10 @@ module.exports = function init(site) {
 
     site.emailService = service;
     site.emailStore = service.store;
+    const mobileAnalytics = createMobileAnalytics({
+        baseDir: process.env.EMAIL_MOBILE_ANALYTICS_DIR || path.join(site.cwd, 'localStorage', 'mobile-analytics'),
+    });
+    site.mobileAnalytics = mobileAnalytics;
 
     // Mobile mailbox ownership is separate from Google Play entitlement.
     // Google Play proves that Pro features may be used; ownerToken proves
@@ -489,6 +494,32 @@ module.exports = function init(site) {
         });
     }
 
+
+    // Strict opt-in diagnostics: client sends only random installation ID and an
+    // allowlisted event name. The server stores a salted HMAC, not the raw ID.
+    onPost('/api/mobile/analytics/event', (req, res) => {
+        const data = body(req) || {};
+        const result = mobileAnalytics.track({
+            event: data.event, installationId: data.installationId,
+        });
+        res.set('Cache-Control', 'no-store');
+        if (!result.done) res.status(result.code === 'daily_event_limit' ? 429 : 400);
+        return res.json(result);
+    });
+    onPost('/api/mobile/analytics/delete', (req, res) => {
+        const result = mobileAnalytics.erase(body(req) || {});
+        res.set('Cache-Control', 'no-store');
+        if (!result.done) res.status(400);
+        return res.json(result);
+    });
+    onPost('/api/mobile/analytics/admin/summary', (req, res) => {
+        if (requestPrincipal(req)?.role !== 'super_admin') {
+            res.status(403);
+            return res.json({ done: false, error: 'Super admin required' });
+        }
+        res.set('Cache-Control', 'no-store');
+        return res.json(mobileAnalytics.summary({ periodDays: body(req)?.days }));
+    });
 
     onPost('/api/mobile/google-play/verify', async (req, res) => {
         const data = body(req);

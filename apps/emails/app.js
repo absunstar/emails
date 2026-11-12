@@ -1565,6 +1565,16 @@ module.exports = function init(site) {
         const where = data.where || {};
         const limit = Math.max(1, Math.min(Number(data.limit || 500), 5000));
         const requestedMailbox = normalizeEmail(where.to || data.email || '');
+        // Reserved official company inboxes are not public disposable mailboxes.
+        // Never turn an unauthorized search into an apparently empty inbox.
+        if (requestedMailbox && service.isOfficialMessage({ to: requestedMailbox }) && !admin(req)) {
+            res.status(403);
+            return res.json({
+                done: false,
+                code: 'OFFICIAL_MAILBOX_PRIVATE',
+                error: 'This is a private official Egytag mailbox. Open it through the authorized administration inbox. VIP Temp Mails is for temporary email addresses.',
+            });
+        }
         const ownerToken = String(data.ownerToken || data.ownershipToken || '').trim();
         const requestedAccess = await authorizeProtectedMailbox(
             req,

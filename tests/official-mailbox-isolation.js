@@ -34,6 +34,8 @@ const app=fs.readFileSync('apps/emails/app.js','utf8');
   assert.equal((await svc.read('official-fixture',adminCtx)).message.subject,'Confidential enquiry');
   assert(app.includes('if (service.isOfficialMessage(event.message)) return;'),'SSE must not broadcast official messages');
   assert(app.includes('service.isOfficialMessage(raw) && !admin(req)'),'Legacy numeric message view must enforce official access');
+  assert(app.includes("code: 'OFFICIAL_MAILBOX_PRIVATE'"),'Reserved official mailbox needs a clear blocked result');
+  assert(app.includes('service.isOfficialMessage({ to: requestedMailbox }) && !admin(req)'),'Reserved addresses must remain admin-only');
   console.log('Official Egytag mailbox: guest list/read/status/export blocked, admin preserved, SSE and legacy checks PASS');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -436,6 +436,48 @@ function createGooglePlayBilling(options = {}) {
         return data;
     }
 
+    // Submit a full production release through the Google Play Edits API.
+    // A committed edit is still subject to Google Play review/managed publishing.
+    async function updateTrackCompleted(editId, options = {}) {
+        const id = String(editId || '').trim();
+        if (!id) throw billingError('EDIT_ID_REQUIRED', 'Google Play edit ID is required.', 400);
+
+        const track = String(options.track || 'production').trim();
+        const versionCode = String(options.versionCode || '').trim();
+        if (!versionCode) throw billingError('VERSION_CODE_REQUIRED', 'Google Play version code is required.', 400);
+
+        const release = {
+            name: String(options.name || ('Version ' + versionCode)).trim(),
+            versionCodes: [versionCode],
+            status: 'completed',
+        };
+        if (Array.isArray(options.releaseNotes) && options.releaseNotes.length) {
+            release.releaseNotes = options.releaseNotes
+                .filter((item) => item && item.language && item.text)
+                .map((item) => ({
+                    language: String(item.language),
+                    text: String(item.text),
+                }));
+        }
+
+        const url = editsBaseUrl() + '/' + encodeURIComponent(id) +
+            '/tracks/' + encodeURIComponent(track);
+        const response = await googleRequest(url, {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ track, releases: [release] }),
+        });
+        const data = await readJson(response);
+        if (!response.ok) {
+            throw billingError(
+                'GOOGLE_PLAY_TRACK_UPDATE_FAILED',
+                String(data?.error?.message || data.error || 'Google Play could not update the completed release.'),
+                response.status
+            );
+        }
+        return data;
+    }
+
     async function commitEdit(editId) {
         const id = String(editId || '').trim();
         if (!id) throw billingError('EDIT_ID_REQUIRED', 'Google Play edit ID is required.', 400);
@@ -571,6 +613,7 @@ function createGooglePlayBilling(options = {}) {
         uploadBundle,
         updateTrackDraft,
         updateTrackStaged,
+        updateTrackCompleted,
         validateEdit,
         commitEdit,
         deleteEdit,

@@ -84,6 +84,10 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
             if (release.status === 'inProgress') {
                 assert.strictEqual(release.userFraction, 0.05);
                 assert.deepStrictEqual(release.versionCodes, ['14']);
+            } else if (release.status === 'completed') {
+                assert.strictEqual(release.userFraction, undefined);
+                assert.deepStrictEqual(release.versionCodes, ['14']);
+                assert.strictEqual(release.releaseNotes[0].language, 'en-US');
             } else {
                 assert.strictEqual(release.status, 'draft');
                 assert.deepStrictEqual(release.versionCodes, ['14']);
@@ -199,6 +203,15 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
     });
     assert.strictEqual(stagedTrack.releases[0].status, 'inProgress');
     assert.strictEqual(stagedTrack.releases[0].userFraction, 0.05);
+
+    const completedTrack = await billing.updateTrackCompleted(edit.id, {
+        track: 'production',
+        versionCode: 14,
+        name: '5.2.2+14',
+        releaseNotes: [{ language: 'en-US', text: 'Release test' }],
+    });
+    assert.strictEqual(completedTrack.releases[0].status, 'completed');
+    assert.strictEqual(completedTrack.releases[0].userFraction, undefined);
 
     const validatedEdit = await billing.validateEdit(edit.id);
     assert.strictEqual(validatedEdit.id, 'edit-test');

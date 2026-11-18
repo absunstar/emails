@@ -311,7 +311,7 @@ function createEmailMcpService(options) {
 
         async mailboxStatuses(args, scope) {
             enforceAdminRate(scope, true);
-            return emailService.mailboxStatuses(args.addresses || [], { allowVip: true, maxAddresses: 100 });
+            return emailService.mailboxStatuses(args.addresses || [], { ...adminContext(scope), allowVip: true, maxAddresses: 100 });
         },
 
         async stats(args, scope) {
